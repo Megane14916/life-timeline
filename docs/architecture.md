@@ -137,14 +137,31 @@ life-timeline-data/
 
 以下のような構造化データを保持します。
 
+### Dimension / Master
+
 - devices
+- apps
+- places
+- categories
+
+### Fact / Record
+
 - app_sessions
-- desktop_sessions
 - location_points
 - place_visits
-- photos
-- manual_events
+- media_items
+- manual_records
+
+### Optional Detail / Aggregate
+
+- desktop_session_details
+- daily_app_stats
+- daily_device_stats
+- daily_location_stats
+- daily_media_stats
 - sync_state
+
+保存形式はTimeline専用にせず、各データを意味ごとのテーブルに分けます。Timeline、Statistics、Map、Photosなどの表示は、これらのデータから用途ごとに組み立てます。
 
 ### ファイルシステム
 

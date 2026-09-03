@@ -38,14 +38,17 @@ PC単体でライフログデータを保存・表示できるようにする。
 - SQLite
 - migration
 - FastAPI
+- 正規化データモデル
 - Timeline API
+- 基本的なStatistics API
 - React Timeline
+- 最小Dashboard
 - ダミーデータ投入
 - 日付切替
 
 完成条件:
 
-ダミーデータをPCのタイムラインで閲覧できる。
+同じダミーデータをTimelineと基本統計の両方から閲覧できる。
 
 ---
 
@@ -164,6 +167,7 @@ PCとAndroidの行動が同じTimeline上で表示される。
 内容:
 
 - Filter / Search
+- Statistics画面
 - Calendar
 - Device management
 - Backup

@@ -17,116 +17,65 @@ life-timelineでは以下を重視します。
 
 ## 2. データモデル
 
-### devices
+### 基本方針
+
+Timelineはlife-timelineの中心的な表示機能ですが、**DBにはTimeline Itemそのものを原本として保存しません**。
+
+保存層では、各データを意味に応じて正規化して保持します。
 
 ```text
-id
-name
-platform
-created_at
-last_seen_at
+Collectors
+   ↓
+Normalized Data
+   ├── app_sessions
+   ├── location_points
+   ├── place_visits
+   ├── media_items
+   └── manual_records
+          ↓
+Presentation / Analysis
+   ├── Timeline
+   ├── Statistics
+   ├── Map
+   ├── Photos
+   └── Search
 ```
 
-すべての記録に `device_id` を持たせ、将来的な複数スマホ・複数PCに対応できるようにします。
+これにより、同じ記録をTimeline以外の統計・地図・一覧・検索にも再利用できます。
 
-### app_sessions
+詳細なデータモデルは `data-model.md` に定義します。
 
-Androidのアプリ使用履歴。
+### Dimension / Master
+
+- `devices`: 端末情報
+- `apps`: Android / Windows共通のアプリ情報
+- `categories`: アプリ等の統計カテゴリ
+- `places`: 自宅・大学・駅など意味のある場所
+
+### Fact / Record
+
+- `app_sessions`: Android / Windows共通のアプリ利用セッション
+- `desktop_session_details`: PC固有のwindow title / URL等
+- `location_points`: 位置情報の生データ
+- `place_visits`: LocationPointから生成した滞在記録
+- `media_items`: 写真・動画の記録
+- `manual_records`: 手動で追加する記録
+
+### Aggregate / Cache
+
+統計表示の高速化が必要になった場合、以下のような再生成可能な集計テーブルを追加します。
+
+- `daily_app_stats`
+- `daily_device_stats`
+- `daily_location_stats`
+- `daily_media_stats`
 
 ```text
-id
-device_id
-package_name
-app_name
-started_at
-ended_at
-duration_seconds
-created_at
+Normalized Data = Source of Truth
+Aggregate Data  = Rebuildable Cache
 ```
 
-UsageStatsの生イベントをそのままUIへ表示せず、連続した利用をSessionとしてまとめます。
-
-### desktop_sessions
-
-ActivityWatchから取り込んだPC利用履歴。
-
-```text
-id
-device_id
-app
-window_title
-url
-started_at
-ended_at
-source_event_id
-created_at
-```
-
-### location_points
-
-位置情報の生データ。
-
-```text
-id
-device_id
-latitude
-longitude
-accuracy
-recorded_at
-created_at
-```
-
-### place_visits
-
-複数のLocationPointから生成する「滞在場所」。
-
-```text
-id
-device_id
-started_at
-ended_at
-center_latitude
-center_longitude
-radius
-label
-```
-
-LocationPointとPlaceVisitは分離します。
-
-### photos
-
-```text
-id
-device_id
-source
-source_id
-filename
-taken_at
-width
-height
-latitude
-longitude
-thumbnail_path
-created_at
-```
-
-原本写真は保持しません。
-
-### manual_events
-
-```text
-id
-device_id
-title
-note
-started_at
-ended_at
-latitude
-longitude
-created_at
-```
-
-自動記録だけでは残らない文脈を補完するための手動イベントです。
+集計ロジックを変更した場合は、正規化データから再生成できることを前提とします。
 
 ---
 
@@ -345,11 +294,11 @@ ActivityWatchの内部データ構造にlife-timeline本体を依存させず、
 
 ---
 
-## 9. Timeline API
+## 9. Presentation / Query API
 
 DBには万能Timelineテーブルを作らず、データ種類ごとに保存します。
 
-Timeline API呼び出し時に統合します。
+Timelineは中心機能ですが、DB上の正規化データから表示時に組み立てます。
 
 ```http
 GET /api/v1/timeline?date=2026-09-03
@@ -378,6 +327,8 @@ GET /api/v1/timeline?date=2026-09-03
 ```
 
 FrontendではDiscriminated Unionとして扱います。
+
+同じ原本データから、統計・地図・写真一覧などのAPIも構築します。Timelineは「時系列で見るためのView」であり、保存形式そのものではありません。
 
 ---
 
