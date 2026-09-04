@@ -185,5 +185,6 @@ Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
 | [Phase 0詳細計画](docs/detailed_plan/phase0-project-setup.md) | Project Setupのタスクと受け入れ条件 |
 | [Phase 1詳細計画](docs/detailed_plan/phase1-pc-core.md)       | PC Coreの実装計画                   |
 | [開発toolchain](docs/development/toolchains.md)               | 固定version、識別子、更新規則       |
+| [Phase 0受け入れ記録](docs/development/phase0-acceptance.md)  | clean checkout検証とPhase 1開始判定 |
 
 Androidの`applicationId`と`namespace`は`com.megane14916.lifetimeline`です。
