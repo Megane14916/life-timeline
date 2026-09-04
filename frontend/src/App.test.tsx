@@ -8,7 +8,7 @@ describe('App', () => {
     render(<App />)
 
     expect(
-      screen.getByRole('heading', { level: 1, name: 'life-timeline' }),
+      screen.getByRole('heading', { level: 1, name: 'required-check-failure-probe' }),
     ).toBeInTheDocument()
     expect(
       screen.getByText('開発基盤の初期化が完了しました。'),
