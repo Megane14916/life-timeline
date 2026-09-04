@@ -1,0 +1,65 @@
+# 開発toolchainとプロジェクト識別子
+
+## 1. この文書の役割
+
+この文書は、Phase 0以降の開発とCIで使うtoolchainの基準を定める。基準日は2026年9月4日とし、後続Issueではここに記載した値を設定ファイルへ反映する。
+
+バージョンを更新するときは、互換性表とサポート状況を確認し、この文書、ルートのversion指定、lock file、CI設定を同じPull Requestで更新する。
+
+## 2. 採用バージョン
+
+| 対象 | 採用値 | repositoryでの指定場所 | 選定理由 |
+| --- | --- | --- | --- |
+| Python | `3.13.15` | `.python-version` | bugfixサポート中の3.13系を使い、ライブラリ互換性と保守期間を優先する |
+| uv | `0.12.9` | この文書。P0-05でCI actionにも指定する | CIとローカルで同じresolverを使うため、minor指定ではなく完全なversionを固定する |
+| Node.js | `24.20.0` | `.nvmrc` | production向けのLTS系列を完全なversionで固定する |
+| npm | Node.js同梱版 | P0-03で`package.json#packageManager`と`package-lock.json`に固定する | frontend生成時に実際の同梱versionを記録し、lock file形式とのずれを防ぐ |
+| JDK | `17` | P0-04でGradle toolchainに指定する | Android Gradle Plugin 9.3の実行要件に合わせる |
+| Android Gradle Plugin | `9.3.0` | P0-04でversion catalogに指定する | stable releaseを使い、GradleとJDKの組み合わせを公式互換性表に合わせる |
+| Gradle | `9.5.0` | P0-04でGradle Wrapperに指定する | Android Gradle Plugin 9.3の必須versionに合わせる |
+| Kotlin | `2.4.10` | P0-04でversion catalogに指定する | 基準日時点のstable releaseを使う |
+| Android compile SDK | API `36` | P0-04でAndroid moduleに指定する | Android 16のAPIでcompileし、現在のGoogle Play target要件と揃える |
+| Android target SDK | API `36` | P0-04でAndroid moduleに指定する | 2026年8月31日以降の新規アプリ・更新のGoogle Play要件に合わせる |
+| Android min SDK | API `26` | P0-04でAndroid moduleに指定する | 個人利用の初期版ではAndroid 8.0以降を対象にし、バックグラウンド実行制約が導入された世代を下限にする |
+
+Pythonのpatch version、Node.jsのLTS version、uvのversionは更新頻度が高い。Issue開始時に更新を必要とする理由がなければ、この表の値をそのまま使う。後続Issueの途中で暗黙に最新版へ変更しない。
+
+## 3. Androidアプリの識別子
+
+Androidプロジェクトでは次の値を使う。
+
+| 項目 | 値 |
+| --- | --- |
+| `applicationId` | `com.megane14916.lifetimeline` |
+| `namespace` | `com.megane14916.lifetimeline` |
+| 初期package | `com.megane14916.lifetimeline` |
+
+`applicationId`はインストール済みアプリ、権限設定、署名済み成果物を識別する永続値として扱う。公開後の変更は別アプリとして扱われるため、表示名やrepository名の変更に追随させない。実装上のpackageを分割しても、`applicationId`は維持する。
+
+## 4. version固定の運用
+
+- Pythonはuvがルートの`.python-version`を読む。backendの依存関係はP0-02で`pyproject.toml`と`uv.lock`へ記録し、`uv.lock`をGit管理する。
+- Node.jsはversion managerがルートの`.nvmrc`を読む。frontendの依存関係はP0-03で`package.json`と`package-lock.json`へ記録し、両方をGit管理する。
+- AndroidはP0-04でJDK toolchain、version catalog、Gradle Wrapperを設定し、Wrapper一式をGit管理する。開発者個人のSDKパスを含む`local.properties`はGit管理しない。
+- P0-05のGitHub ActionsはPython、uv、Node.js、JDKのversionをこの文書と同じ値で明示する。
+
+## 5. repository共通規約
+
+- text fileはUTF-8、原則LF、末尾改行ありとする。Windows batch fileだけCRLFとする。
+- Pythonは4 spaces、TypeScript、JSON、YAML、Markdown、Kotlin、XML、propertiesは2 spacesとする。
+- Markdownでは明示的な改行に使う行末spacesを許可する。それ以外のtext fileでは行末spacesを削除する。
+- `.env`、秘密鍵、Android署名鍵、ローカルDB、収集データ、build成果物、IDE固有ファイルはGit管理しない。
+- `.env.example`、lock file、Gradle Wrapperは再現可能な開発・CIに必要なためGit管理する。
+
+規則の機械可読な定義は、repositoryルートの`.editorconfig`、`.gitattributes`、`.gitignore`を正とする。
+
+## 6. 一次情報
+
+- [Python release status](https://www.python.org/downloads/)
+- [uv installation and version pinning](https://docs.astral.sh/uv/getting-started/installation/)
+- [uv projects and lock file](https://docs.astral.sh/uv/concepts/projects/layout/)
+- [Node.js releases](https://nodejs.org/en/about/previous-releases)
+- [Android Gradle Plugin 9.3 release notes](https://developer.android.com/build/releases/agp-9-3-0-release-notes)
+- [Android Java versions and Gradle JDK](https://developer.android.com/build/jdks)
+- [Google Play target API requirements](https://developer.android.com/google/play/requirements/target-sdk)
+- [Kotlin releases](https://kotlinlang.org/docs/releases.html)
