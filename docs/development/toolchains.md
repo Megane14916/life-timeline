@@ -13,11 +13,12 @@
 | Python | `3.13.15` | `.python-version` | bugfixサポート中の3.13系を使い、ライブラリ互換性と保守期間を優先する |
 | uv | `0.12.9` | この文書。P0-05でCI actionにも指定する | CIとローカルで同じresolverを使うため、minor指定ではなく完全なversionを固定する |
 | Node.js | `24.20.0` | `.nvmrc` | production向けのLTS系列を完全なversionで固定する |
-| npm | Node.js同梱版 | P0-03で`package.json#packageManager`と`package-lock.json`に固定する | frontend生成時に実際の同梱versionを記録し、lock file形式とのずれを防ぐ |
+| npm | `11.19.0` | `frontend/package.json#packageManager`、`frontend/package-lock.json` | Node.js 24.20.0同梱版を使い、lock file形式とのずれを防ぐ |
 | JDK | `17` | P0-04でGradle toolchainに指定する | Android Gradle Plugin 9.3の実行要件に合わせる |
 | Android Gradle Plugin | `9.3.0` | P0-04でversion catalogに指定する | stable releaseを使い、GradleとJDKの組み合わせを公式互換性表に合わせる |
 | Gradle | `9.5.0` | P0-04でGradle Wrapperに指定する | Android Gradle Plugin 9.3の必須versionに合わせる |
 | Kotlin | `2.4.10` | P0-04でversion catalogに指定する | 基準日時点のstable releaseを使う |
+| Compose BOM | `2026.03.00` | `android/gradle/libs.versions.toml` | compile SDK 36をサポートするCompose 1.10.5系列を使う |
 | Android compile SDK | API `36` | P0-04でAndroid moduleに指定する | Android 16のAPIでcompileし、現在のGoogle Play target要件と揃える |
 | Android target SDK | API `36` | P0-04でAndroid moduleに指定する | 2026年8月31日以降の新規アプリ・更新のGoogle Play要件に合わせる |
 | Android min SDK | API `26` | P0-04でAndroid moduleに指定する | 個人利用の初期版ではAndroid 8.0以降を対象にし、バックグラウンド実行制約が導入された世代を下限にする |

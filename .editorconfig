@@ -13,6 +13,9 @@ indent_size = 4
 [*.{js,jsx,ts,tsx,json,jsonc,yml,yaml,md,kt,kts,xml,properties}]
 indent_size = 2
 
+[*.{kt,kts}]
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
 [*.md]
 trim_trailing_whitespace = false
 
