@@ -71,7 +71,8 @@ def _assert_migrated(engine: Engine) -> None:
 
     # Keep the check explicit so a database migrated by an unknown branch is not
     # silently treated as compatible with this fixture.
-    script_directory = ScriptDirectory("migrations")
+    migrations_path = Path(__file__).resolve().parents[2] / "migrations"
+    script_directory = ScriptDirectory(str(migrations_path))
     if current_revision not in script_directory.get_heads():
         raise SeedError(
             f"The database revision '{current_revision}' is not the current migration head. "
