@@ -48,6 +48,12 @@ jobs:
       - name: Test
         run: uv run pytest
 
+      - name: Check migration heads
+        run: uv run alembic heads
+
+      - name: Apply migrations
+        run: uv run alembic upgrade head
+
       - name: Run HTTP smoke test
         run: uv run python scripts/smoke.py
 
@@ -89,6 +95,12 @@ jobs:
 
       - name: Test
         run: uv run pytest
+
+      - name: Check migration heads
+        run: uv run alembic heads
+
+      - name: Apply migrations
+        run: uv run alembic upgrade head
 
       - name: Run HTTP smoke test
         run: ./scripts/smoke.ps1
