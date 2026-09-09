@@ -10,3 +10,20 @@ class InvalidRequestError(ValueError):
         super().__init__(message)
         self.message = message
         self.field = field
+
+
+class SyncConflictError(ValueError):
+    """Raised when a sync request conflicts with persisted normalized data."""
+
+    def __init__(self, message: str, *, field: str | None = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.field = field
+
+
+class TemporarilyUnavailableError(RuntimeError):
+    """Raised when SQLite cannot accept a sync transaction before its timeout."""
+
+    def __init__(self, message: str = "The PC is temporarily unavailable.") -> None:
+        super().__init__(message)
+        self.message = message

@@ -68,6 +68,8 @@ def create_engine_for_settings(settings: Settings) -> Engine:
         cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
         try:
             cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute(f"PRAGMA busy_timeout={int(settings.sqlite_timeout_seconds * 1000)}")
+            cursor.execute("PRAGMA journal_mode=WAL")
         finally:
             cursor.close()
 

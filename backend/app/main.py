@@ -10,8 +10,13 @@ from pydantic import BaseModel
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.api.errors import InvalidRequestError
+from app.api.errors import (
+    InvalidRequestError,
+    SyncConflictError,
+    TemporarilyUnavailableError,
+)
 from app.api.statistics import router as statistics_router
+from app.api.sync import router as sync_router
 from app.api.timeline import router as timeline_router
 from app.db import create_session_factory
 
@@ -22,12 +27,21 @@ class HealthResponse(BaseModel):
     status: Literal["ok"]
 
 
-def _error_response(code: str, message: str, field: str | None = None) -> JSONResponse:
-    detail = {"code": code, "message": message}
-    if field is not None:
-        detail["field"] = field
+def _error_response(
+    code: str,
+    message: str,
+    field: str | None = None,
+    *,
+    status_code: int | None = None,
+) -> JSONResponse:
+    detail: dict[str, str | None] = {"code": code, "message": message}
+    detail["field"] = field
     return JSONResponse(
-        status_code=422 if code == "invalid_request" else 500,
+        status_code=status_code
+        if status_code is not None
+        else 422
+        if code == "invalid_request"
+        else 500,
         content={"error": detail},
     )
 
@@ -59,6 +73,16 @@ def create_app(
     async def invalid_request_handler(_request: Request, exc: InvalidRequestError) -> JSONResponse:
         return _error_response("invalid_request", exc.message, exc.field)
 
+    @application.exception_handler(SyncConflictError)
+    async def sync_conflict_handler(_request: Request, exc: SyncConflictError) -> JSONResponse:
+        return _error_response("sync_conflict", exc.message, exc.field, status_code=409)
+
+    @application.exception_handler(TemporarilyUnavailableError)
+    async def temporarily_unavailable_handler(
+        _request: Request, exc: TemporarilyUnavailableError
+    ) -> JSONResponse:
+        return _error_response("temporarily_unavailable", exc.message, status_code=503)
+
     @application.exception_handler(RequestValidationError)
     async def request_validation_handler(
         _request: Request, exc: RequestValidationError
@@ -73,6 +97,7 @@ def create_app(
 
     application.include_router(timeline_router)
     application.include_router(statistics_router)
+    application.include_router(sync_router)
 
     @application.get("/api/v1/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
