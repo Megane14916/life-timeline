@@ -3,8 +3,27 @@ import { useEffect, useState } from 'react'
 import { ApiClientError, getAppStatistics, getTimeline } from '../../api/client'
 import type { StatisticsResponse, TimelineResponse } from '../../api/types'
 import { Dashboard } from './Dashboard'
-import { nextCalendarDate, readTimelineLocation } from './date'
+import {
+  readTimelineLocation,
+  shiftCalendarDate,
+  todayInTimezone,
+  type TimelineLocation,
+} from './date'
+import { DateNavigator } from './DateNavigator'
+import { nextCalendarDate } from './date'
 import { TimelineItem } from './TimelineItem'
+
+interface PanelState<T> {
+  key: string
+  data: T | null
+  error: string | null
+}
+
+const initialPanelState: PanelState<never> = {
+  key: '',
+  data: null,
+  error: null,
+}
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiClientError) {
@@ -13,63 +32,157 @@ function errorMessage(error: unknown): string {
   return '予期しないエラーが発生しました。'
 }
 
+function locationKey(location: TimelineLocation): string {
+  return `${location.date}|${location.timezone}`
+}
+
+function navigateTo(location: TimelineLocation, date: string): void {
+  const params = new URLSearchParams({
+    date,
+    timezone: location.timezone,
+  })
+  window.history.pushState({}, '', `/timeline?${params.toString()}`)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
 export function TimelinePage() {
-  const { date, timezone } = readTimelineLocation()
-  const [timeline, setTimeline] = useState<TimelineResponse | null>(null)
-  const [timelineError, setTimelineError] = useState<string | null>(null)
-  const [timelineLoading, setTimelineLoading] = useState(true)
+  const [location, setLocation] = useState<TimelineLocation>(() =>
+    readTimelineLocation(),
+  )
+  const [timelineState, setTimelineState] =
+    useState<PanelState<TimelineResponse>>(initialPanelState)
+  const [statisticsState, setStatisticsState] =
+    useState<PanelState<StatisticsResponse>>(initialPanelState)
   const [timelineRetry, setTimelineRetry] = useState(0)
-  const [statistics, setStatistics] = useState<StatisticsResponse | null>(null)
-  const [statisticsError, setStatisticsError] = useState<string | null>(null)
-  const [statisticsLoading, setStatisticsLoading] = useState(true)
   const [statisticsRetry, setStatisticsRetry] = useState(0)
-  const nextDate = nextCalendarDate(date)
+  const currentKey = locationKey(location)
+  const timelineRequestKey = `${currentKey}|${timelineRetry}`
+  const statisticsRequestKey = `${currentKey}|${statisticsRetry}`
+  const nextDate = nextCalendarDate(location.date)
+  const locationIsValid = location.isValid
+
+  useEffect(() => {
+    const handlePopState = () => setLocation(readTimelineLocation())
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  useEffect(() => {
+    if (!location.isValid) return
+    const params = new URLSearchParams(window.location.search)
+    if (
+      params.get('date') === location.date &&
+      params.get('timezone') === location.timezone &&
+      window.location.pathname === '/timeline'
+    ) {
+      return
+    }
+    const normalizedParams = new URLSearchParams({
+      date: location.date,
+      timezone: location.timezone,
+    })
+    window.history.replaceState(
+      {},
+      '',
+      `/timeline?${normalizedParams.toString()}`,
+    )
+  }, [location.date, location.isValid, location.timezone])
+
+  useEffect(() => {
+    if (!locationIsValid) return
+
+    const controller = new AbortController()
+    void getTimeline(location.date, location.timezone, controller.signal)
+      .then((response) => {
+        if (controller.signal.aborted) return
+        setTimelineState({
+          key: timelineRequestKey,
+          data: response,
+          error: null,
+        })
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        setTimelineState({
+          key: timelineRequestKey,
+          data: null,
+          error: errorMessage(error),
+        })
+      })
+
+    return () => controller.abort()
+  }, [location.date, location.timezone, locationIsValid, timelineRequestKey])
+
+  useEffect(() => {
+    if (!locationIsValid) return
+
+    const controller = new AbortController()
+    void getAppStatistics(
+      location.date,
+      nextDate,
+      location.timezone,
+      controller.signal,
+    )
+      .then((response) => {
+        if (controller.signal.aborted) return
+        setStatisticsState({
+          key: statisticsRequestKey,
+          data: response,
+          error: null,
+        })
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        setStatisticsState({
+          key: statisticsRequestKey,
+          data: null,
+          error: errorMessage(error),
+        })
+      })
+
+    return () => controller.abort()
+  }, [
+    location.date,
+    location.timezone,
+    locationIsValid,
+    nextDate,
+    statisticsRequestKey,
+  ])
+
+  const timelineMatches =
+    locationIsValid && timelineState.key === timelineRequestKey
+  const statisticsMatches =
+    locationIsValid && statisticsState.key === statisticsRequestKey
+  const timeline = timelineMatches ? timelineState.data : null
+  const statistics = statisticsMatches ? statisticsState.data : null
+  const timelineError = timelineMatches ? timelineState.error : null
+  const statisticsError = statisticsMatches ? statisticsState.error : null
+  const timelineLoading = locationIsValid && !timelineMatches
+  const statisticsLoading = locationIsValid && !statisticsMatches
+
+  const changeDate = (value: string) => {
+    const date =
+      value === 'previous'
+        ? shiftCalendarDate(location.date, -1)
+        : value === 'next'
+          ? shiftCalendarDate(location.date, 1)
+          : value
+    if (date !== null && date !== location.date) {
+      navigateTo(location, date)
+    }
+  }
+
+  const goToToday = () => {
+    navigateTo(location, todayInTimezone(location.timezone))
+  }
 
   const retryTimeline = () => {
-    setTimeline(null)
-    setTimelineError(null)
-    setTimelineLoading(true)
     setTimelineRetry((value) => value + 1)
   }
 
   const retryStatistics = () => {
-    setStatistics(null)
-    setStatisticsError(null)
-    setStatisticsLoading(true)
     setStatisticsRetry((value) => value + 1)
   }
-
-  useEffect(() => {
-    const controller = new AbortController()
-    void getTimeline(date, timezone, controller.signal)
-      .then((response) => {
-        setTimeline(response)
-        setTimelineLoading(false)
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return
-        setTimelineError(errorMessage(error))
-        setTimelineLoading(false)
-      })
-
-    return () => controller.abort()
-  }, [date, timezone, timelineRetry])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    void getAppStatistics(date, nextDate, timezone, controller.signal)
-      .then((response) => {
-        setStatistics(response)
-        setStatisticsLoading(false)
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return
-        setStatisticsError(errorMessage(error))
-        setStatisticsLoading(false)
-      })
-
-    return () => controller.abort()
-  }, [date, nextDate, timezone, statisticsRetry])
 
   return (
     <main className="app-shell">
@@ -81,11 +194,16 @@ export function TimelinePage() {
             <p className="page-description">記録された一日の流れと利用状況</p>
           </div>
           <div className="date-context">
-            <span className="date-label">表示日</span>
-            <time dateTime={date}>{date}</time>
-            <span className="timezone-label">{timezone}</span>
+            <span className="date-label">選択中のタイムゾーン</span>
+            <span className="timezone-label">{location.timezone}</span>
           </div>
         </header>
+
+        <DateNavigator
+          location={location}
+          onDateChange={changeDate}
+          onToday={goToToday}
+        />
 
         <Dashboard
           data={statistics}
@@ -108,6 +226,9 @@ export function TimelinePage() {
             )}
           </div>
 
+          {!locationIsValid && (
+            <p className="panel-status">URLを修正すると記録を読み込めます。</p>
+          )}
           {timelineLoading && (
             <p className="panel-status">Timelineを読み込んでいます…</p>
           )}
