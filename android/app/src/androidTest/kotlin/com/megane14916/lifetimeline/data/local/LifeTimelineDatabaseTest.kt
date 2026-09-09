@@ -4,8 +4,12 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.megane14916.lifetimeline.domain.UsageEventKind
+import com.megane14916.lifetimeline.domain.UsageEventRecord
 import com.megane14916.lifetimeline.domain.generateUlid
 import com.megane14916.lifetimeline.repository.CollectionInput
+import com.megane14916.lifetimeline.repository.CollectionRepository
+import com.megane14916.lifetimeline.repository.CollectionRequest
 import com.megane14916.lifetimeline.repository.LocalDataRepository
 import com.megane14916.lifetimeline.repository.SourceKeyConflictException
 import kotlinx.coroutines.runBlocking
@@ -73,6 +77,62 @@ class LifeTimelineDatabaseTest {
 
       assertEquals(1, updated)
       assertEquals(listOf(sessions[1]), database.androidAppSessionDao().getPending())
+    }
+
+  @Test
+  fun collectionRepositoryReusesSessionIdAndPersistsOpenActivityAcrossCollections() =
+    runBlocking {
+      val generatedIds =
+        listOf(
+          generateUlid(1_780_000_003_000),
+          generateUlid(1_780_000_003_001),
+        ).iterator()
+      val repository =
+        CollectionRepository(
+          database = database,
+          idGenerator = { generatedIds.next() },
+        )
+      val deviceId = generateUlid(1_780_000_003_100)
+      val firstRequest =
+        CollectionRequest(
+          deviceId = deviceId,
+          events = listOf(usageEvent(1_780_000_003_200, UsageEventKind.ACTIVITY_RESUMED)),
+          cursorAtMs = 1_780_000_003_200,
+          cursorKey = "cursor-resume",
+          collectedAtMs = 1_780_000_003_400,
+        )
+      val secondRequest =
+        CollectionRequest(
+          deviceId = deviceId,
+          events = listOf(usageEvent(1_780_000_003_300, UsageEventKind.ACTIVITY_PAUSED)),
+          cursorAtMs = 1_780_000_003_300,
+          cursorKey = "cursor-pause",
+          collectedAtMs = 1_780_000_003_500,
+        )
+      val replayRequest =
+        secondRequest.copy(
+          events =
+            listOf(
+              usageEvent(1_780_000_003_200, UsageEventKind.ACTIVITY_RESUMED),
+              usageEvent(1_780_000_003_300, UsageEventKind.ACTIVITY_PAUSED),
+            ),
+        )
+
+      val first = repository.collectAndSave(firstRequest)
+      assertEquals(0, first.insertedSessions)
+      assertEquals(1, first.openActivities.size)
+      assertEquals(0, repository.countPending())
+
+      val second = repository.collectAndSave(secondRequest)
+      val replay = repository.collectAndSave(replayRequest)
+
+      assertEquals(1, second.insertedSessions)
+      assertEquals(0, second.reusedSessions)
+      assertEquals(0, replay.insertedSessions)
+      assertEquals(1, replay.reusedSessions)
+      assertEquals(second.sessions.single().id, replay.sessions.single().id)
+      assertEquals(1, repository.countPending())
+      assertEquals(null, database.openActivityDao().getAll().singleOrNull())
     }
 
   @Test
@@ -152,4 +212,16 @@ class LifeTimelineDatabaseTest {
       syncStatus = "pending",
       collectedAtMs = 1_780_000_000_500,
     )
+
+  private fun usageEvent(
+    timestampMs: Long,
+    kind: UsageEventKind,
+  ) = UsageEventRecord(
+    timestampMs = timestampMs,
+    packageName = "com.example.browser",
+    className = "MainActivity",
+    displayName = "Example Browser",
+    kind = kind,
+    eventKey = "$timestampMs|browser|${kind.ordinal}",
+  )
 }
