@@ -6,6 +6,7 @@ dependencies = [
     "alembic==1.18.4",
     "fastapi==0.141.1",
     "sqlalchemy==2.0.44",
+    "tzdata==2025.2",
     "uvicorn>=0.52.4",
 ]
 
