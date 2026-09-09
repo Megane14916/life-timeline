@@ -16,7 +16,10 @@ data class RawUsageEvent(
 )
 
 fun interface UsageEventsSource {
-  fun queryEvents(beginAtMs: Long, endAtMs: Long): List<RawUsageEvent>?
+  fun queryEvents(
+    beginAtMs: Long,
+    endAtMs: Long,
+  ): List<RawUsageEvent>?
 }
 
 fun interface PackageLabelResolver {
@@ -26,7 +29,10 @@ fun interface PackageLabelResolver {
 class AndroidUsageEventsSource(
   private val usageStatsManager: UsageStatsManager,
 ) : UsageEventsSource {
-  override fun queryEvents(beginAtMs: Long, endAtMs: Long): List<RawUsageEvent>? {
+  override fun queryEvents(
+    beginAtMs: Long,
+    endAtMs: Long,
+  ): List<RawUsageEvent>? {
     val usageEvents = usageStatsManager.queryEvents(beginAtMs, endAtMs) ?: return null
     val event = UsageEvents.Event()
     val records = mutableListOf<RawUsageEvent>()
@@ -46,8 +52,7 @@ class AndroidUsageEventsSource(
   }
 
   companion object {
-    fun from(context: Context): AndroidUsageEventsSource =
-      AndroidUsageEventsSource(context.getSystemService(UsageStatsManager::class.java))
+    fun from(context: Context): AndroidUsageEventsSource = AndroidUsageEventsSource(context.getSystemService(UsageStatsManager::class.java))
   }
 }
 
@@ -75,8 +80,12 @@ class UsageEventMapper(
     val kind =
       if (apiLevel >= 29) {
         when (rawEvent.eventType) {
-          UsageEvents.Event.ACTIVITY_RESUMED -> UsageEventKind.ACTIVITY_RESUMED
-          UsageEvents.Event.ACTIVITY_PAUSED -> UsageEventKind.ACTIVITY_PAUSED
+          UsageEvents.Event.ACTIVITY_RESUMED -> {
+            UsageEventKind.ACTIVITY_RESUMED
+          }
+          UsageEvents.Event.ACTIVITY_PAUSED -> {
+            UsageEventKind.ACTIVITY_PAUSED
+          }
           UsageEvents.Event.SCREEN_NON_INTERACTIVE ->
             if (apiLevel >= 28) UsageEventKind.SCREEN_NON_INTERACTIVE else null
           UsageEvents.Event.DEVICE_SHUTDOWN -> UsageEventKind.DEVICE_SHUTDOWN
