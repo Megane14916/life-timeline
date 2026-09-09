@@ -31,12 +31,12 @@ import com.megane14916.lifetimeline.collector.AndroidUsageEventsSource
 import com.megane14916.lifetimeline.collector.UsageAccessChecker
 import com.megane14916.lifetimeline.collector.UsageEventMapper
 import com.megane14916.lifetimeline.collector.UsageEventsCollector
-import com.megane14916.lifetimeline.data.local.LocalDataRepository
 import com.megane14916.lifetimeline.data.remote.SyncApiFactory
 import com.megane14916.lifetimeline.data.remote.SyncAppDto
 import com.megane14916.lifetimeline.data.remote.SyncDeviceDto
 import com.megane14916.lifetimeline.repository.CollectionCoordinator
 import com.megane14916.lifetimeline.repository.CollectionRepository
+import com.megane14916.lifetimeline.repository.LocalDataRepository
 import com.megane14916.lifetimeline.repository.SyncRepository
 import retrofit2.Retrofit
 

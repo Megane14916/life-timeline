@@ -48,73 +48,74 @@ class SyncRepository(
   private val nowMs: () -> Long = { System.currentTimeMillis() },
   private val mutex: Mutex = Mutex(),
 ) {
-  suspend fun syncAll(): SyncResult =
-    mutex.withLock {
-      var batchesSucceeded = 0
-      var sessionsSynced = 0
+  suspend fun syncAll(): SyncResult = mutex.withLock { syncAllLocked() }
 
-      while (true) {
-        val pending = pendingStore.getPendingSessions()
-        if (pending.isEmpty()) {
-          return@withLock SyncResult(
-            status = if (batchesSucceeded == 0) SyncRunStatus.NO_PENDING else SyncRunStatus.SUCCESS,
-            batchesSucceeded = batchesSucceeded,
-            sessionsSynced = sessionsSynced,
-            pendingCount = 0,
-          )
-        }
+  private suspend fun syncAllLocked(): SyncResult {
+    var batchesSucceeded = 0
+    var sessionsSynced = 0
 
-        val request =
-          try {
-            buildRequest(pending)
-          } catch (failure: SyncRepositoryException) {
-            return@withLock failureResult(batchesSucceeded, sessionsSynced, failure.failure)
-          }
-        val response =
-          try {
-            syncApi.syncAppSessions(request)
-          } catch (_: SSLException) {
-            return@withLock failureResult(
-              batchesSucceeded,
-              sessionsSynced,
-              SyncFailure(SyncFailureKind.NETWORK, NETWORK_ERROR_MESSAGE),
-            )
-          } catch (_: IOException) {
-            return@withLock failureResult(
-              batchesSucceeded,
-              sessionsSynced,
-              SyncFailure(SyncFailureKind.NETWORK, NETWORK_ERROR_MESSAGE),
-            )
-          } catch (_: RuntimeException) {
-            return@withLock failureResult(
-              batchesSucceeded,
-              sessionsSynced,
-              SyncFailure(SyncFailureKind.NETWORK, NETWORK_ERROR_MESSAGE),
-            )
-          }
-
-        val accepted =
-          try {
-            validateResponse(response, request.sessions.map { it.id }.toSet())
-          } catch (failure: SyncRepositoryException) {
-            return@withLock failureResult(batchesSucceeded, sessionsSynced, failure.failure)
-          } ?: return@withLock failureResult(
-            batchesSucceeded,
-            sessionsSynced,
-            SyncFailure(SyncFailureKind.PROTOCOL, PROTOCOL_ERROR_MESSAGE),
-          )
-        val updated = pendingStore.markAcceptedAsSynced(accepted, nowMs())
-        if (updated != accepted.size) {
-          return@withLock failureResult(
-            batchesSucceeded,
-            sessionsSynced,
-            SyncFailure(SyncFailureKind.PROTOCOL, PROTOCOL_ERROR_MESSAGE),
-          )
-        }
-        batchesSucceeded += 1
-        sessionsSynced += accepted.size
+    while (true) {
+      val pending = pendingStore.getPendingSessions()
+      if (pending.isEmpty()) {
+        return SyncResult(
+          status = if (batchesSucceeded == 0) SyncRunStatus.NO_PENDING else SyncRunStatus.SUCCESS,
+          batchesSucceeded = batchesSucceeded,
+          sessionsSynced = sessionsSynced,
+          pendingCount = 0,
+        )
       }
+
+      val request =
+        try {
+          buildRequest(pending)
+        } catch (failure: SyncRepositoryException) {
+          return failureResult(batchesSucceeded, sessionsSynced, failure.failure)
+        }
+      val response =
+        try {
+          syncApi.syncAppSessions(request)
+        } catch (_: SSLException) {
+          return failureResult(
+            batchesSucceeded,
+            sessionsSynced,
+            SyncFailure(SyncFailureKind.NETWORK, NETWORK_ERROR_MESSAGE),
+          )
+        } catch (_: IOException) {
+          return failureResult(
+            batchesSucceeded,
+            sessionsSynced,
+            SyncFailure(SyncFailureKind.NETWORK, NETWORK_ERROR_MESSAGE),
+          )
+        } catch (_: RuntimeException) {
+          return failureResult(
+            batchesSucceeded,
+            sessionsSynced,
+            SyncFailure(SyncFailureKind.NETWORK, NETWORK_ERROR_MESSAGE),
+          )
+        }
+
+      val accepted =
+        try {
+          validateResponse(response, request.sessions.map { it.id }.toSet())
+        } catch (failure: SyncRepositoryException) {
+          return failureResult(batchesSucceeded, sessionsSynced, failure.failure)
+        } ?: return failureResult(
+          batchesSucceeded,
+          sessionsSynced,
+          SyncFailure(SyncFailureKind.PROTOCOL, PROTOCOL_ERROR_MESSAGE),
+        )
+      val updated = pendingStore.markAcceptedAsSynced(accepted, nowMs())
+      if (updated != accepted.size) {
+        return failureResult(
+          batchesSucceeded,
+          sessionsSynced,
+          SyncFailure(SyncFailureKind.PROTOCOL, PROTOCOL_ERROR_MESSAGE),
+        )
+      }
+      batchesSucceeded += 1
+      sessionsSynced += accepted.size
     }
+  }
 
   private suspend fun buildRequest(sessions: List<AndroidAppSessionEntity>): SyncAppSessionsRequest {
     val appIds = sessions.map { it.appId }.toSet()
