@@ -577,6 +577,21 @@ E2Eは毎PRで重い場合、
 
 # 14. Git運用
 
+## 14.1 Issue・Pull Request・コミット・ブランチの命名規則
+
+命名は、GitHub上で読むIssue / Pull Requestと、Git履歴・checkoutで扱うコミット / ブランチを分けて考える。IssueとPull Requestの内容は日本語、コミットメッセージとブランチ名は英語にする。
+
+| 対象 | Issueに紐づく変更 | Issueに紐づかない変更 |
+| --- | --- | --- |
+| Issueタイトル | `[P2-03] Android AppSession同期APIを実装する` | 原則として先にIssueを作成する。緊急の小変更などでIssueを作らない場合は作成理由をPRへ記録する |
+| Pull Requestタイトル | `[P2-03] Android AppSession同期APIを実装する` | `feat: 管理画面の表示を改善する` のように `feat:` / `fix:` / `docs:` 等を文頭へ付ける |
+| コミットメッセージ | `feat: add Android app session sync API` | `feat: add ...`、`fix: correct ...`、`docs: update ...` 等のConventional Commits形式にする |
+| ブランチ名 | `feature/32-backend-sync-api` | `feature/refresh-api-docs`、`fix/duplicate-sync`、`docs/update-sync-design` 等、英語のtypeとkebab-caseにする |
+
+Issue / Pull Requestのタイトルでは、`P2-XX`のPhase識別子を先頭に置き、対応内容を日本語で具体的に書く。Pull Request本文には対応Issueを `Closes #番号` または `Fixes #番号` で記載する。コミットとブランチでは、Issue番号を含める場合もtypeと説明を英語にする。
+
+`feat`、`fix`、`docs`、`test`、`refactor`、`chore`を変更の主目的に応じて使い分ける。Issueへ紐づかない変更は、Pull Requestタイトルとコミットメッセージの文頭にこのtypeを必ず付ける。
+
 ## 基本方針
 
 **すべての実装タスクは、コードを書き始める前にGitHub Issueを作成します。**
