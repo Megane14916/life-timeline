@@ -15,7 +15,9 @@ class UsageAccessChecker(
 ) {
   fun isUsageAccessGranted(): Boolean = stateProvider.isGranted()
 
-  fun usageAccessSettingsIntent(): Intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+  fun usageAccessSettingsAction(): String = Settings.ACTION_USAGE_ACCESS_SETTINGS
+
+  fun usageAccessSettingsIntent(): Intent = Intent(usageAccessSettingsAction())
 
   companion object {
     fun from(context: Context): UsageAccessChecker =

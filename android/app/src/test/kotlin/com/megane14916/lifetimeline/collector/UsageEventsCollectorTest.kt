@@ -48,7 +48,10 @@ class UsageEventsCollectorTest {
       UsageEventKind.DEVICE_STARTUP,
       mapper.map(rawEvent(500, UsageEvents.Event.DEVICE_STARTUP))?.kind,
     )
-    assertEquals(null, mapper.map(rawEvent(600, UsageEvents.Event.MOVE_TO_FOREGROUND)))
+    assertEquals(
+      UsageEventKind.ACTIVITY_RESUMED,
+      mapper.map(rawEvent(600, UsageEvents.Event.MOVE_TO_FOREGROUND))?.kind,
+    )
   }
 
   @Test
@@ -173,7 +176,7 @@ class UsageAccessCheckerTest {
     assertFalse(checker.isUsageAccessGranted())
     assertEquals(
       "android.settings.USAGE_ACCESS_SETTINGS",
-      checker.usageAccessSettingsIntent().action,
+      checker.usageAccessSettingsAction(),
     )
     assertTrue(UsageAccessChecker { true }.isUsageAccessGranted())
   }
