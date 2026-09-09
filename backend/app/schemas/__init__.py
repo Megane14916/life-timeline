@@ -10,6 +10,13 @@ from app.schemas.api import (
     TimelineItem,
     TimelineResponse,
 )
+from app.schemas.sync import (
+    SyncApp,
+    SyncAppSession,
+    SyncAppSessionsRequest,
+    SyncAppSessionsResponse,
+    SyncDevice,
+)
 
 __all__ = [
     "ErrorDetail",
@@ -17,6 +24,11 @@ __all__ = [
     "StatisticsAppItem",
     "StatisticsResponse",
     "StatisticsTotals",
+    "SyncApp",
+    "SyncAppSession",
+    "SyncAppSessionsRequest",
+    "SyncAppSessionsResponse",
+    "SyncDevice",
     "TimelineDisplay",
     "TimelineItem",
     "TimelineResponse",
