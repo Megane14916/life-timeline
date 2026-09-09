@@ -71,9 +71,10 @@ class UsageEventsCollectorTest {
         accessChecker = UsageAccessChecker { true },
         source = source,
         mapper = UsageEventMapper(apiLevel = 29),
-        labelResolver = PackageLabelResolver { packageName ->
-          if (packageName == "com.example.browser") "Browser" else packageName
-        },
+        labelResolver =
+          PackageLabelResolver { packageName ->
+            if (packageName == "com.example.browser") "Browser" else packageName
+          },
         selfPackageName = "com.megane14916.lifetimeline",
       )
 
@@ -100,7 +101,7 @@ class UsageEventsCollectorTest {
           endAtMs = 500,
           cursorAtMs = result.nextCursorAtMs!!,
           cursorKey = result.nextCursorKey!!,
-        )
+        ),
       )
     assertEquals(UsageCollectionStatus.NO_DATA, replay.status)
     assertFalse(replay.shouldAdvanceCursor)
@@ -112,7 +113,11 @@ class UsageEventsCollectorTest {
     val denied =
       UsageEventsCollector(
         accessChecker = UsageAccessChecker { false },
-        source = UsageEventsSource { _, _ -> sourceCalls += 1; emptyList() },
+        source =
+          UsageEventsSource { _, _ ->
+            sourceCalls += 1
+            emptyList()
+          },
         mapper = UsageEventMapper(29),
         labelResolver = PackageLabelResolver { it },
         selfPackageName = "com.megane14916.lifetimeline",
@@ -153,13 +158,12 @@ class UsageEventsCollectorTest {
     timestampMs: Long,
     eventType: Int,
     packageName: String? = "com.example.browser",
-  ) =
-    RawUsageEvent(
-      timestampMs = timestampMs,
-      packageName = packageName,
-      className = "MainActivity",
-      eventType = eventType,
-    )
+  ) = RawUsageEvent(
+    timestampMs = timestampMs,
+    packageName = packageName,
+    className = "MainActivity",
+    eventType = eventType,
+  )
 }
 
 class UsageAccessCheckerTest {
