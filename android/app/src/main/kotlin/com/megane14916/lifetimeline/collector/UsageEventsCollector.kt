@@ -86,19 +86,33 @@ class UsageEventMapper(
           UsageEvents.Event.ACTIVITY_PAUSED -> {
             UsageEventKind.ACTIVITY_PAUSED
           }
-          UsageEvents.Event.SCREEN_NON_INTERACTIVE ->
+          UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
             if (apiLevel >= 28) UsageEventKind.SCREEN_NON_INTERACTIVE else null
-          UsageEvents.Event.DEVICE_SHUTDOWN -> UsageEventKind.DEVICE_SHUTDOWN
-          UsageEvents.Event.DEVICE_STARTUP -> UsageEventKind.DEVICE_STARTUP
-          else -> null
+          }
+          UsageEvents.Event.DEVICE_SHUTDOWN -> {
+            UsageEventKind.DEVICE_SHUTDOWN
+          }
+          UsageEvents.Event.DEVICE_STARTUP -> {
+            UsageEventKind.DEVICE_STARTUP
+          }
+          else -> {
+            null
+          }
         }
       } else {
         when (rawEvent.eventType) {
-          UsageEvents.Event.MOVE_TO_FOREGROUND -> UsageEventKind.ACTIVITY_RESUMED
-          UsageEvents.Event.MOVE_TO_BACKGROUND -> UsageEventKind.ACTIVITY_PAUSED
-          UsageEvents.Event.SCREEN_NON_INTERACTIVE ->
+          UsageEvents.Event.MOVE_TO_FOREGROUND -> {
+            UsageEventKind.ACTIVITY_RESUMED
+          }
+          UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+            UsageEventKind.ACTIVITY_PAUSED
+          }
+          UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
             if (apiLevel >= 28) UsageEventKind.SCREEN_NON_INTERACTIVE else null
-          else -> null
+          }
+          else -> {
+            null
+          }
         }
       }
     val packageName = rawEvent.packageName?.takeIf { it.isNotBlank() } ?: return null
