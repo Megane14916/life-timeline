@@ -1,0 +1,76 @@
+{
+  "endpoint": "/api/v1/sync/app-sessions",
+  "contentType": "application/json",
+  "maxSessions": 100,
+  "request": {
+    "schemaVersion": 1,
+    "device": {
+      "id": "01K4N6Q2N6N8YJ7W4M2D3A9B5C",
+      "name": "Google Pixel 9",
+      "platform": "android"
+    },
+    "apps": [
+      {
+        "id": "01K4N6R7KQJ8J2W9VQW4B6M0TN",
+        "identifier": "com.android.chrome",
+        "displayName": "Chrome"
+      }
+    ],
+    "sessions": [
+      {
+        "id": "01K4N70E3Q6N9D6E6G0C8M2H1P",
+        "appId": "01K4N6R7KQJ8J2W9VQW4B6M0TN",
+        "startedAtMs": 1788908400000,
+        "endedAtMs": 1788909600000,
+        "durationMs": 1200000,
+        "source": "android_usage_stats"
+      }
+    ]
+  },
+  "success": {
+    "schemaVersion": 1,
+    "accepted": ["01K4N70E3Q6N9D6E6G0C8M2H1P"]
+  },
+  "errors": [
+    {
+      "status": 422,
+      "payload": {
+        "error": {
+          "code": "invalid_request",
+          "message": "The request contains an invalid app session.",
+          "field": "sessions[0].durationMs"
+        }
+      }
+    },
+    {
+      "status": 409,
+      "payload": {
+        "error": {
+          "code": "sync_conflict",
+          "message": "An app session ID is already stored with different content.",
+          "field": "sessions[0].id"
+        }
+      }
+    },
+    {
+      "status": 503,
+      "payload": {
+        "error": {
+          "code": "temporarily_unavailable",
+          "message": "The PC is temporarily unavailable.",
+          "field": null
+        }
+      }
+    },
+    {
+      "status": 500,
+      "payload": {
+        "error": {
+          "code": "internal_error",
+          "message": "The sync request could not be completed.",
+          "field": null
+        }
+      }
+    }
+  ]
+}

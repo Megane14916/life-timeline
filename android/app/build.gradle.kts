@@ -1,6 +1,8 @@
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
+  alias(libs.plugins.kotlin.serialization)
+  alias(libs.plugins.ksp)
 }
 
 android {
@@ -31,6 +33,10 @@ android {
     disable +=
       setOf("AndroidGradlePluginVersion", "GradleDependency", "ObsoleteSdkInt", "OldTargetApi")
   }
+
+  sourceSets {
+    getByName("test").resources.directories.add(rootProject.file("../contracts").path)
+  }
 }
 
 kotlin {
@@ -42,8 +48,21 @@ dependencies {
   implementation(libs.androidx.activity.compose)
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.ui.tooling.preview)
+  implementation(libs.androidx.datastore.preferences)
+  implementation(libs.androidx.lifecycle.runtime.compose)
+  implementation(libs.androidx.lifecycle.viewmodel.compose)
+  implementation(libs.androidx.room.ktx)
+  implementation(libs.androidx.room.runtime)
+  implementation(libs.coroutines.android)
+  implementation(libs.kotlinx.serialization.json)
+  implementation(libs.okhttp)
+  implementation(libs.retrofit)
+  implementation(libs.retrofit.converter.kotlinx.serialization)
+
+  ksp(libs.androidx.room.compiler)
 
   debugImplementation(libs.androidx.compose.ui.tooling)
 
   testImplementation(libs.junit)
+  testImplementation(libs.coroutines.test)
 }
