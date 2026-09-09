@@ -22,10 +22,10 @@ interface AndroidAppSessionDao {
     SELECT * FROM android_app_sessions
     WHERE sync_status = 'pending'
     ORDER BY started_at_ms ASC, id ASC
-    LIMIT :limit
+    LIMIT 100
     """,
   )
-  suspend fun getPending(limit: Int = 100): List<AndroidAppSessionEntity>
+  suspend fun getPending(): List<AndroidAppSessionEntity>
 
   @Query(
     """

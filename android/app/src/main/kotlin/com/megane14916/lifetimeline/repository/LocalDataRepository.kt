@@ -74,7 +74,7 @@ class LocalDataRepository(
       CollectionSaveResult(insertedSessions, reusedSessions)
     }
 
-  suspend fun getPendingSessions(limit: Int = 100): List<AndroidAppSessionEntity> = database.androidAppSessionDao().getPending(limit)
+  suspend fun getPendingSessions(): List<AndroidAppSessionEntity> = database.androidAppSessionDao().getPending()
 
   suspend fun markAcceptedAsSynced(
     ids: List<String>,

@@ -29,8 +29,9 @@ interface AndroidAppDao {
   )
 
   @Transaction
-  suspend fun upsertByPackageName(app: AndroidAppEntity) {
+  suspend fun upsertByPackageName(app: AndroidAppEntity): AndroidAppEntity {
     insertIfAbsent(app)
     updateLabel(app.packageName, app.displayName, app.updatedAtMs)
+    return checkNotNull(findByPackageName(app.packageName))
   }
 }
