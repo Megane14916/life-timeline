@@ -10,6 +10,10 @@ android {
   compileSdk = 36
 
   defaultConfig {
+    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+  }
+
+  defaultConfig {
     applicationId = "com.megane14916.lifetimeline"
     minSdk = 26
     targetSdk = 36
@@ -36,6 +40,7 @@ android {
 
   sourceSets {
     getByName("test").resources.directories.add(rootProject.file("../contracts").path)
+    getByName("androidTest").assets.directories.add(file("$projectDir/schemas").path)
   }
 }
 
@@ -65,4 +70,15 @@ dependencies {
 
   testImplementation(libs.junit)
   testImplementation(libs.coroutines.test)
+
+  androidTestImplementation(libs.androidx.room.testing)
+  androidTestImplementation(libs.androidx.test.ext.junit)
+  androidTestImplementation(libs.androidx.test.rules)
+  androidTestImplementation(libs.androidx.test.runner)
+}
+
+ksp {
+  arg("room.schemaLocation", "$projectDir/schemas")
+  arg("room.generateKotlin", "true")
+  arg("room.incremental", "true")
 }

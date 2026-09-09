@@ -40,6 +40,8 @@ P2-01では、既存のKotlin・AGP・compile SDKを変更せず、次の依存�
 | OkHttp | `5.3.0` | RetrofitのtransportとしてTLS接続を最新stable系列へ固定する |
 | Kotlin Serialization | `1.11.0` | JSON DTOを明示的にシリアライズし、unknown fieldを拒否する |
 | Coroutines Test | `1.11.0` | production Coroutinesと同じversionでunit testを実行する |
+| AndroidX Test core / rules / runner | `1.7.0` | Roomのinstrumentation testで、Android API上のDB再起動・transaction境界を検証する |
+| AndroidX Test Ext JUnit | `1.3.0` | `AndroidJUnit4` runnerでinstrumentation testを実行する |
 
 依存の一次資料は、[Room release notes](https://developer.android.com/jetpack/androidx/releases/room)、[DataStore release notes](https://developer.android.com/jetpack/androidx/releases/datastore)、[Lifecycle release notes](https://developer.android.com/jetpack/androidx/releases/lifecycle)、[KSP releases](https://github.com/google/ksp/releases)、[Retrofit releases](https://github.com/square/retrofit/releases)、[OkHttp repository](https://github.com/square/okhttp)、[Kotlin serialization documentation](https://kotlinlang.org/docs/serialization.html)、[Kotlin coroutines releases](https://github.com/Kotlin/kotlinx.coroutines/releases)を参照した。
 
