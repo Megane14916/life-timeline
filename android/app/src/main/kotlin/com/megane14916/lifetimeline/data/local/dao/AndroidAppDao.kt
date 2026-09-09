@@ -12,6 +12,9 @@ interface AndroidAppDao {
   @Query("SELECT * FROM android_apps WHERE package_name = :packageName LIMIT 1")
   suspend fun findByPackageName(packageName: String): AndroidAppEntity?
 
+  @Query("SELECT * FROM android_apps WHERE id IN (:ids)")
+  suspend fun findByIds(ids: List<String>): List<AndroidAppEntity>
+
   @Insert(onConflict = OnConflictStrategy.IGNORE)
   suspend fun insertIfAbsent(app: AndroidAppEntity)
 

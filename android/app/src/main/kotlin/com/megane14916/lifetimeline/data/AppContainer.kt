@@ -10,6 +10,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.concurrent.TimeUnit
 
 interface AppContainer {
   val json: Json
@@ -23,7 +24,13 @@ class DefaultAppContainer(
   context: Context,
 ) : AppContainer {
   override val json: Json = SyncContractJson
-  override val httpClient: OkHttpClient = OkHttpClient.Builder().build()
+  override val httpClient: OkHttpClient =
+    OkHttpClient
+      .Builder()
+      .connectTimeout(10, TimeUnit.SECONDS)
+      .readTimeout(10, TimeUnit.SECONDS)
+      .writeTimeout(10, TimeUnit.SECONDS)
+      .build()
   override val retrofit: Retrofit =
     Retrofit
       .Builder()

@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.datastore.preferences.preferencesDataStoreFile
@@ -18,6 +19,8 @@ import java.net.URISyntaxException
 data class AppSettings(
   val deviceId: String?,
   val pcBaseUrl: String?,
+  val lastCollectionAtMs: Long?,
+  val lastSyncAtMs: Long?,
 )
 
 private val Context.lifeTimelineDataStore: DataStore<Preferences> by preferencesDataStore(
@@ -32,6 +35,8 @@ class AppPreferences private constructor(
       AppSettings(
         deviceId = preferences[DEVICE_ID_KEY],
         pcBaseUrl = preferences[PC_BASE_URL_KEY],
+        lastCollectionAtMs = preferences[LAST_COLLECTION_AT_KEY],
+        lastSyncAtMs = preferences[LAST_SYNC_AT_KEY],
       )
     }
 
@@ -55,9 +60,21 @@ class AppPreferences private constructor(
     }
   }
 
+  suspend fun recordCollection(atMs: Long) {
+    require(atMs >= 0) { "Collection timestamp must be non-negative." }
+    dataStore.edit { preferences -> preferences[LAST_COLLECTION_AT_KEY] = atMs }
+  }
+
+  suspend fun recordSync(atMs: Long) {
+    require(atMs >= 0) { "Sync timestamp must be non-negative." }
+    dataStore.edit { preferences -> preferences[LAST_SYNC_AT_KEY] = atMs }
+  }
+
   companion object {
     private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
     private val PC_BASE_URL_KEY = stringPreferencesKey("pc_base_url")
+    private val LAST_COLLECTION_AT_KEY = longPreferencesKey("last_collection_at_ms")
+    private val LAST_SYNC_AT_KEY = longPreferencesKey("last_sync_at_ms")
 
     fun create(context: Context): AppPreferences = AppPreferences(context.lifeTimelineDataStore)
 

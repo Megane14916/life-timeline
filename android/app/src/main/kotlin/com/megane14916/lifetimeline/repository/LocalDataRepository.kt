@@ -19,13 +19,24 @@ data class CollectionSaveResult(
   val reusedSessions: Int,
 )
 
+interface PendingSessionStore {
+  suspend fun getPendingSessions(): List<AndroidAppSessionEntity>
+
+  suspend fun markAcceptedAsSynced(
+    ids: List<String>,
+    syncedAtMs: Long,
+  ): Int
+
+  suspend fun countPending(): Int
+}
+
 class SourceKeyConflictException(
   message: String,
 ) : IllegalStateException(message)
 
 class LocalDataRepository(
   private val database: LifeTimelineDatabase,
-) {
+) : PendingSessionStore {
   suspend fun saveCollection(input: CollectionInput): CollectionSaveResult =
     database.withTransaction {
       val canonicalAppIds =
@@ -74,9 +85,16 @@ class LocalDataRepository(
       CollectionSaveResult(insertedSessions, reusedSessions)
     }
 
-  suspend fun getPendingSessions(): List<AndroidAppSessionEntity> = database.androidAppSessionDao().getPending()
+  override suspend fun getPendingSessions(): List<AndroidAppSessionEntity> = database.androidAppSessionDao().getPending()
 
-  suspend fun markAcceptedAsSynced(
+  suspend fun getAppsByIds(ids: List<String>): List<AndroidAppEntity> =
+    if (ids.isEmpty()) {
+      emptyList()
+    } else {
+      database.androidAppDao().findByIds(ids)
+    }
+
+  override suspend fun markAcceptedAsSynced(
     ids: List<String>,
     syncedAtMs: Long,
   ): Int =
@@ -88,7 +106,7 @@ class LocalDataRepository(
       }
     }
 
-  suspend fun countPending(): Int = database.androidAppSessionDao().countPending()
+  override suspend fun countPending(): Int = database.androidAppSessionDao().countPending()
 }
 
 private fun AndroidAppSessionEntity.hasSameContentAs(other: AndroidAppSessionEntity): Boolean =
