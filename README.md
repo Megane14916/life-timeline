@@ -2,7 +2,7 @@
 
 Life Timelineは、PCとスマートフォンから収集した活動データをローカルで管理し、複数の形式で振り返るためのアプリケーションです。
 
-現在はPhase 0の開発基盤を整備しています。RepositoryにはFastAPI Backend、React Frontend、Androidアプリの最小構成があり、データベース、Collector、同期、Timelineなどの製品機能は後続Phaseで追加します。
+現在はPhase 1のPC Coreを実装済みです。SQLiteへ正規化データを保存し、FastAPI経由でReactのTimelineとDashboardを表示できます。Android Collector、同期、写真、位置情報は後続Phaseで追加します。
 
 ## Repository構成
 
@@ -65,6 +65,17 @@ cd backend
 uv sync --all-groups --frozen
 ```
 
+デモ用の保存先をrepository rootから絶対パスで設定し、同じ環境変数のままmigrationとseedを実行します。
+
+```powershell
+$env:LIFE_TIMELINE_DATA_DIR = Join-Path (Get-Location).Path '..\data\demo'
+New-Item -ItemType Directory -Force -Path $env:LIFE_TIMELINE_DATA_DIR | Out-Null
+uv run alembic upgrade head
+uv run python -m app.cli.seed --data-dir $env:LIFE_TIMELINE_DATA_DIR
+```
+
+DBは`$env:LIFE_TIMELINE_DATA_DIR\lifelog.db`に作成されます。migration前のDBへseedを実行すると失敗するため、必ず同じ保存先へmigrationを適用してください。
+
 開発サーバーをloopbackで起動します。
 
 ```powershell
@@ -99,7 +110,13 @@ npm ci
 npm run dev
 ```
 
-ブラウザで`http://127.0.0.1:5173/`を開き、`life-timeline`と初期化済みのメッセージが表示されることを確認します。
+ブラウザで次の固定日URLを開きます。
+
+```text
+http://127.0.0.1:5173/timeline?date=2026-09-03&timezone=Asia%2FTokyo
+```
+
+`npm run dev`はViteを`127.0.0.1:5173`へ固定します。ポートが使用中の場合は別ポートへ移動せず失敗するため、意図しないAPI接続先で起動することはありません。
 
 検証コマンドは`frontend/`で実行します。
 
@@ -109,6 +126,13 @@ npm run lint
 npm run typecheck
 npm run test:run
 npm run build
+```
+
+実DBを使うChromium E2EはBackendとFrontendを一時環境で起動し、次で実行します。初回だけブラウザを導入してください。
+
+```powershell
+npx playwright install chromium
+npm run e2e
 ```
 
 `npm run format`はPrettierでファイルを修正します。CIと同じ確認には、ファイルを書き換えない`npm run format:check`を使います。Production buildは`frontend/dist/`へ生成されます。
@@ -142,7 +166,17 @@ Pull Requestと`main`へのpushでは、変更パスに関係なく次のcheck�
 
 Android CIの成功時には`life-timeline-debug-apk`というartifactが保存されます。GitHubのPull Requestで対象checkを開き、workflow runの`Artifacts`から取得できます。保存期間は7日です。
 
-Phase 1でDB、製品API、React UIを接続した時点で、実DBからAPIを経由してReactまで確認する`pc-core-e2e`を追加し、required checkにします。
+Phase 1では、実DBからAPIを経由してReactまで確認する`pc-core-e2e`をPull Requestのrequired checkにしています。失敗・未実行・中断の状態ではmergeできません。
+
+## Phase 1固定データの確認値
+
+`2026-09-03` / `Asia/Tokyo`では、Timelineに4件、Dashboardに合計`1時間5分`、4 sessions、2 appsが表示されます。アプリ別はAndroid Chromeが`35分`、Windows Chromeが`30分`です。
+
+`2026-09-04`へ進むと合計`1分30秒`、`2026-09-05`ではTimelineが空、Dashboardの合計・session・appがすべて0になります。日付を戻してreloadしてもURLの日付と両表示が一致します。
+
+## Phase 1受け入れ記録
+
+Windowsで実施した手順、migration・seedの再実行、Backend再起動、停止からの復旧、AC-01〜13、CIとrulesetの結果は[Phase 1受け入れ記録](docs/development/phase1-acceptance.md)に記録しています。
 
 ## よくある問題
 
@@ -153,6 +187,28 @@ Phase 1でDB、製品API、React UIを接続した時点で、実DBからAPIを�
 ### `npm ci`がversionまたはlock fileのエラーになる
 
 `node --version`と`npm --version`がQuick Startの値に合っているか確認してください。依存関係を変更するときは`package.json`と`package-lock.json`を同じPull Requestへ含めます。
+
+### `migration未適用`またはDBパスが想定と違う
+
+Backendを実行するPowerShellで保存先を確認します。
+
+```powershell
+$env:LIFE_TIMELINE_DATA_DIR
+Resolve-Path $env:LIFE_TIMELINE_DATA_DIR
+Test-Path (Join-Path $env:LIFE_TIMELINE_DATA_DIR 'lifelog.db')
+```
+
+別のPowerShellでBackendを起動する場合は、`LIFE_TIMELINE_DATA_DIR`を設定し直してください。`uv run alembic upgrade head`とseedの`--data-dir`が同じ絶対パスを指す必要があります。
+
+### `npm run dev`でポートが使用中になる
+
+8000番と5173番の使用状況を確認し、不要な開発サーバーを停止してから再実行します。
+
+```powershell
+Get-NetTCPConnection -LocalPort 8000,5173 -ErrorAction SilentlyContinue
+```
+
+別ポートへ変更する場合は、Vite proxy、Backendの起動引数、手順内URLを同時に変更してください。通常の受け入れ確認では固定値を使います。
 
 ### Backendのsmokeでポートエラーになる
 
