@@ -65,9 +65,10 @@ class SyncRepository(
         )
       }
 
+      val batch = pending.take(BATCH_SIZE)
       val request =
         try {
-          buildRequest(pending)
+          buildRequest(batch)
         } catch (failure: SyncRepositoryException) {
           return failureResult(batchesSucceeded, sessionsSynced, failure.failure)
         }
@@ -195,6 +196,7 @@ class SyncRepository(
   ) : IllegalStateException(failure.message)
 
   private companion object {
+    const val BATCH_SIZE = 100
     const val SCHEMA_VERSION = 1
     const val NETWORK_ERROR_MESSAGE = "PCへ接続できません。URL、Tailscale、PCの状態を確認してください。"
     const val PROTOCOL_ERROR_MESSAGE = "PCから不正な同期応答を受け取りました。"
