@@ -67,7 +67,6 @@ class AppSessionizer {
               diagnostics = diagnostics.copy(duplicateResumes = diagnostics.duplicateResumes + 1)
               return@forEach
             }
-            val packageWasActive = activeActivities.values.any { it.packageName == event.packageName }
             activeActivities[activityKey] =
               OpenActivityState(
                 activityKey = activityKey,
@@ -76,11 +75,7 @@ class AppSessionizer {
                 startedAtMs = timestampMs,
                 startEventKey = event.eventKey,
               )
-            if (!packageWasActive) {
-              packageStarts[event.packageName] = timestampMs
-            } else {
-              packageStarts.putIfAbsent(event.packageName, timestampMs)
-            }
+            packageStarts.putIfAbsent(event.packageName, timestampMs)
           }
 
           UsageEventKind.ACTIVITY_PAUSED -> {
