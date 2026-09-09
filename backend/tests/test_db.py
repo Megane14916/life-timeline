@@ -54,6 +54,25 @@ def test_sqlite_foreign_keys_are_enabled_for_each_connection(tmp_path: Path) -> 
         with engine.connect() as connection:
             assert connection.execute(text("PRAGMA foreign_keys")).scalar_one() == 1
             assert connection.execute(text("PRAGMA busy_timeout")).scalar_one() == 12_500
+            assert connection.execute(text("PRAGMA journal_mode")).scalar_one() == "wal"
+    finally:
+        engine.dispose()
+
+
+def test_wal_allows_reads_during_an_uncommitted_write(tmp_path: Path) -> None:
+    engine = create_engine_for_settings(Settings(data_dir=tmp_path / "data"))
+    try:
+        with engine.begin() as connection:
+            connection.execute(text("CREATE TABLE example (id INTEGER PRIMARY KEY)"))
+
+        with engine.connect() as writer:
+            transaction = writer.begin()
+            try:
+                writer.execute(text("INSERT INTO example (id) VALUES (1)"))
+                with engine.connect() as reader:
+                    assert reader.execute(text("SELECT COUNT(*) FROM example")).scalar_one() == 0
+            finally:
+                transaction.rollback()
     finally:
         engine.dispose()
 
