@@ -59,7 +59,7 @@ captures/
 *.aab
 
 # Runtime data and local databases
-data/
+/data/
 *.db
 *.db-shm
 *.db-wal

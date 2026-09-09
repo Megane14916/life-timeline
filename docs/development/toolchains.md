@@ -25,6 +25,24 @@
 
 Pythonのpatch version、Node.jsのLTS version、uvのversionは更新頻度が高い。Issue開始時に更新を必要とする理由がなければ、この表の値をそのまま使う。後続Issueの途中で暗黙に最新版へ変更しない。
 
+### Phase 2 Android依存
+
+P2-01では、既存のKotlin・AGP・compile SDKを変更せず、次の依存を追加した。いずれもversion catalogへ固定し、Roomのschema生成や同期clientなど、最初に利用するPhaseの実装から参照する。
+
+| 対象 | 採用値 | 選定理由 |
+| --- | --- | --- |
+| KSP | `2.3.11` | 公開されている現行stable plugin。KSP 2.3系はKotlin compiler versionと独立したversioningのため、Kotlin `2.4.10`と組み合わせる |
+| Room | `2.8.4` | compile SDK 36 / min SDK 26で利用できるstable AndroidX。KSPによるKotlin code generationを使う |
+| Kotlin Coroutines | `1.11.0` | Androidのstructured concurrencyと後続のRepository / ViewModelで共通利用するstable release |
+| DataStore Preferences | `1.2.1` | device identity・PC URLなど小さな設定をtransactionalに保存するstable release |
+| Lifecycle | `2.10.0` | compile SDK 36と両立するstable AndroidX。ComposeのViewModel / lifecycle連携を提供する |
+| Retrofit | `3.0.0` | version付きHTTP APIを型安全に定義できるstable release |
+| OkHttp | `5.3.0` | RetrofitのtransportとしてTLS接続を最新stable系列へ固定する |
+| Kotlin Serialization | `1.11.0` | JSON DTOを明示的にシリアライズし、unknown fieldを拒否する |
+| Coroutines Test | `1.11.0` | production Coroutinesと同じversionでunit testを実行する |
+
+依存の一次資料は、[Room release notes](https://developer.android.com/jetpack/androidx/releases/room)、[DataStore release notes](https://developer.android.com/jetpack/androidx/releases/datastore)、[Lifecycle release notes](https://developer.android.com/jetpack/androidx/releases/lifecycle)、[KSP releases](https://github.com/google/ksp/releases)、[Retrofit releases](https://github.com/square/retrofit/releases)、[OkHttp repository](https://github.com/square/okhttp)、[Kotlin serialization documentation](https://kotlinlang.org/docs/serialization.html)、[Kotlin coroutines releases](https://github.com/Kotlin/kotlinx.coroutines/releases)を参照した。
+
 ## 3. Androidアプリの識別子
 
 Androidプロジェクトでは次の値を使う。
