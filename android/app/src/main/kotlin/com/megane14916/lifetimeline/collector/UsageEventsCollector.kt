@@ -83,18 +83,23 @@ class UsageEventMapper(
           UsageEvents.Event.ACTIVITY_RESUMED -> {
             UsageEventKind.ACTIVITY_RESUMED
           }
+
           UsageEvents.Event.ACTIVITY_PAUSED -> {
             UsageEventKind.ACTIVITY_PAUSED
           }
+
           UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
             if (apiLevel >= 28) UsageEventKind.SCREEN_NON_INTERACTIVE else null
           }
+
           UsageEvents.Event.DEVICE_SHUTDOWN -> {
             UsageEventKind.DEVICE_SHUTDOWN
           }
+
           UsageEvents.Event.DEVICE_STARTUP -> {
             UsageEventKind.DEVICE_STARTUP
           }
+
           else -> {
             null
           }
@@ -104,12 +109,15 @@ class UsageEventMapper(
           UsageEvents.Event.MOVE_TO_FOREGROUND -> {
             UsageEventKind.ACTIVITY_RESUMED
           }
+
           UsageEvents.Event.MOVE_TO_BACKGROUND -> {
             UsageEventKind.ACTIVITY_PAUSED
           }
+
           UsageEvents.Event.SCREEN_NON_INTERACTIVE -> {
             if (apiLevel >= 28) UsageEventKind.SCREEN_NON_INTERACTIVE else null
           }
+
           else -> {
             null
           }
@@ -191,38 +199,52 @@ class UsageEventsCollector(
       } ?: return UsageCollectionResult(status = UsageCollectionStatus.NO_DATA)
 
     var diagnostics = UsageDiagnostics(rawEventCount = rawEvents.size)
-    val events = buildList {
-      rawEvents.forEach { rawEvent ->
-        if (rawEvent.timestampMs !in window.beginAtMs until window.endAtMs) {
-          diagnostics = diagnostics.copy(ignoredOutOfRangeEvents = diagnostics.ignoredOutOfRangeEvents + 1)
-          return@forEach
-        }
-        val eventKey = usageEventKey(rawEvent)
-        if (
-          rawEvent.timestampMs < window.cursorAtMs ||
+    val events =
+      buildList {
+        rawEvents.forEach { rawEvent ->
+          if (rawEvent.timestampMs !in window.beginAtMs until window.endAtMs) {
+            diagnostics =
+              diagnostics.copy(
+                ignoredOutOfRangeEvents = diagnostics.ignoredOutOfRangeEvents + 1,
+              )
+            return@forEach
+          }
+          val eventKey = usageEventKey(rawEvent)
+          if (
+            rawEvent.timestampMs < window.cursorAtMs ||
             (rawEvent.timestampMs == window.cursorAtMs && eventKey <= window.cursorKey)
-        ) {
-          return@forEach
-        }
-        if (rawEvent.packageName == selfPackageName) {
-          diagnostics = diagnostics.copy(ignoredSelfEvents = diagnostics.ignoredSelfEvents + 1)
-          return@forEach
-        }
-        val mapped = mapper.map(rawEvent)
-        if (mapped == null) {
+          ) {
+            return@forEach
+          }
+          if (rawEvent.packageName == selfPackageName) {
+            diagnostics =
+              diagnostics.copy(
+                ignoredSelfEvents = diagnostics.ignoredSelfEvents + 1,
+              )
+            return@forEach
+          }
+          val mapped = mapper.map(rawEvent)
+          if (mapped == null) {
+            diagnostics =
+              diagnostics.copy(
+                ignoredInvalidEvents =
+                  diagnostics.ignoredInvalidEvents +
+                    if (rawEvent.packageName.isNullOrBlank()) 1 else 0,
+                ignoredUnsupportedEvents =
+                  diagnostics.ignoredUnsupportedEvents +
+                    if (rawEvent.packageName.isNullOrBlank()) 0 else 1,
+              )
+            return@forEach
+          }
           diagnostics =
             diagnostics.copy(
-              ignoredInvalidEvents = diagnostics.ignoredInvalidEvents +
-                if (rawEvent.packageName.isNullOrBlank()) 1 else 0,
-              ignoredUnsupportedEvents = diagnostics.ignoredUnsupportedEvents +
-                if (rawEvent.packageName.isNullOrBlank()) 0 else 1,
+              mappedEventCount = diagnostics.mappedEventCount + 1,
             )
-          return@forEach
+          add(mapped.copy(displayName = labelResolver.labelFor(mapped.packageName)))
         }
-        diagnostics = diagnostics.copy(mappedEventCount = diagnostics.mappedEventCount + 1)
-        add(mapped.copy(displayName = labelResolver.labelFor(mapped.packageName)))
-      }
-    }.sortedWith(compareBy<UsageEventRecord> { it.timestampMs }.thenBy { it.eventKey })
+      }.sortedWith(
+        compareBy<UsageEventRecord> { it.timestampMs }.thenBy { it.eventKey },
+      )
 
     if (events.isEmpty()) {
       return UsageCollectionResult(
