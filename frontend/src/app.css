@@ -129,6 +129,99 @@ h3 {
   box-shadow: 0 1.5rem 4rem rgb(32 50 47 / 8%);
 }
 
+.date-navigator {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #c8d8d2;
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 72%);
+}
+
+.date-controls {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.date-input-label {
+  display: grid;
+  gap: 0.25rem;
+  color: #55766c;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.date-input-label input {
+  min-height: 2.25rem;
+  border: 1px solid #b8cec4;
+  border-radius: 0.6rem;
+  padding: 0.35rem 0.55rem;
+  background: #ffffff;
+  color: #254c40;
+  font-weight: 700;
+}
+
+.secondary-button,
+.today-button,
+.date-meta button {
+  min-height: 2.25rem;
+  border-radius: 0.6rem;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.secondary-button {
+  border: 1px solid #c4d7cf;
+  background: #f4faf7;
+  color: #356655;
+}
+
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.today-button {
+  border: 1px solid #307b5e;
+  background: #307b5e;
+  color: #ffffff;
+}
+
+.date-meta {
+  display: grid;
+  justify-items: end;
+  gap: 0.35rem;
+}
+
+.location-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 0.4rem 0.7rem;
+  color: #9a4e3e;
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+.location-error span {
+  display: block;
+}
+
+.date-meta button {
+  border: 1px solid #c27a69;
+  background: #fff7f4;
+  color: #8d4d3f;
+}
+
 .dashboard {
   margin-bottom: 1.5rem;
   padding: clamp(1.25rem, 3vw, 2rem);
@@ -434,6 +527,24 @@ td {
     align-items: flex-start;
     flex-direction: column;
     gap: 1.25rem;
+  }
+
+  .date-navigator {
+    display: block;
+  }
+
+  .date-controls {
+    align-items: end;
+  }
+
+  .date-meta {
+    justify-items: start;
+    margin-top: 0.75rem;
+  }
+
+  .location-error {
+    justify-content: start;
+    text-align: left;
   }
 
   .date-context {

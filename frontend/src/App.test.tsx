@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './App'
@@ -160,5 +160,51 @@ describe('App', () => {
     expect(await screen.findByText('0分')).toBeInTheDocument()
     expect(screen.getAllByText('0件')).toHaveLength(2)
     expect(screen.getByText('この日の記録はありません')).toBeInTheDocument()
+  })
+
+  it('keeps the selected date in the URL and follows browser history', async () => {
+    render(<App />)
+    await screen.findByText('1時間5分')
+
+    fireEvent.click(screen.getByRole('button', { name: '翌日を表示' }))
+    expect(window.location.search).toContain('date=2026-09-04')
+    expect(await screen.findByDisplayValue('2026-09-04')).toBeInTheDocument()
+    expect(requestedPaths).toContain(
+      '/api/v1/timeline?date=2026-09-04&timezone=Asia%2FTokyo',
+    )
+
+    window.history.pushState(
+      {},
+      '',
+      '/timeline?date=2026-09-02&timezone=Asia%2FTokyo',
+    )
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    expect(await screen.findByDisplayValue('2026-09-02')).toBeInTheDocument()
+    expect(requestedPaths).toContain(
+      '/api/v1/stats/apps?from=2026-09-02&to=2026-09-03&timezone=Asia%2FTokyo',
+    )
+  })
+
+  it('does not fetch for invalid URL values and offers a recovery action', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/timeline?date=not-a-date&timezone=Not%2FAZone',
+    )
+
+    render(<App />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '有効な日付ではありません',
+    )
+    expect(screen.getByRole('alert')).toHaveTextContent('タイムゾーン')
+    expect(requestedPaths).toHaveLength(0)
+
+    fireEvent.click(screen.getByRole('button', { name: '今日へ戻す' }))
+    expect(
+      await screen.findByDisplayValue(/\d{4}-\d{2}-\d{2}/),
+    ).toBeInTheDocument()
+    expect(window.location.search).not.toContain('Not%2FAZone')
+    expect(requestedPaths.length).toBe(2)
   })
 })
