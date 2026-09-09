@@ -14,7 +14,7 @@ export function TimelineItem({ item, timezone }: TimelineItemProps) {
   ].filter((flag): flag is string => flag !== null)
 
   return (
-    <li className="timeline-item">
+    <li className="timeline-item" data-testid="timeline-item">
       <div className="timeline-time" aria-label="表示時間">
         <time dateTime={item.display.startedAt}>
           {formatTime(item.display.startedAt, timezone)}
@@ -31,7 +31,9 @@ export function TimelineItem({ item, timezone }: TimelineItemProps) {
             <h3>{item.appName}</h3>
             <p className="app-identifier">{item.appIdentifier}</p>
           </div>
-          <strong>{formatDuration(item.display.durationMs)}</strong>
+          <strong data-testid="timeline-item-duration">
+            {formatDuration(item.display.durationMs)}
+          </strong>
         </div>
         <div className="timeline-details">
           <span>{formatPlatform(item.platform)}</span>

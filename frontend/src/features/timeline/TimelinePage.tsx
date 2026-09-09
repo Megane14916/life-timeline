@@ -233,7 +233,11 @@ export function TimelinePage() {
             <p className="panel-status">Timelineを読み込んでいます…</p>
           )}
           {timelineError !== null && (
-            <div className="error-state" role="alert">
+            <div
+              className="error-state"
+              role="alert"
+              data-testid="timeline-error"
+            >
               <strong>Timelineの取得に失敗しました</strong>
               <p>{timelineError}</p>
               <button type="button" onClick={retryTimeline}>
@@ -253,7 +257,7 @@ export function TimelinePage() {
                 <p>別の日付を指定すると、記録されたSessionを確認できます。</p>
               </div>
             ) : (
-              <ol className="timeline-list">
+              <ol className="timeline-list" data-testid="timeline-list">
                 {timeline.items.map((item) => (
                   <TimelineItem
                     key={`${item.type}-${item.deviceId}-${item.id}`}

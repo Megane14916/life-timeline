@@ -1,0 +1,65 @@
+name: PC Core E2E
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pc-core-e2e:
+    name: pc-core-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: 0.12.9
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --all-groups --frozen
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run real DB to React E2E
+        working-directory: frontend
+        env:
+          CI: true
+          E2E_ARTIFACT_DIR: ${{ github.workspace }}/e2e-artifacts
+        run: npm run e2e
+
+      - name: Upload E2E diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: pc-core-e2e-diagnostics
+          if-no-files-found: warn
+          path: |
+            e2e-artifacts/
+            frontend/playwright-report/
+            frontend/test-results/
