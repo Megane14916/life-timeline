@@ -35,6 +35,7 @@ export function DateNavigator({
             value={location.date}
             onChange={(event) => onDateChange(event.target.value)}
             aria-label="表示日"
+            data-testid="date-input"
           />
         </label>
         <button

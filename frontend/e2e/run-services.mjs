@@ -1,4 +1,4 @@
-import { createWriteStream, existsSync, mkdirSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn, spawnSync } from 'node:child_process'
@@ -27,20 +27,17 @@ function pythonExecutable() {
   return process.platform === 'win32' ? 'python' : 'python3'
 }
 
-function npmExecutable() {
-  return process.platform === 'win32' ? 'npm.cmd' : 'npm'
-}
-
 function startProcess(command, args, cwd, logName, extraEnvironment = {}) {
   const logPath = join(artifactDirectory, logName)
-  const logStream = createWriteStream(logPath, { flags: 'w' })
+  const logFileDescriptor = openSync(logPath, 'w')
   const child = spawn(command, args, {
     cwd,
     env: { ...process.env, ...extraEnvironment },
-    stdio: ['ignore', logStream, logStream],
+    stdio: ['ignore', logFileDescriptor, logFileDescriptor],
+    shell: false,
     windowsHide: true,
   })
-  child.logStream = logStream
+  child.logFileDescriptor = logFileDescriptor
   return child
 }
 
@@ -54,7 +51,9 @@ function stopProcess(child) {
   } else {
     child.kill('SIGTERM')
   }
-  child.logStream?.end()
+  const logFileDescriptor = child.logFileDescriptor
+  child.logFileDescriptor = undefined
+  if (logFileDescriptor !== undefined) closeSync(logFileDescriptor)
 }
 
 async function waitForUrl(url, child, timeoutMs = 120_000) {
@@ -74,7 +73,15 @@ async function waitForUrl(url, child, timeoutMs = 120_000) {
   throw new Error(`Timed out waiting for ${url}`)
 }
 
-const backend = startProcess(
+let backend
+let frontend
+
+process.once('exit', () => {
+  stopProcess(frontend)
+  stopProcess(backend)
+})
+
+backend = startProcess(
   pythonExecutable(),
   ['scripts/e2e_server.py', '--data-dir', dataDirectory],
   backendDirectory,
@@ -87,20 +94,40 @@ const backend = startProcess(
 
 try {
   await waitForUrl('http://127.0.0.1:8000/api/v1/health', backend)
-  const frontend = startProcess(
-    npmExecutable(),
-    ['run', 'dev', '--', '--host', '127.0.0.1', '--port', '5173'],
+  frontend = startProcess(
+    process.execPath,
+    [
+      join(frontendDirectory, 'node_modules', 'vite', 'bin', 'vite.js'),
+      '--host',
+      '127.0.0.1',
+      '--port',
+      '5173',
+    ],
     frontendDirectory,
     'frontend.log',
   )
 
   let stopping = false
+  const parentProcessId = process.ppid
+  let parentWatch
   const stop = (exitCode = 0) => {
     if (stopping) return
     stopping = true
+    if (parentWatch !== undefined) clearInterval(parentWatch)
     stopProcess(frontend)
     stopProcess(backend)
     setTimeout(() => process.exit(exitCode), 250)
+  }
+
+  if (parentProcessId > 1) {
+    parentWatch = setInterval(() => {
+      try {
+        process.kill(parentProcessId, 0)
+      } catch {
+        stop()
+      }
+    }, 250)
+    parentWatch.unref()
   }
 
   process.on('SIGINT', () => stop())

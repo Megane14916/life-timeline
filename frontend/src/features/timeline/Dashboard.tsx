@@ -21,7 +21,7 @@ export function Dashboard({ data, error, loading, onRetry }: DashboardProps) {
 
       {loading && <p className="panel-status">統計を読み込んでいます…</p>}
       {error !== null && (
-        <div className="error-state" role="alert">
+        <div className="error-state" role="alert" data-testid="dashboard-error">
           <strong>Dashboardの取得に失敗しました</strong>
           <p>{error}</p>
           <button type="button" onClick={onRetry}>
@@ -31,18 +31,24 @@ export function Dashboard({ data, error, loading, onRetry }: DashboardProps) {
       )}
       {!loading && error === null && data !== null && (
         <>
-          <div className="metric-grid">
+          <div className="metric-grid" data-testid="dashboard-metrics">
             <div className="metric-card">
               <span>記録された利用時間</span>
-              <strong>{formatDuration(data.totals.usageMs)}</strong>
+              <strong data-testid="dashboard-usage">
+                {formatDuration(data.totals.usageMs)}
+              </strong>
             </div>
             <div className="metric-card">
               <span>セッション</span>
-              <strong>{data.totals.sessionCount}件</strong>
+              <strong data-testid="dashboard-session-count">
+                {data.totals.sessionCount}件
+              </strong>
             </div>
             <div className="metric-card">
               <span>利用アプリ</span>
-              <strong>{data.totals.appCount}件</strong>
+              <strong data-testid="dashboard-app-count">
+                {data.totals.appCount}件
+              </strong>
             </div>
           </div>
 
@@ -73,8 +79,12 @@ export function Dashboard({ data, error, loading, onRetry }: DashboardProps) {
                             {item.appIdentifier}
                           </span>
                         </th>
-                        <td>{formatDuration(item.usageMs)}</td>
-                        <td>{item.sessionCount}件</td>
+                        <td data-testid="dashboard-app-usage">
+                          {formatDuration(item.usageMs)}
+                        </td>
+                        <td data-testid="dashboard-app-sessions">
+                          {item.sessionCount}件
+                        </td>
                       </tr>
                     ))}
                   </tbody>

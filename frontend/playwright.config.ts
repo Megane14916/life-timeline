@@ -18,6 +18,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'node e2e/run-services.mjs',
+    gracefulShutdown: { signal: 'SIGKILL', timeout: 1_000 },
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: false,
     timeout: 120_000,
