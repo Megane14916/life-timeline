@@ -177,7 +177,7 @@ class UsageEventsCollector(
         val eventKey = usageEventKey(rawEvent)
         if (
           rawEvent.timestampMs < window.cursorAtMs ||
-            rawEvent.timestampMs == window.cursorAtMs && eventKey <= window.cursorKey
+            (rawEvent.timestampMs == window.cursorAtMs && eventKey <= window.cursorKey)
         ) {
           return@forEach
         }
