@@ -153,6 +153,19 @@ android/app/build/outputs/apk/debug/app-debug.apk
 
 Android Studioで実行する場合は`android/`をprojectとして開き、JDK 17とAPI 36を選択してください。Phase 0ではdebug APKのbuildを必須とし、emulatorまたは実機へのinstallは任意です。
 
+### 6. Tailscale Serve（Phase 2）
+
+FastAPIは必ず`127.0.0.1:8000`で起動し、AndroidからはTailscale Serveが提示するHTTPS hostnameへ接続します。Funnel、LANへの直接公開、cleartext HTTP、証明書検証の無効化は使用しません。Windows / Androidの接続確認、最小ACL、障害復旧は[Tailscale Serve接続手順](docs/development/phase2-tailscale.md)を参照してください。
+
+Backend起動中にrepository rootからServeを設定・確認できます。
+
+```powershell
+.\scripts\tailscale-serve.ps1 -Action configure -LocalPort 8000
+.\scripts\tailscale-serve.ps1 -Action check -Endpoint 'https://<machine>.<tailnet>.ts.net'
+```
+
+実tailnetのhostnameやidentityはログ・Issue・PRへ記録しないでください。
+
 ## CIとローカル検証の対応
 
 Pull Requestと`main`へのpushでは、変更パスに関係なく次のcheckをすべて実行します。
