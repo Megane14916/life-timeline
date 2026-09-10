@@ -2,7 +2,7 @@
 
 Life Timelineは、PCとスマートフォンから収集した活動データをローカルで管理し、複数の形式で振り返るためのアプリケーションです。
 
-現在はPhase 1のPC Coreを実装済みです。SQLiteへ正規化データを保存し、FastAPI経由でReactのTimelineとDashboardを表示できます。Android Collector、同期、写真、位置情報は後続Phaseで追加します。
+Phase 2まで実装済みです。SQLiteへ正規化データを保存し、AndroidのUsage Accessで収集したAppSessionをTailscale Serve経由で手動同期して、FastAPIのTimelineとDashboardで表示できます。写真、位置情報、WorkManagerによる自動同期は後続Phaseで追加します。
 
 ## Repository構成
 
@@ -151,7 +151,17 @@ Android SDKとJDK 17を利用できるPowerShellで、repository rootからWrapp
 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Android Studioで実行する場合は`android/`をprojectとして開き、JDK 17とAPI 36を選択してください。Phase 0ではdebug APKのbuildを必須とし、emulatorまたは実機へのinstallは任意です。
+Android Studioで実行する場合は`android/`をprojectとして開き、JDK 17とAPI 36を選択してください。実機でPhase 2を確認する場合は、Androidの開発者向けオプションとUSB debuggingを有効にしてから、次のようにinstallします。
+
+```powershell
+adb devices
+adb install -r .\android\app\build\outputs\apk\debug\app-debug.apk
+adb shell am start -n com.megane14916.lifetimeline/.MainActivity
+```
+
+初回起動時は`Usage access: 要設定`の「利用状況へのアクセス設定」から`life-timeline`を許可します。アプリへ戻って`Usage access: 許可済み`になったことを確認し、`PC endpoint (HTTPS)`へTailscale ServeのURLを入力して「PC URLを保存」を押します。アプリの「収集して同期」で、収集・送信・ACK反映をまとめて実行できます。画面には最終収集、最終同期、Pending、最後の状態が表示されます。
+
+Android Chromeで`https://<machine>.<tailnet>.ts.net/api/v1/health`を開き、`{"status":"ok"}`が表示されることを先に確認すると、アプリ設定とSync APIを切り分けやすくなります。実機での全手順と結果は[Phase 2受け入れ記録](docs/development/phase2-acceptance.md)に記載しています。
 
 ### 6. Tailscale Serve（Phase 2）
 
@@ -176,10 +186,11 @@ Pull Requestと`main`へのpushでは、変更パスに関係なく次のcheck�
 | `backend-ci (ubuntu)`  | frozen sync、format、lint、typecheck、test、実HTTP smoke           |
 | `backend-ci (windows)` | Ubuntuと同じ検証をPowerShell上で実行                               |
 | `android-ci`           | Gradle Wrapper検証、Spotless、Android Lint、unit test、debug build |
+| `android-instrumentation-ci` | Emulator上のRoom / Compose instrumentation test |
 
 Android CIの成功時には`life-timeline-debug-apk`というartifactが保存されます。GitHubのPull Requestで対象checkを開き、workflow runの`Artifacts`から取得できます。保存期間は7日です。
 
-Phase 1では、実DBからAPIを経由してReactまで確認する`pc-core-e2e`をPull Requestのrequired checkにしています。失敗・未実行・中断の状態ではmergeできません。
+Phase 2では、実DBからAPIを経由してReactまで確認する`pc-core-e2e`と、Emulator上のRoom / Composeを確認する`android-instrumentation-ci`をPull Requestのrequired checkにしています。失敗・未実行・中断の状態ではmergeできません。
 
 ## Phase 1固定データの確認値
 
@@ -190,6 +201,10 @@ Phase 1では、実DBからAPIを経由してReactまで確認する`pc-core-e2e
 ## Phase 1受け入れ記録
 
 Windowsで実施した手順、migration・seedの再実行、Backend再起動、停止からの復旧、AC-01〜13、CIとrulesetの結果は[Phase 1受け入れ記録](docs/development/phase1-acceptance.md)に記録しています。
+
+## Phase 2受け入れ記録
+
+Windowsの専用一時DB、Android実機、Tailscale Serveを使ったUsage Access・手動同期・停止からの復旧・再送の確認結果と、AC-01〜15の証拠は[Phase 2受け入れ記録](docs/development/phase2-acceptance.md)に記録しています。実tailnetのhostname、identity、個人のアプリ一覧、tokenは記録しません。
 
 ## よくある問題
 
@@ -237,6 +252,18 @@ Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
 
 `java -version`がJDK 17を指していることと、`ANDROID_HOME`が有効なSDKディレクトリを指していることを確認してください。Android StudioのSDK ManagerでAPI 36とBuild-Tools 36.0.0がインストール済みか確認します。
 
+### AndroidでUsage Accessが未許可になる
+
+アプリの`利用状況へのアクセス設定`からAndroidの設定を開き、`life-timeline`を許可してからアプリへ戻ります。許可前は「収集して同期」を実行できません。設定後も`要設定`のままなら、アプリをforegroundへ戻してから再確認するか、Androidの設定画面を再度開いて許可状態を確認します。
+
+### AndroidでPCへ接続できない
+
+PC endpointには`https://`のTailscale Serve URLだけを設定します。まずPCの`http://127.0.0.1:8000/api/v1/health`、次にAndroid Chromeの`https://<machine>.<tailnet>.ts.net/api/v1/health`を確認します。PCのFastAPI、Serve、Tailscaleの順に状態を確認し、Serveを設定したPCとAndroidが同じtailnetに参加していること、ACLで対象PCの443が許可されていることを確認します。Funnel、LANアドレス、`http://`、証明書検証の無効化は使用しません。
+
+### 同期失敗後もPendingが残る
+
+同期失敗時にPendingが減らないことはデータ保持のための正常な動作です。FastAPIまたはTailscale Serveを復旧し、同じ画面で「収集して同期」を再実行します。ACKを受信したSessionだけがsyncedになり、同じSessionを再送してもPC側で重複登録されません。PC停止、Serve停止、Tailscale切断の切り分けは[Tailscale Serve接続手順](docs/development/phase2-tailscale.md)を参照してください。
+
 ### ローカルでは成功するがCIで失敗する
 
 失敗したcheckの最初のerrorを確認し、対応表のローカルコマンドを同じ順序で実行します。生成済みのvirtual environment、`node_modules`、Gradle cacheに依存している疑いがある場合は、新しいcheckoutで再現を確認します。
@@ -253,7 +280,11 @@ Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue
 | [実装計画](docs/implementation-plan.md)                       | Phase構成と実装順序                 |
 | [Phase 0詳細計画](docs/detailed_plan/phase0-project-setup.md) | Project Setupのタスクと受け入れ条件 |
 | [Phase 1詳細計画](docs/detailed_plan/phase1-pc-core.md)       | PC Coreの実装計画                   |
+| [Phase 2詳細計画](docs/detailed_plan/phase2-android-app-usage-mvp.md) | Android App Usage MVPの実装計画 |
 | [開発toolchain](docs/development/toolchains.md)               | 固定version、識別子、更新規則       |
 | [Phase 0受け入れ記録](docs/development/phase0-acceptance.md)  | clean checkout検証とPhase 1開始判定 |
+| [Phase 1受け入れ記録](docs/development/phase1-acceptance.md)  | PC Coreの検証結果とPhase 2への引き継ぎ |
+| [Phase 2 Tailscale手順](docs/development/phase2-tailscale.md) | Serve、ACL、障害復旧の手順 |
+| [Phase 2受け入れ記録](docs/development/phase2-acceptance.md)  | Android実機、同期、CIの検証結果 |
 
 Androidの`applicationId`と`namespace`は`com.megane14916.lifetimeline`です。
