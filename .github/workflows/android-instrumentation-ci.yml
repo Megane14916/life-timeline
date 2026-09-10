@@ -9,7 +9,7 @@ permissions:
 jobs:
   android-instrumentation:
     name: android-instrumentation-ci
-    runs-on: macos-14
+    runs-on: macos-14-large
     timeout-minutes: 35
     steps:
       - name: Check out repository
