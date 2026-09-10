@@ -15,12 +15,14 @@ flowchart LR
         MS[MediaStore]
         LOC[Fused Location Provider]
         ROOM[(Room)]
-        WM[WorkManager]
+        MSYNC[Manual Sync]
+        WM[WorkManager Phase 3]
 
         US --> ROOM
         MS --> ROOM
         LOC --> ROOM
-        ROOM --> WM
+        ROOM --> MSYNC
+        ROOM -.-> WM
     end
 
     subgraph Network["Private Network"]
@@ -40,7 +42,8 @@ flowchart LR
         AW --> API
     end
 
-    WM -->|HTTPS| TS
+    MSYNC -->|HTTPS| TS
+    WM -.->|Phase 3| TS
     TS --> API
 ```
 
@@ -88,7 +91,7 @@ flowchart LR
 - MediaStore
 - Fused Location Provider
 
-Androidはライフログデータの収集、一時保存、PCへの同期に特化します。
+Androidはライフログデータの収集、一時保存、PCへの同期に特化します。Phase 2では画面の`収集して同期`からRoomのpending Sessionを手動送信し、ACKを受け取ったものだけをsyncedへ更新します。WorkManagerによる定期収集・自動同期はPhase 3で追加します。
 
 ### 通信
 
@@ -210,7 +213,7 @@ sequenceDiagram
 
     OS->>App: UsageStats
     App->>Room: 未同期データ保存
-    App->>PC: バッチ送信
+    App->>PC: 手動Syncからバッチ送信
     PC->>DB: UPSERT
     PC-->>App: accepted IDs
     App->>Room: synced更新

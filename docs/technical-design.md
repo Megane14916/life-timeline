@@ -200,7 +200,7 @@ PCが以下の状態でもAndroid側のデータを消しません。
 - Tailscale未接続
 - 通信切断
 
-WorkManagerにより後から再試行します。
+Phase 2ではユーザーが画面から手動で再試行します。Phase 3でWorkManagerによる定期収集・自動retry・network constraint・backoffを追加します。
 
 ---
 
@@ -539,8 +539,11 @@ Frontend
 Android
 ├ lint
 ├ unit test
-└ debug APK build
+├ debug APK build
+└ instrumentation test
 ```
+
+Phase 2以降のPull Requestでは、`pc-core-e2e`と`android-instrumentation-ci`もrequired checkとして実行します。実tailnetを使う受け入れは秘密情報をCIへ持ち込まず、Windows / Android実機のローカル手順と受け入れ記録で確認します。
 
 ## 推奨ツール
 
@@ -566,12 +569,7 @@ Android:
 
 ## E2E
 
-E2Eは毎PRで重い場合、
-
-- mainへのmerge時
-- release前
-
-に限定しても構いません。
+`pc-core-e2e`は実DBからSync APIを経由してReact表示まで、`android-instrumentation-ci`はEmulator上のRoom / Compose状態までを毎Pull Requestで確認します。Tailscaleを含む実機経路はローカル受け入れで補完します。
 
 ---
 
