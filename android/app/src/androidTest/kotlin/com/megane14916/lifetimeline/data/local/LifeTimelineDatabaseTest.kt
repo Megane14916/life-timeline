@@ -121,7 +121,7 @@ class LifeTimelineDatabaseTest {
       val first = repository.collectAndSave(firstRequest)
       assertEquals(0, first.insertedSessions)
       assertEquals(1, first.openActivities.size)
-      assertEquals(0, repository.countPending())
+      assertEquals(0, database.androidAppSessionDao().countPending())
 
       val second = repository.collectAndSave(secondRequest)
       val replay = repository.collectAndSave(replayRequest)
@@ -131,7 +131,7 @@ class LifeTimelineDatabaseTest {
       assertEquals(0, replay.insertedSessions)
       assertEquals(1, replay.reusedSessions)
       assertEquals(second.sessions.single().id, replay.sessions.single().id)
-      assertEquals(1, repository.countPending())
+      assertEquals(1, database.androidAppSessionDao().countPending())
       assertEquals(null, database.openActivityDao().getAll().singleOrNull())
     }
 
@@ -153,12 +153,17 @@ class LifeTimelineDatabaseTest {
       }
       assertEquals(1, repository.countPending())
 
+      val collectorStateBeforeInvalidInput =
+        database.collectorStateDao().find("android_usage_stats_v1")
       val invalid = session(2).copy(appId = generateUlid(1_780_000_001_000))
       assertThrows(IllegalArgumentException::class.java) {
         runBlocking { repository.saveCollection(collectionInput(listOf(session(3), invalid))) }
       }
       assertEquals(1, repository.countPending())
-      assertEquals(null, database.collectorStateDao().find("android_usage_stats_v1"))
+      assertEquals(
+        collectorStateBeforeInvalidInput,
+        database.collectorStateDao().find("android_usage_stats_v1"),
+      )
     }
 
   @Test
@@ -184,6 +189,7 @@ class LifeTimelineDatabaseTest {
       assertEquals(1, fileDatabase.androidAppSessionDao().getPending().size)
       fileDatabase.close()
       file.delete()
+      Unit
     }
 
   private fun collectionInput(sessions: List<AndroidAppSessionEntity>) =
