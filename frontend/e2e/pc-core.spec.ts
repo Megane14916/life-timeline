@@ -157,7 +157,9 @@ test.describe('PC core real database flow', () => {
     await expect(page.getByTestId('dashboard-session-count')).toHaveText('1件')
     await expect(page.getByTestId('dashboard-app-count')).toHaveText('1件')
     await expect(page.getByTestId('timeline-item')).toHaveCount(1)
-    await expect(page.getByText('P2 E2E Browser')).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'P2 E2E Browser' }),
+    ).toBeVisible()
     await expect(page.getByTestId('timeline-item-duration')).toHaveText('2分')
   })
 })
