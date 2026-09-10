@@ -159,6 +159,8 @@ Serveを使い終わったら、共有を停止します。
 
 この開発環境ではTailscale CLIを実行していませんが、利用者環境ではTailscaleアプリを使った実機通信を確認済みです。Serveの設定変更・状態確認・障害切り分けをCLIで行う場合だけ、Tailscale CLIをPATHから利用できるようにしてください。
 
+通常の同期にTailscale CLIは必須ではありません。Serveが設定済みで、Windows / AndroidのTailscaleアプリが接続状態なら、Androidアプリから同期できます。
+
 ## 参照
 
 - [Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve)
