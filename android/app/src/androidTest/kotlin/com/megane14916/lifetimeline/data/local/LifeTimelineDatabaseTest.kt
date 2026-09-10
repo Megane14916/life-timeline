@@ -121,7 +121,7 @@ class LifeTimelineDatabaseTest {
       val first = repository.collectAndSave(firstRequest)
       assertEquals(0, first.insertedSessions)
       assertEquals(1, first.openActivities.size)
-      assertEquals(0, repository.countPending())
+      assertEquals(0, database.androidAppSessionDao().countPending())
 
       val second = repository.collectAndSave(secondRequest)
       val replay = repository.collectAndSave(replayRequest)
@@ -131,7 +131,7 @@ class LifeTimelineDatabaseTest {
       assertEquals(0, replay.insertedSessions)
       assertEquals(1, replay.reusedSessions)
       assertEquals(second.sessions.single().id, replay.sessions.single().id)
-      assertEquals(1, repository.countPending())
+      assertEquals(1, database.androidAppSessionDao().countPending())
       assertEquals(null, database.openActivityDao().getAll().singleOrNull())
     }
 
