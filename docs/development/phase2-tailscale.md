@@ -142,9 +142,24 @@ Serveを使い終わったら、共有を停止します。
 - [ ] Funnel、LAN直接公開、cleartext、TLS検証回避を使っていない
 - [ ] hostname、tailnet名、identity、アプリ一覧、tokenをrepositoryへ残していない
 
+### 2026-09-10 実機確認結果
+
+利用者のWindows / Android環境で、次の結果を確認済みです。実際のhostname、tailnet名、identity、Session内容は記録していません。
+
+| 確認項目 | 結果 | 確認内容 |
+| --- | --- | --- |
+| AndroidからHTTPS health | PASS | Android Chromeで`{"status":"ok"}`を確認 |
+| Androidアプリの同期 | PASS | Androidアプリから同期を実行できた |
+| FastAPI停止時の保持 | PASS | FastAPI停止後もPendingが維持された |
+| FastAPI復旧後の再同期 | PASS | FastAPI再起動後に再同期できた |
+| 再送の冪等性 | PASS | 復旧後の再同期で重複登録が発生しなかった |
+| Tailscale切断・再接続 | PASS | Tailscaleのオン / オフ切替後も、再接続すれば通信が復旧した |
+
 ### このcheckoutでの準備状況
 
-PR作成環境ではTailscale CLIが未インストールだったため、実tailnet・Android実機の結果は未実施です。上記のチェックは、あなたのPCへTailscaleを導入して同じtailnetへAndroidを参加させた後に実施してください。実施結果は、この文書へhostnameなどの実値を入れず、別途Phase 2受け入れ記録へ`PASS` / `FAIL`だけ反映します。
+この開発環境ではTailscale CLIを実行していませんが、利用者環境ではTailscaleアプリを使った実機通信を確認済みです。Serveの設定変更・状態確認・障害切り分けをCLIで行う場合だけ、Tailscale CLIをPATHから利用できるようにしてください。
+
+通常の同期にTailscale CLIは必須ではありません。Serveが設定済みで、Windows / AndroidのTailscaleアプリが接続状態なら、Androidアプリから同期できます。
 
 ## 参照
 
