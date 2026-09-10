@@ -393,15 +393,14 @@ Photos画面も`media_items`を日付・場所などで絞り込んで表示し�
 
 # 11. Android側の同期状態
 
-Roomでは各送信対象について概念的に以下を管理します。
+Roomでは各送信対象について以下を管理します。
 
 ```text
 pending
-syncing
 synced
 ```
 
-ただしPC側Factには`synced`を持たせません。PCに保存された時点で同期済みとみなし、重複防止はIDで行います。
+Phase 2のRoom永続状態は`pending`と`synced`です。送信中の表示は画面上の一時状態として扱い、永続的な`syncing` leaseは持ちません。PC側Factには`synced`を持たせず、PCに保存された時点で同期済みとみなします。重複防止はAndroidで生成したIDとPC側の一意制約で行います。WorkManager、retry、network constraintはPhase 3で追加します。
 
 ---
 

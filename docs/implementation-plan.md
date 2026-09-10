@@ -54,6 +54,8 @@ PC単体でライフログデータを保存・表示できるようにする。
 
 ## Phase 2: Android App Usage MVP
 
+状態: 完了。実機での受け入れ結果は[Phase 2受け入れ記録](development/phase2-acceptance.md)を参照してください。
+
 目的:
 
 Android → PC の同期経路を一本完成させる。
@@ -72,9 +74,13 @@ Android → PC の同期経路を一本完成させる。
 
 実機Androidのアプリ利用履歴がPC Timelineに表示される。
 
+Phase 2では手動同期までを対象とし、PC停止やTailscale切断時はRoomのpendingを保持して復旧後に再送します。定期収集・自動同期はPhase 3で追加します。
+
 ---
 
 ## Phase 3: Automatic Sync
+
+開始条件: Phase 2の実機同期、再送時の冪等性、Timeline / Dashboard表示、required checksが受け入れ記録に残っていること。
 
 目的:
 

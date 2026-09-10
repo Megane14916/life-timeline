@@ -2,7 +2,7 @@
 
 - 作成日: 2026-09-09
 - 対象: Androidのアプリ利用履歴収集、Roomへの永続化、手動同期、Tailscale経由のSync API、既存Timelineへの統合
-- 状態: 実装前の計画
+- 状態: 実装・実機受け入れ済み。結果は[Phase 2受け入れ記録](../development/phase2-acceptance.md)を参照
 - 完成条件: Android実機で発生した確定済みAppSessionをRoomへ保存し、手動同期によってTailscale経由でPCへ送り、同じIDの再送で二重登録せずReact TimelineとDashboardから閲覧できる
 
 ## 1. 参照資料とPhase 2の位置付け
