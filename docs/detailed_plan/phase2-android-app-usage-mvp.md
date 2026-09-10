@@ -11,7 +11,7 @@
 
 | 文書                                                        | Phase 2に関係する方針                                                                              | 本計画への反映                                                                               |
 | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| [README.md](../../README.md)                                | Phase 1のPC Coreは実装済みで、Android Collector・同期・Tailscaleは後続                             | 既存の起動・migration・Timeline / Statistics・required checksを維持してAndroid経路を追加する |
+| [README.md](../../README.md)                                | Phase 2まで実装済み。Android Collector・手動同期・Tailscale Serveを実機手順へ反映                   | 起動・migration・Timeline / Statistics・required checksと実機受け入れ手順を一つにする          |
 | [overview.md](../overview.md)                               | PCをデータ管理の中心、Androidを収集と一時保存、同期はTailscale                                     | Roomは送信待ちデータを保持し、PCのNormalized Dataを長期保存の正とする                        |
 | [product-spec.md](../product-spec.md)                       | 収集→Room→PC→ACK、PC停止中も記録継続、MVP受け入れ条件1〜8                                          | 手動同期でもACK受信前に削除せず、実機から既存Timelineまでを受け入れる                        |
 | [architecture.md](../architecture.md)                       | Kotlin / Compose / Room / UsageStatsManager / Retrofit・OkHttp、Tailscale Serve、FastAPIはloopback | Android内部の責務分割とHTTPS経路をこの構成へ揃える                                           |
