@@ -36,20 +36,6 @@ jobs:
           force-avd-creation: true
           disable-animations: true
           script: |
-            set -euo pipefail
-            adb wait-for-device
-            for attempt in $(seq 1 120); do
-              boot_completed=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
-              package_service=$(adb shell service check package 2>/dev/null || true)
-              if [ "$boot_completed" = "1" ] && printf '%s' "$package_service" | grep -q 'found'; then
-                break
-              fi
-              if [ "$attempt" -eq 120 ]; then
-                echo "Android package service did not become ready."
-                exit 1
-              fi
-              sleep 5
-            done
             set +e
             ./android/gradlew --no-daemon -p android connectedDebugAndroidTest
             test_status=$?
