@@ -153,12 +153,17 @@ class LifeTimelineDatabaseTest {
       }
       assertEquals(1, repository.countPending())
 
+      val collectorStateBeforeInvalidInput =
+        database.collectorStateDao().find("android_usage_stats_v1")
       val invalid = session(2).copy(appId = generateUlid(1_780_000_001_000))
       assertThrows(IllegalArgumentException::class.java) {
         runBlocking { repository.saveCollection(collectionInput(listOf(session(3), invalid))) }
       }
       assertEquals(1, repository.countPending())
-      assertEquals(null, database.collectorStateDao().find("android_usage_stats_v1"))
+      assertEquals(
+        collectorStateBeforeInvalidInput,
+        database.collectorStateDao().find("android_usage_stats_v1"),
+      )
     }
 
   @Test
