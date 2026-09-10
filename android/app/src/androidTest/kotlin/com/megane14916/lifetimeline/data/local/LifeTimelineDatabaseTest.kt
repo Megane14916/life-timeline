@@ -184,6 +184,7 @@ class LifeTimelineDatabaseTest {
       assertEquals(1, fileDatabase.androidAppSessionDao().getPending().size)
       fileDatabase.close()
       file.delete()
+      Unit
     }
 
   private fun collectionInput(sessions: List<AndroidAppSessionEntity>) =
