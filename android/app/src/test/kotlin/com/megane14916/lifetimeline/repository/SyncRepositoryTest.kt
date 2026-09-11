@@ -77,6 +77,19 @@ class SyncRepositoryTest {
     }
 
   @Test
+  fun classifiesUnexpectedApiRuntimeFailureAsProtocolFailure() =
+    kotlinx.coroutines.runBlocking {
+      val store = FakePendingSessionStore(listOf(session(1)))
+      val api = RecordingSyncApi { throw IllegalArgumentException("malformed response") }
+
+      val result = repository(store, api).syncAll()
+
+      assertEquals(SyncFailureKind.PROTOCOL, result.failure?.kind)
+      assertEquals(1, result.pendingCount)
+      assertTrue(store.markedIds.isEmpty())
+    }
+
+  @Test
   fun stopsAfterConfiguredBatchLimitAndLeavesRemainingSessionsPending() =
     kotlinx.coroutines.runBlocking {
       val store = FakePendingSessionStore((0 until 201).map(::session))

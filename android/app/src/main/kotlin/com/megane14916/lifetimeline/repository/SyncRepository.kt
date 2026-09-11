@@ -9,6 +9,7 @@ import com.megane14916.lifetimeline.data.remote.SyncAppSessionsResponse
 import com.megane14916.lifetimeline.data.remote.SyncDeviceDto
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.SerializationException
 import retrofit2.Response
 import java.io.IOException
 import javax.net.ssl.SSLException
@@ -112,11 +113,17 @@ class SyncRepository(
             sessionsSynced,
             SyncFailure(SyncFailureKind.NETWORK, NETWORK_ERROR_MESSAGE),
           )
+        } catch (_: SerializationException) {
+          return failureResult(
+            batchesSucceeded,
+            sessionsSynced,
+            SyncFailure(SyncFailureKind.PROTOCOL, PROTOCOL_ERROR_MESSAGE),
+          )
         } catch (_: RuntimeException) {
           return failureResult(
             batchesSucceeded,
             sessionsSynced,
-            SyncFailure(SyncFailureKind.NETWORK, NETWORK_ERROR_MESSAGE),
+            SyncFailure(SyncFailureKind.PROTOCOL, PROTOCOL_ERROR_MESSAGE),
           )
         }
 

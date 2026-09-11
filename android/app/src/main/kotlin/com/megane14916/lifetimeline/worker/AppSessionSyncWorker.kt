@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.megane14916.lifetimeline.data.WorkerDependencies
+import com.megane14916.lifetimeline.repository.BackgroundExecutionCoordinator
+import com.megane14916.lifetimeline.repository.BackgroundLease
 import com.megane14916.lifetimeline.repository.SyncFailure
 import com.megane14916.lifetimeline.repository.SyncFailureKind
 import com.megane14916.lifetimeline.repository.SyncRunStatus
@@ -56,8 +58,8 @@ class AppSessionSyncWorker(
   }
 
   private suspend fun handleResult(
-    executionCoordinator: com.megane14916.lifetimeline.repository.BackgroundExecutionCoordinator,
-    lease: com.megane14916.lifetimeline.repository.BackgroundLease,
+    executionCoordinator: BackgroundExecutionCoordinator,
+    lease: BackgroundLease,
     result: com.megane14916.lifetimeline.repository.SyncResult,
   ): Result {
     when (result.status) {
