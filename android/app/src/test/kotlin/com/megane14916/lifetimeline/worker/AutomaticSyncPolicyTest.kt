@@ -12,6 +12,7 @@ class AutomaticSyncPolicyTest {
     assertEquals(5L, AutomaticSyncPolicy.COLLECTION_FLEX_MINUTES)
     assertEquals(15L, AutomaticSyncPolicy.SYNC_BACKOFF_MINUTES)
     assertEquals(15L, AutomaticSyncPolicy.LEASE_TTL_MINUTES)
+    assertEquals(5L, AutomaticSyncPolicy.MAX_CLOCK_SKEW_MINUTES)
     assertEquals(100, AutomaticSyncPolicy.BATCH_SIZE)
     assertEquals(20, AutomaticSyncPolicy.MAX_BATCHES_PER_RUN)
     assertEquals(8L, AutomaticSyncPolicy.MAX_RUN_MINUTES)
