@@ -23,6 +23,10 @@ class LifeTimelineWorkerFactory(
         WorkerCreator { appContext, workerParameters, workerDependencies ->
           UsageCollectionWorker(appContext, workerParameters, workerDependencies)
         },
+      AppSessionSyncWorker::class.java.name to
+        WorkerCreator { appContext, workerParameters, workerDependencies ->
+          AppSessionSyncWorker(appContext, workerParameters, workerDependencies)
+        },
     ),
 ) : WorkerFactory() {
   override fun createWorker(

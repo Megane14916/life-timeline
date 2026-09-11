@@ -14,4 +14,5 @@ data class WorkerDependencies(
   },
   val pcBaseUrlProvider: suspend () -> String? = { null },
   val syncTrigger: () -> Unit = {},
+  val syncSuccessRecorder: suspend (Long) -> Unit = {},
 )
