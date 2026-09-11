@@ -9,6 +9,7 @@ import com.megane14916.lifetimeline.data.remote.SyncAppSessionsResponse
 import com.megane14916.lifetimeline.data.remote.SyncDeviceDto
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.SerializationException
 import retrofit2.Response
 import java.io.IOException
 import javax.net.ssl.SSLException
@@ -30,6 +31,8 @@ enum class SyncRunStatus {
   NO_PENDING,
   PARTIAL_SUCCESS,
   FAILED,
+  RETRY_LIMIT_REACHED,
+  LEASE_LOST,
 }
 
 data class SyncResult(
@@ -48,9 +51,24 @@ class SyncRepository(
   private val nowMs: () -> Long = { System.currentTimeMillis() },
   private val mutex: Mutex = Mutex(),
 ) {
-  suspend fun syncAll(): SyncResult = mutex.withLock { syncAllLocked() }
+  suspend fun syncAll(
+    maxBatches: Int = Int.MAX_VALUE,
+    deadlineNanos: Long = Long.MAX_VALUE,
+    nowNanos: () -> Long = { System.nanoTime() },
+    onBatchCompleted: suspend () -> Boolean = { true },
+  ): SyncResult {
+    require(maxBatches > 0) { "maxBatches must be positive." }
+    return mutex.withLock {
+      syncAllLocked(maxBatches, deadlineNanos, nowNanos, onBatchCompleted)
+    }
+  }
 
-  private suspend fun syncAllLocked(): SyncResult {
+  private suspend fun syncAllLocked(
+    maxBatches: Int,
+    deadlineNanos: Long,
+    nowNanos: () -> Long,
+    onBatchCompleted: suspend () -> Boolean,
+  ): SyncResult {
     var batchesSucceeded = 0
     var sessionsSynced = 0
 
@@ -62,6 +80,14 @@ class SyncRepository(
           batchesSucceeded = batchesSucceeded,
           sessionsSynced = sessionsSynced,
           pendingCount = 0,
+        )
+      }
+      if (batchesSucceeded >= maxBatches || nowNanos() >= deadlineNanos) {
+        return SyncResult(
+          status = SyncRunStatus.RETRY_LIMIT_REACHED,
+          batchesSucceeded = batchesSucceeded,
+          sessionsSynced = sessionsSynced,
+          pendingCount = pending.size,
         )
       }
 
@@ -87,11 +113,17 @@ class SyncRepository(
             sessionsSynced,
             SyncFailure(SyncFailureKind.NETWORK, NETWORK_ERROR_MESSAGE),
           )
+        } catch (_: SerializationException) {
+          return failureResult(
+            batchesSucceeded,
+            sessionsSynced,
+            SyncFailure(SyncFailureKind.PROTOCOL, PROTOCOL_ERROR_MESSAGE),
+          )
         } catch (_: RuntimeException) {
           return failureResult(
             batchesSucceeded,
             sessionsSynced,
-            SyncFailure(SyncFailureKind.NETWORK, NETWORK_ERROR_MESSAGE),
+            SyncFailure(SyncFailureKind.PROTOCOL, PROTOCOL_ERROR_MESSAGE),
           )
         }
 
@@ -115,6 +147,14 @@ class SyncRepository(
       }
       batchesSucceeded += 1
       sessionsSynced += accepted.size
+      if (!onBatchCompleted()) {
+        return SyncResult(
+          status = SyncRunStatus.LEASE_LOST,
+          batchesSucceeded = batchesSucceeded,
+          sessionsSynced = sessionsSynced,
+          pendingCount = pendingStore.countPending(),
+        )
+      }
     }
   }
 

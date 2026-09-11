@@ -76,6 +76,66 @@ class SyncRepositoryTest {
       assertTrue(store.markedIds.isEmpty())
     }
 
+  @Test
+  fun classifiesUnexpectedApiRuntimeFailureAsProtocolFailure() =
+    kotlinx.coroutines.runBlocking {
+      val store = FakePendingSessionStore(listOf(session(1)))
+      val api = RecordingSyncApi { throw IllegalArgumentException("malformed response") }
+
+      val result = repository(store, api).syncAll()
+
+      assertEquals(SyncFailureKind.PROTOCOL, result.failure?.kind)
+      assertEquals(1, result.pendingCount)
+      assertTrue(store.markedIds.isEmpty())
+    }
+
+  @Test
+  fun stopsAfterConfiguredBatchLimitAndLeavesRemainingSessionsPending() =
+    kotlinx.coroutines.runBlocking {
+      val store = FakePendingSessionStore((0 until 201).map(::session))
+      val api =
+        RecordingSyncApi { request ->
+          Response.success(
+            SyncAppSessionsResponse(
+              schemaVersion = 1,
+              accepted = request.sessions.map { it.id },
+            ),
+          )
+        }
+
+      val result = repository(store, api).syncAll(maxBatches = 1)
+
+      assertEquals(SyncRunStatus.RETRY_LIMIT_REACHED, result.status)
+      assertEquals(1, result.batchesSucceeded)
+      assertEquals(100, result.sessionsSynced)
+      assertEquals(101, result.pendingCount)
+      assertEquals(100, store.markedIds.size)
+      assertEquals(listOf(100), api.requests.map { it.sessions.size })
+    }
+
+  @Test
+  fun stopsWhenLeaseHeartbeatIsLostAfterAcceptedBatch() =
+    kotlinx.coroutines.runBlocking {
+      val store = FakePendingSessionStore((0 until 101).map(::session))
+      val api =
+        RecordingSyncApi { request ->
+          Response.success(
+            SyncAppSessionsResponse(
+              schemaVersion = 1,
+              accepted = request.sessions.map { it.id },
+            ),
+          )
+        }
+
+      val result = repository(store, api).syncAll(onBatchCompleted = { false })
+
+      assertEquals(SyncRunStatus.LEASE_LOST, result.status)
+      assertEquals(1, result.batchesSucceeded)
+      assertEquals(1, result.pendingCount)
+      assertEquals(100, store.markedIds.size)
+      assertEquals(listOf(100), api.requests.map { it.sessions.size })
+    }
+
   private fun repository(
     store: FakePendingSessionStore,
     api: SyncApi,

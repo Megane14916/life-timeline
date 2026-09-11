@@ -81,6 +81,7 @@ class DefaultAppContainer(
       backgroundExecutionCoordinatorFactory = { BackgroundExecutionCoordinator(database) },
       pcBaseUrlProvider = preferences::getPcBaseUrl,
       syncTrigger = { backgroundWorkScheduler.enqueueSync() },
+      syncSuccessRecorder = preferences::recordSync,
     )
   }
   override val workerFactory: LifeTimelineWorkerFactory by lazy {
