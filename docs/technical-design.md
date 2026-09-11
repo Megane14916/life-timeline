@@ -200,7 +200,7 @@ PCが以下の状態でもAndroid側のデータを消しません。
 - Tailscale未接続
 - 通信切断
 
-Phase 2ではユーザーが画面から手動で再試行します。Phase 3でWorkManagerによる定期収集・自動retry・network constraint・backoffを追加します。
+Phase 3ではWorkManagerが定期収集・自動retry・network constraint・指数backoffを担当します。ユーザーの「収集して同期」操作は、同じRoom leaseとRepositoryを使う診断・即時実行手段として残します。未ACKのSessionはpendingを維持し、復旧後に同じIDで再送します。
 
 ---
 

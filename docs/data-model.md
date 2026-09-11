@@ -400,7 +400,17 @@ pending
 synced
 ```
 
-Phase 2のRoom永続状態は`pending`と`synced`です。送信中の表示は画面上の一時状態として扱い、永続的な`syncing` leaseは持ちません。PC側Factには`synced`を持たせず、PCに保存された時点で同期済みとみなします。重複防止はAndroidで生成したIDとPC側の一意制約で行います。WorkManager、retry、network constraintはPhase 3で追加します。
+AppSessionの同期状態は引き続き`pending`と`synced`だけを持ちます。送信中の表示は画面上の一時状態として扱い、Sessionを永続的な`syncing`へ一括変更しません。自動workerと手動診断は別々のRoom `background_work_state` leaseで直列化し、PC側Factには`synced`を持たせず、PCに保存された時点で同期済みとみなします。重複防止はAndroidで生成したIDとPC側の一意制約で行います。WorkManagerのunique work、CONNECTED / BatteryNotLow制約、指数backoff、Room v2 leaseはPhase 3で実装済みです。
+
+### Phase 3のbackground work state
+
+Room v2では`background_work_state`を追加し、collectionとsyncそれぞれについて次の診断状態を保持します。
+
+- `work_key`、`lease_owner`、取得時刻、期限切れ時刻。
+- 最終試行・最終成功時刻、`last_result`、`last_error_kind`。
+- 連続失敗回数と更新時刻。
+
+leaseはworker、手動処理、process再生成の境界をまたぐ排他用であり、Sessionの同期状態を置き換えません。ACK済みだけを`synced`へ更新し、未ACKは常に`pending`として再送可能な状態を保ちます。endpoint、package名、payload、tailnet名はこの診断状態へ保存しません。
 
 ---
 
