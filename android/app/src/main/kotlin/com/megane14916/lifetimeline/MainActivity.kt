@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
       collectionCoordinator = container.createCollectionCoordinator(appContext),
       pendingCount = container.localDataRepository::countPending,
       syncRepositoryFactory = { endpoint -> container.createSyncRepository(appContext, endpoint) },
+      onPcBaseUrlSaved = container.backgroundWorkScheduler::enqueueSync,
     )
   }
 }
