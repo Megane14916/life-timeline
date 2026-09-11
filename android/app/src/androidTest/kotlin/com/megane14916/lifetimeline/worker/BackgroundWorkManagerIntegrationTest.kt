@@ -128,14 +128,14 @@ class BackgroundWorkManagerIntegrationTest {
     Log.i(DIAGNOSTIC_TAG, "$label state=${info?.state} runAttemptCount=${info?.runAttemptCount}")
   }
 
-  private class SuccessfulWorker(
+  class SuccessfulWorker(
     context: Context,
     parameters: WorkerParameters,
   ) : Worker(context, parameters) {
     override fun doWork(): Result = Result.success()
   }
 
-  private class RetryingWorker(
+  class RetryingWorker(
     context: Context,
     parameters: WorkerParameters,
   ) : Worker(context, parameters) {
