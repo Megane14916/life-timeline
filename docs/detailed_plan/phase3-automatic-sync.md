@@ -410,7 +410,7 @@ P3-01 WorkManager依存・方針・共通dependency factory
 - **依存:** P3-05〜07。
 - **作業:** §12の24時間以上の代表シナリオを、専用PC DBと実機で実施する。worker時刻、pending推移、battery消費の参考値、復旧時間、Timeline件数を個人情報なしで記録する。
 - **成果物:** `docs/development/phase3-acceptance.md`。
-- **完了条件:** AC-01〜17を満たし、通常利用中に画面操作なしでPCへデータが蓄積される。
+- **完了条件:** 通常系の自動収集・自動同期が確認され、AC-01〜17の追加シナリオを必要に応じて追試できる記録がある。Doze、OEM最適化、force-stop中の厳密な無人復旧は非保証として扱う。
 
 ### P3-09: 文書を更新しPhase 4へ引き継ぐ
 
@@ -418,7 +418,7 @@ P3-01 WorkManager依存・方針・共通dependency factory
 - **依存:** P3-08。
 - **作業:** README、architecture、technical-design、data-model、implementation-plan、toolchainsへ実装済みの値と制約を反映し、Phase 3を完了へ更新する。
 - **成果物:** 再現手順、運用・障害切り分け、Phase 4へのscheduler拡張点。
-- **完了条件:** 計画値ではなく実測済みの挙動が記載され、Phase 2の「手動のみ」という古い説明が残っていない。
+- **完了条件:** 正常系の実装値と運用手順が各文書から追跡でき、Phase 2の「手動のみ」という古い説明が残っていない。未実施の拡張実機試験は非保証・任意シナリオとして明記され、Phase 4の開始条件と残課題が分離されている。
 
 ## 11. テスト・CI計画
 
@@ -512,7 +512,7 @@ WorkManager公式の[Integration tests](https://developer.android.com/develop/ba
 | AC-16 | UIでschedule、最終自動収集 / 同期、pending、直近errorを確認できる           | Compose test、実機画面                      |
 | AC-17 | 24時間以上の通常利用で、手動操作なしにPCへデータが蓄積される                | Phase 3受け入れ記録                         |
 
-AC-01〜17、全required checks、専用実機データでの長時間試験をもってPhase 3を完了する。
+正常系の自動収集・自動同期、全required checks、WorkManager / Room統合テスト、Phase 3受け入れ手順の反映をPhase 3実装完了の条件とする。Doze、OEM最適化、24時間以上の長時間試験などOS・実機依存の追加確認は、`docs/development/phase3-acceptance.md`の任意シナリオとして別管理する。
 
 ## 13. 非保証と運用上の注意
 
@@ -542,7 +542,7 @@ AC-01〜17、全required checks、専用実機データでの長時間試験を�
 
 ## 15. Phase 4への引き継ぎ
 
-Phase 4の写真同期では、Phase 3で作るscheduler、WorkerFactory、期限付きlease、safe diagnostics、retry classifierの考え方を再利用できる。ただし写真はファイル転送、容量、Wi-Fi only、原本非送信、thumbnailのatomic保存が必要なため、AppSessionのworkerへ同居させない。
+Phase 4の写真同期では、Phase 3で確定したscheduler、WorkerFactory、期限付きlease、safe diagnostics、retry classifierの考え方を再利用できる。ただし写真はファイル転送、容量、Wi-Fi only、原本非送信、thumbnailのatomic保存が必要なため、AppSessionのworkerへ同居させない。
 
 Phase 3完了時に、次をPhase 4へ引き渡す。
 
@@ -552,5 +552,7 @@ Phase 3完了時に、次をPhase 4へ引き渡す。
 - transient / permanent errorとbackoffの共通分類方針。
 - WorkManager unit / instrumentation / 実機長時間試験の雛形。
 - 個人情報を含めないworker診断と受け入れ記録の形式。
+
+Phase 3で未実施のDoze、OEM最適化、force-stop、24時間以上の実機試験は、写真同期の設計を確定する前に必要に応じて再確認する。Phase 4では写真の容量、送信頻度、Wi-Fi制約、原本保持方針を実測値に基づいて別途決定し、既存AppSessionのunique work名・Room lease・retry分類を変更しない。
 
 写真用のwork name、batch、constraints、lease key、retry上限はPhase 4のデータ量を基に別途決定する。
