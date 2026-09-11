@@ -18,8 +18,8 @@ class MainActivityTest {
     composeRule.onNodeWithText(ApplicationInfo.NAME).assertIsDisplayed()
     composeRule.onNodeWithText("Usage access: 要設定").assertIsDisplayed()
     composeRule.onNodeWithText("PC endpoint (HTTPS)").assertIsDisplayed()
-    composeRule.onNodeWithText("自動収集:", substring = true).assertIsDisplayed()
-    composeRule.onNodeWithText("次回自動収集:", substring = true).assertIsDisplayed()
+    composeRule.onNodeWithText("自動収集スケジュール:", substring = true).assertIsDisplayed()
+    composeRule.onNodeWithText("次回の自動収集:", substring = true).assertIsDisplayed()
     composeRule.onNodeWithText("収集して同期").assertIsDisplayed()
   }
 }

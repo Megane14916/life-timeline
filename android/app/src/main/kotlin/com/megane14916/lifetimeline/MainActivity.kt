@@ -126,8 +126,8 @@ private fun MainScreen(
 
       Text("最終収集: ${formatDeviceTimestamp(state.lastCollectionAtMs)}")
       Text("最終同期: ${formatDeviceTimestamp(state.lastSyncAtMs)}")
-      Text("自動収集: ${if (state.collectionScheduled) "スケジュール済み" else "未スケジュール"}")
-      Text("次回自動収集: ${formatDeviceTimestamp(state.nextCollectionAtMs)}")
+      Text("自動収集スケジュール: ${if (state.collectionScheduled) "スケジュール済み" else "未スケジュール"}")
+      Text("次回の自動収集: ${formatDeviceTimestamp(state.nextCollectionAtMs)}")
       Text(
         "自動収集の直近結果: ${state.automaticCollectionResult ?: "未実行"} " +
           "(${formatDeviceTimestamp(state.automaticCollectionSuccessAtMs)})",
