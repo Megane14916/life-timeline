@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.megane14916.lifetimeline.data.WorkerDependencies
-import com.megane14916.lifetimeline.repository.BackgroundExecutionCoordinator
 import com.megane14916.lifetimeline.repository.CollectionRunStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
