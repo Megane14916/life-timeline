@@ -14,13 +14,16 @@ fun interface WorkerCreator {
   ): ListenableWorker
 }
 
-/**
- * Creates workers from application-scoped dependencies without coupling WorkManager to Activities.
- * P3-04 and P3-05 will register the concrete worker creators.
- */
+/** Creates workers from application-scoped dependencies without coupling WorkManager to Activities. */
 class LifeTimelineWorkerFactory(
   private val dependencies: WorkerDependencies,
-  private val creators: Map<String, WorkerCreator> = emptyMap(),
+  private val creators: Map<String, WorkerCreator> =
+    mapOf(
+      UsageCollectionWorker::class.java.name to
+        WorkerCreator { appContext, workerParameters, workerDependencies ->
+          UsageCollectionWorker(appContext, workerParameters, workerDependencies)
+        },
+    ),
 ) : WorkerFactory() {
   override fun createWorker(
     appContext: Context,
