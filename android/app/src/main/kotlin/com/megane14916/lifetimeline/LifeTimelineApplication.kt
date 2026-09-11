@@ -16,4 +16,9 @@ class LifeTimelineApplication :
         .Builder()
         .setWorkerFactory(appContainer.workerFactory)
         .build()
+
+  override fun onCreate() {
+    super.onCreate()
+    appContainer.backgroundWorkScheduler.ensureScheduled()
+  }
 }

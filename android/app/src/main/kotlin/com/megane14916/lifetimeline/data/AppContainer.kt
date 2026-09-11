@@ -18,7 +18,9 @@ import com.megane14916.lifetimeline.repository.CollectionCoordinator
 import com.megane14916.lifetimeline.repository.CollectionRepository
 import com.megane14916.lifetimeline.repository.LocalDataRepository
 import com.megane14916.lifetimeline.repository.SyncRepository
+import com.megane14916.lifetimeline.worker.BackgroundWorkScheduler
 import com.megane14916.lifetimeline.worker.LifeTimelineWorkerFactory
+import androidx.work.WorkManager
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -35,6 +37,7 @@ interface AppContainer {
   val localDataRepository: LocalDataRepository
   val workerDependencies: WorkerDependencies
   val workerFactory: LifeTimelineWorkerFactory
+  val backgroundWorkScheduler: BackgroundWorkScheduler
 
   fun createCollectionCoordinator(context: Context): CollectionCoordinator
 
@@ -78,6 +81,9 @@ class DefaultAppContainer(
   }
   override val workerFactory: LifeTimelineWorkerFactory by lazy {
     LifeTimelineWorkerFactory(workerDependencies)
+  }
+  override val backgroundWorkScheduler: BackgroundWorkScheduler by lazy {
+    BackgroundWorkScheduler(WorkManager.getInstance(context))
   }
 
   override fun createCollectionCoordinator(context: Context): CollectionCoordinator {
