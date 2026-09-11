@@ -155,7 +155,7 @@ class MainViewModel(
           throw cancelled
         } catch (_: Throwable) {
           collectionLease?.let {
-            executionCoordinator?.recordFailure(it, "retry", "unexpected")
+            executionCoordinator.recordFailure(it, "retry", "unexpected")
           }
           _uiState.value =
             _uiState.value.copy(
@@ -200,7 +200,7 @@ class MainViewModel(
           throw cancelled
         } catch (_: Throwable) {
           syncLease?.let {
-            executionCoordinator?.recordFailure(it, "retry", "unexpected")
+            executionCoordinator.recordFailure(it, "retry", "unexpected")
           }
           _uiState.value =
             _uiState.value.copy(
