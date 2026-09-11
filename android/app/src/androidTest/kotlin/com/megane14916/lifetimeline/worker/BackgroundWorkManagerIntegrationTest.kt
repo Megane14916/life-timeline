@@ -1,6 +1,7 @@
 package com.megane14916.lifetimeline.worker
 
 import android.content.Context
+import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.ExistingWorkPolicy
@@ -10,7 +11,6 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestDriver
 import androidx.work.testing.WorkManagerTestInitHelper
-import org.junit.AfterClass
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.BeforeClass
@@ -35,6 +35,8 @@ class BackgroundWorkManagerIntegrationTest {
     val collection = scheduler.collectionWorkInfos().get()
     val sync = scheduler.syncWorkInfos().get()
 
+    logWorkInfo("unique-schedule collection", collection.singleOrNull())
+    logWorkInfo("unique-schedule sync", sync.singleOrNull())
     assertEquals(1, collection.size)
     assertEquals(1, sync.size)
   }
@@ -53,6 +55,7 @@ class BackgroundWorkManagerIntegrationTest {
     testDriver.setPeriodDelayMet(request.id)
 
     val info = checkNotNull(workManager.getWorkInfoById(request.id).get())
+    logWorkInfo("periodic-after-delay", info)
     assertEquals(WorkInfo.State.ENQUEUED, info.state)
     assertEquals(0, info.runAttemptCount)
   }
@@ -69,11 +72,13 @@ class BackgroundWorkManagerIntegrationTest {
 
     workManager.enqueue(request).result.get()
     val beforeConstraints = checkNotNull(workManager.getWorkInfoById(request.id).get())
+    logWorkInfo("sync-before-constraints", beforeConstraints)
     assertEquals(WorkInfo.State.ENQUEUED, beforeConstraints.state)
 
     testDriver.setAllConstraintsMet(request.id)
 
     val afterRetry = checkNotNull(workManager.getWorkInfoById(request.id).get())
+    logWorkInfo("sync-after-retry", afterRetry)
     assertEquals(WorkInfo.State.ENQUEUED, afterRetry.state)
     assertEquals(1, afterRetry.runAttemptCount)
     assertEquals(
@@ -109,11 +114,19 @@ class BackgroundWorkManagerIntegrationTest {
       .get()
 
     val info = scheduler.syncWorkInfos().get()
+    logWorkInfo("keep-policy", info.singleOrNull())
     assertEquals(1, info.size)
     assertEquals(first.id, info.single().id)
   }
 
   private fun scheduler(): BackgroundWorkScheduler = BackgroundWorkScheduler(workManager)
+
+  private fun logWorkInfo(
+    label: String,
+    info: WorkInfo?,
+  ) {
+    Log.i(DIAGNOSTIC_TAG, "$label state=${info?.state} runAttemptCount=${info?.runAttemptCount}")
+  }
 
   private class SuccessfulWorker(
     context: Context,
@@ -130,6 +143,8 @@ class BackgroundWorkManagerIntegrationTest {
   }
 
   private companion object {
+    const val DIAGNOSTIC_TAG = "LifeTimelineWorkInfo"
+
     lateinit var workManager: WorkManager
     lateinit var testDriver: TestDriver
 
@@ -140,13 +155,6 @@ class BackgroundWorkManagerIntegrationTest {
       WorkManagerTestInitHelper.initializeTestWorkManager(context)
       workManager = WorkManager.getInstance(context)
       testDriver = checkNotNull(WorkManagerTestInitHelper.getTestDriver(context))
-    }
-
-    @JvmStatic
-    @AfterClass
-    fun closeWorkManagerDatabase() {
-      workManager.cancelAllWork().result.get()
-      WorkManagerTestInitHelper.closeWorkDatabase()
     }
   }
 }
