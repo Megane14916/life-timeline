@@ -1,6 +1,5 @@
 package com.megane14916.lifetimeline
 
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -26,19 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.megane14916.lifetimeline.collector.AndroidPackageLabelResolver
-import com.megane14916.lifetimeline.collector.AndroidUsageEventsSource
 import com.megane14916.lifetimeline.collector.UsageAccessChecker
-import com.megane14916.lifetimeline.collector.UsageEventMapper
-import com.megane14916.lifetimeline.collector.UsageEventsCollector
-import com.megane14916.lifetimeline.data.remote.SyncApiFactory
-import com.megane14916.lifetimeline.data.remote.SyncAppDto
-import com.megane14916.lifetimeline.data.remote.SyncDeviceDto
-import com.megane14916.lifetimeline.repository.CollectionCoordinator
-import com.megane14916.lifetimeline.repository.CollectionRepository
-import com.megane14916.lifetimeline.repository.LocalDataRepository
-import com.megane14916.lifetimeline.repository.SyncRepository
-import retrofit2.Retrofit
 
 class MainActivity : ComponentActivity() {
   private val viewModel: MainViewModel by viewModels { MainViewModel.Factory { createMainViewModel() } }
@@ -67,58 +54,16 @@ class MainActivity : ComponentActivity() {
 
   private fun createMainViewModel(): MainViewModel {
     val container = (application as LifeTimelineApplication).appContainer
-    val accessChecker = UsageAccessChecker.from(this)
-    val collector =
-      UsageEventsCollector(
-        accessChecker = accessChecker,
-        source = AndroidUsageEventsSource.from(this),
-        mapper = UsageEventMapper(Build.VERSION.SDK_INT),
-        labelResolver = AndroidPackageLabelResolver(this),
-        selfPackageName = packageName,
-      )
-    val localRepository = LocalDataRepository(container.database)
-    val coordinator =
-      CollectionCoordinator(
-        database = container.database,
-        preferences = container.preferences,
-        accessChecker = accessChecker,
-        collector = collector,
-        collectionRepository = CollectionRepository(container.database),
-      )
+    val appContext = applicationContext
+    val accessChecker = UsageAccessChecker.from(appContext)
     return MainViewModel(
       preferences = container.preferences,
       usageAccessChecker = accessChecker,
-      collectionCoordinator = coordinator,
-      pendingCount = localRepository::countPending,
-      syncRepositoryFactory = { endpoint ->
-        SyncRepository(
-          pendingStore = localRepository,
-          appProvider = { ids ->
-            localRepository.getAppsByIds(ids.toList()).map { app ->
-              SyncAppDto(
-                id = app.id,
-                identifier = app.packageName,
-                displayName = app.displayName,
-              )
-            }
-          },
-          syncApi =
-            SyncApiFactory.create(
-              baseUrl = endpoint,
-              retrofitBuilder = Retrofit.Builder().client(container.httpClient),
-            ),
-          device =
-            SyncDeviceDto(
-              id = container.preferences.ensureDeviceId(),
-              name = deviceName(),
-              platform = "android",
-            ),
-        )
-      },
+      collectionCoordinator = container.createCollectionCoordinator(appContext),
+      pendingCount = container.localDataRepository::countPending,
+      syncRepositoryFactory = { endpoint -> container.createSyncRepository(appContext, endpoint) },
     )
   }
-
-  private fun deviceName(): String = "${Build.MANUFACTURER} ${Build.MODEL}".trim().ifBlank { "Android device" }
 }
 
 @Composable
