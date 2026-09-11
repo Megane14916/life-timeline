@@ -63,7 +63,10 @@ class DefaultAppContainer(
       .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE))
       .build()
   override val database: LifeTimelineDatabase by lazy {
-    Room.databaseBuilder(context, LifeTimelineDatabase::class.java, DATABASE_NAME).build()
+    Room
+      .databaseBuilder(context, LifeTimelineDatabase::class.java, DATABASE_NAME)
+      .addMigrations(LifeTimelineDatabase.MIGRATION_1_2)
+      .build()
   }
   override val preferences: AppPreferences = AppPreferences.create(context)
   override val localDataRepository: LocalDataRepository by lazy { LocalDataRepository(database) }

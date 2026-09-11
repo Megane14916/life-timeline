@@ -9,6 +9,7 @@ object AutomaticSyncPolicy {
   const val COLLECTION_FLEX_MINUTES = 5L
   const val SYNC_BACKOFF_MINUTES = 15L
   const val LEASE_TTL_MINUTES = 15L
+  const val MAX_CLOCK_SKEW_MINUTES = 5L
   const val BATCH_SIZE = 100
   const val MAX_BATCHES_PER_RUN = 20
   const val MAX_RUN_MINUTES = 8L
