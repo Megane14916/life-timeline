@@ -2,7 +2,7 @@
 
 Life Timelineは、PCとスマートフォンから収集した活動データをローカルで管理し、複数の形式で振り返るためのアプリケーションです。
 
-Phase 2まで実装済みです。SQLiteへ正規化データを保存し、AndroidのUsage Accessで収集したAppSessionをTailscale Serve経由で手動同期して、FastAPIのTimelineとDashboardで表示できます。写真、位置情報、WorkManagerによる自動同期は後続Phaseで追加します。
+Phase 3まで実装済みです。SQLiteへ正規化データを保存し、AndroidのUsage Accessで収集したAppSessionをRoomへ退避します。WorkManagerが定期収集と自動同期を行い、Tailscale Serve経由でFastAPIへ送信したデータをTimelineとDashboardで表示できます。画面の「収集して同期」は診断・即時実行用に残しています。写真と位置情報は後続Phaseで追加します。
 
 ## Repository構成
 
@@ -142,7 +142,7 @@ npm run e2e
 Android SDKとJDK 17を利用できるPowerShellで、repository rootからWrapperを実行します。
 
 ```powershell
-./android/gradlew.bat -p android spotlessCheck lintDebug testDebugUnitTest assembleDebug
+./android/gradlew.bat -p android spotlessCheck lintDebug testDebugUnitTest assembleDebug assembleDebugAndroidTest
 ```
 
 成功するとdebug APKが次の場所に生成されます。
@@ -159,11 +159,11 @@ adb install -r .\android\app\build\outputs\apk\debug\app-debug.apk
 adb shell am start -n com.megane14916.lifetimeline/.MainActivity
 ```
 
-初回起動時は`Usage access: 要設定`の「利用状況へのアクセス設定」から`life-timeline`を許可します。アプリへ戻って`Usage access: 許可済み`になったことを確認し、`PC endpoint (HTTPS)`へTailscale ServeのURLを入力して「PC URLを保存」を押します。アプリの「収集して同期」で、収集・送信・ACK反映をまとめて実行できます。画面には最終収集、最終同期、Pending、最後の状態が表示されます。
+初回起動時は`Usage access: 要設定`の「利用状況へのアクセス設定」から`life-timeline`を許可します。アプリへ戻って`Usage access: 許可済み`になったことを確認し、`PC endpoint (HTTPS)`へTailscale ServeのURLを入力して「PC URLを保存」を押します。保存後はWorkManagerが定期収集と自動同期を登録します。アプリの「収集して同期」は収集・送信・ACK反映を即時に確認する診断手段として残り、画面にはschedule、最終収集、最終同期、Pending、最後の状態が表示されます。
 
 Android Chromeで`https://<machine>.<tailnet>.ts.net/api/v1/health`を開き、`{"status":"ok"}`が表示されることを先に確認すると、アプリ設定とSync APIを切り分けやすくなります。実機での全手順と結果は[Phase 2受け入れ記録](docs/development/phase2-acceptance.md)に記載しています。
 
-### 6. Tailscale Serve（Phase 2）
+### 6. Tailscale Serve（Phase 2 / Phase 3）
 
 FastAPIは必ず`127.0.0.1:8000`で起動し、AndroidからはTailscale Serveが提示するHTTPS hostnameへ接続します。Funnel、LANへの直接公開、cleartext HTTP、証明書検証の無効化は使用しません。Windows / Androidの接続確認、最小ACL、障害復旧は[Tailscale Serve接続手順](docs/development/phase2-tailscale.md)を参照してください。
 
@@ -186,11 +186,12 @@ Pull Requestと`main`へのpushでは、変更パスに関係なく次のcheck�
 | `backend-ci (ubuntu)`  | frozen sync、format、lint、typecheck、test、実HTTP smoke           |
 | `backend-ci (windows)` | Ubuntuと同じ検証をPowerShell上で実行                               |
 | `android-ci`           | Gradle Wrapper検証、Spotless、Android Lint、unit test、debug build |
+| `pc-core-e2e`           | 実DB → Sync API → Timeline / DashboardのE2E                      |
 | `android-instrumentation-ci` | Emulator上のRoom / Compose instrumentation test |
 
 Android CIの成功時には`life-timeline-debug-apk`というartifactが保存されます。GitHubのPull Requestで対象checkを開き、workflow runの`Artifacts`から取得できます。保存期間は7日です。
 
-Phase 2では、実DBからAPIを経由してReactまで確認する`pc-core-e2e`と、Emulator上のRoom / Composeを確認する`android-instrumentation-ci`をPull Requestのrequired checkにしています。失敗・未実行・中断の状態ではmergeできません。
+Phase 3では、上記6つをPull Requestのrequired checkにしています。`android-ci`はWorkManager workerのunit test、`android-instrumentation-ci`はRoom / scheduler / WorkManager integration test、`pc-core-e2e`は実DBからTimeline / Dashboardまでを確認します。失敗・未実行・中断の状態ではmergeできません。
 
 ## Phase 1固定データの確認値
 
@@ -205,6 +206,10 @@ Windowsで実施した手順、migration・seedの再実行、Backend再起動�
 ## Phase 2受け入れ記録
 
 Windowsの専用一時DB、Android実機、Tailscale Serveを使ったUsage Access・手動同期・停止からの復旧・再送の確認結果と、AC-01〜15の証拠は[Phase 2受け入れ記録](docs/development/phase2-acceptance.md)に記録しています。実tailnetのhostname、identity、個人のアプリ一覧、tokenは記録しません。
+
+## Phase 3受け入れ記録
+
+WorkManagerによる定期収集・自動同期、Room v2、期限付きlease、retry、unique work、CI gateの実装と正常系の確認は[Phase 3受け入れ記録](docs/development/phase3-acceptance.md)に記録しています。Doze、OEMの電池最適化、端末再起動、Tailscale切替、24時間以上の運転はOS・実機依存のため、必要に応じて同記録の任意シナリオを追加確認します。
 
 ## よくある問題
 
@@ -262,7 +267,7 @@ PC endpointには`https://`のTailscale Serve URLだけを設定します。ま�
 
 ### 同期失敗後もPendingが残る
 
-同期失敗時にPendingが減らないことはデータ保持のための正常な動作です。FastAPIまたはTailscale Serveを復旧し、同じ画面で「収集して同期」を再実行します。ACKを受信したSessionだけがsyncedになり、同じSessionを再送してもPC側で重複登録されません。PC停止、Serve停止、Tailscale切断の切り分けは[Tailscale Serve接続手順](docs/development/phase2-tailscale.md)を参照してください。
+同期失敗時にPendingが減らないことはデータ保持のための正常な動作です。FastAPIまたはTailscale Serveを復旧すると、WorkManagerのretry / 次回triggerが同じSession IDを自動再送します。「収集して同期」は復旧を待たずに状態を確認する診断・即時実行手段です。ACKを受信したSessionだけがsyncedになり、同じSessionを再送してもPC側で重複登録されません。PC停止、Serve停止、Tailscale切断の切り分けは[Tailscale Serve接続手順](docs/development/phase2-tailscale.md)と[Phase 3受け入れ記録](docs/development/phase3-acceptance.md)を参照してください。
 
 ### ローカルでは成功するがCIで失敗する
 
@@ -286,5 +291,7 @@ PC endpointには`https://`のTailscale Serve URLだけを設定します。ま�
 | [Phase 1受け入れ記録](docs/development/phase1-acceptance.md)  | PC Coreの検証結果とPhase 2への引き継ぎ |
 | [Phase 2 Tailscale手順](docs/development/phase2-tailscale.md) | Serve、ACL、障害復旧の手順 |
 | [Phase 2受け入れ記録](docs/development/phase2-acceptance.md)  | Android実機、同期、CIの検証結果 |
+| [Phase 3詳細計画](docs/detailed_plan/phase3-automatic-sync.md) | 自動収集・自動同期・retryの実装計画 |
+| [Phase 3受け入れ記録](docs/development/phase3-acceptance.md) | WorkManager、障害復旧、実機確認の記録 |
 
 Androidの`applicationId`と`namespace`は`com.megane14916.lifetimeline`です。

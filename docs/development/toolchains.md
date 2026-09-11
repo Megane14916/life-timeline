@@ -46,9 +46,11 @@ P2-01では、既存のKotlin・AGP・compile SDKを変更せず、次の依存�
 
 依存の一次資料は、[Room release notes](https://developer.android.com/jetpack/androidx/releases/room)、[DataStore release notes](https://developer.android.com/jetpack/androidx/releases/datastore)、[Lifecycle release notes](https://developer.android.com/jetpack/androidx/releases/lifecycle)、[KSP releases](https://github.com/google/ksp/releases)、[Retrofit releases](https://github.com/square/retrofit/releases)、[OkHttp repository](https://github.com/square/okhttp)、[Kotlin serialization documentation](https://kotlinlang.org/docs/serialization.html)、[Kotlin coroutines releases](https://github.com/Kotlin/kotlinx.coroutines/releases)を参照した。
 
-### Phase 3 Android依存
+### Phase 3 Android依存（実装済み）
 
-P3-01では、WorkManagerのruntime KTXとtesting helperを追加した。定期workのruntimeは`androidx.work:work-runtime-ktx:2.11.2`、integration test用helperは`androidx.work:work-testing:2.11.2`へ固定する。公式release notesでは2.11.2がstableであり、network constraint、`NetworkStateTracker`、未捕捉例外後のperiodic work再scheduleに関する修正を含む。WorkManagerは`compileSdk 33`以上を要求するため、既存のcompile SDK 36と互換である。
+WorkManagerのruntime KTXとtesting helperを追加した。定期workのruntimeは`androidx.work:work-runtime-ktx:2.11.2`、integration test用helperは`androidx.work:work-testing:2.11.2`へ固定する。collectionは15分 / 5分flexのperiodic work、syncは`CONNECTED`かつ`BatteryNotLow`のone-time workとして利用する。公式release notesでは2.11.2がstableであり、network constraint、`NetworkStateTracker`、未捕捉例外後のperiodic work再scheduleに関する修正を含む。WorkManagerは`compileSdk 33`以上を要求するため、既存のcompile SDK 36と互換である。
+
+WorkManagerのscheduler、worker、Room v2 migration、期限付きlease、retry分類はPhase 3で実装済みである。`TestListenableWorkerBuilder`はworker単体、`WorkManagerTestInitHelper` / `TestDriver`はperiod・constraint・retry・unique workのintegration testに使い、既存の6 required checksへ統合する。emulator artifactにはJUnit、logcat、Room schema、WorkInfoの安全な要約だけを含め、endpoint、device ID、package利用履歴は含めない。
 
 一次資料: [WorkManager release notes](https://developer.android.com/jetpack/androidx/releases/work)
 

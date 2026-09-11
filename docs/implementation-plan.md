@@ -74,17 +74,19 @@ Android → PC の同期経路を一本完成させる。
 
 実機Androidのアプリ利用履歴がPC Timelineに表示される。
 
-Phase 2では手動同期までを対象とし、PC停止やTailscale切断時はRoomのpendingを保持して復旧後に再送します。定期収集・自動同期はPhase 3で追加します。
+Phase 2の受け入れでは手動同期経路と再送の冪等性を確認しました。定期収集・自動同期はPhase 3で実装済みであり、画面の手動操作は診断・即時実行手段として残ります。
 
 ---
 
 ## Phase 3: Automatic Sync
 
+状態: 実装完了。WorkManager、Room v2、期限付きlease、自動retry、手動 / 自動の共通実行基盤、CI gateをmainへ反映済みです。正常系の確認と実機確認の範囲は[Phase 3受け入れ記録](development/phase3-acceptance.md)を参照してください。
+
 開始条件: Phase 2の実機同期、再送時の冪等性、Timeline / Dashboard表示、required checksが受け入れ記録に残っていること。
 
 目的:
 
-手動同期を不要にする。
+通常利用中の手動同期を不要にし、必要な場合だけ診断・即時実行として残す。
 
 内容:
 
@@ -99,9 +101,13 @@ Phase 2では手動同期までを対象とし、PC停止やTailscale切断時�
 
 Androidを普段通り利用するだけでPCへデータが蓄積される。
 
+Phase 3で確定した主な運用値は、collectionの15分周期 / 5分flex、syncの`CONNECTED`かつ`BatteryNotLow`、指数backoff初期15分、100件batch、1回8分または20 batch上限です。Doze、OEM最適化、force-stop中の無人復旧の厳密性は保証対象外で、必要に応じて実機受け入れ記録の任意シナリオで確認します。
+
 ---
 
 ## Phase 4: Photos
+
+開始条件: Phase 3の正常系、CI gate、Room / WorkManagerの統合テスト、受け入れ手順がmainへ反映されていること。Phase 3で確定したscheduler、WorkerFactory、期限付きlease、retry分類、safe diagnosticsを再利用します。
 
 目的:
 
