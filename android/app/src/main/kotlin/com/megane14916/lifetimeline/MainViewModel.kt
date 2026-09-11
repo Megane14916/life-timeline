@@ -44,6 +44,7 @@ class MainViewModel(
   private val collectionCoordinator: CollectionCoordinator,
   private val pendingCount: suspend () -> Int,
   private val syncRepositoryFactory: suspend (String) -> SyncRepository,
+  private val onPcBaseUrlSaved: () -> Unit = {},
   private val nowMs: () -> Long = { System.currentTimeMillis() },
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(MainUiState())
@@ -76,6 +77,7 @@ class MainViewModel(
     viewModelScope.launch {
       try {
         preferences.setPcBaseUrl(value)
+        onPcBaseUrlSaved()
         _uiState.value = _uiState.value.copy(status = MainStatus.READY, errorMessage = null)
       } catch (_: IllegalArgumentException) {
         _uiState.value =
