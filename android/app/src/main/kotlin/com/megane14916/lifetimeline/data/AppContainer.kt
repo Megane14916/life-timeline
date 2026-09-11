@@ -15,6 +15,7 @@ import com.megane14916.lifetimeline.data.remote.SyncApiFactory
 import com.megane14916.lifetimeline.data.remote.SyncAppDto
 import com.megane14916.lifetimeline.data.remote.SyncContractJson
 import com.megane14916.lifetimeline.data.remote.SyncDeviceDto
+import com.megane14916.lifetimeline.repository.BackgroundExecutionCoordinator
 import com.megane14916.lifetimeline.repository.CollectionCoordinator
 import com.megane14916.lifetimeline.repository.CollectionRepository
 import com.megane14916.lifetimeline.repository.LocalDataRepository
@@ -77,6 +78,9 @@ class DefaultAppContainer(
     WorkerDependencies(
       collectionCoordinatorFactory = ::createCollectionCoordinator,
       syncRepositoryFactory = ::createSyncRepository,
+      backgroundExecutionCoordinatorFactory = { BackgroundExecutionCoordinator(database) },
+      pcBaseUrlProvider = preferences::getPcBaseUrl,
+      syncTrigger = { backgroundWorkScheduler.enqueueSync() },
     )
   }
   override val workerFactory: LifeTimelineWorkerFactory by lazy {

@@ -4,6 +4,8 @@ package com.megane14916.lifetimeline.worker
 object AutomaticSyncPolicy {
   const val COLLECTION_WORK_NAME = "life_timeline_usage_collection_v1"
   const val SYNC_WORK_NAME = "life_timeline_app_session_sync_v1"
+  const val COLLECTION_LEASE_KEY = "usage_collection_v1"
+  const val SYNC_LEASE_KEY = "app_session_sync_v1"
 
   const val COLLECTION_INTERVAL_MINUTES = 15L
   const val COLLECTION_FLEX_MINUTES = 5L
