@@ -11,6 +11,8 @@ import androidx.work.PeriodicWorkRequest
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /** Owns the persistent WorkManager contracts used by automatic collection and sync. */
@@ -44,6 +46,17 @@ class BackgroundWorkScheduler(
 
   /** Returns the WorkManager records for the unique sync work. */
   fun syncWorkInfos(): ListenableFuture<List<WorkInfo>> = workManager.getWorkInfosForUniqueWork(AutomaticSyncPolicy.SYNC_WORK_NAME)
+
+  /** Reads the current periodic collection record without duplicating schedule state in Room. */
+  suspend fun currentCollectionWorkInfo(): WorkInfo? = currentWorkInfo(collectionWorkInfos())
+
+  /** Reads the current unique sync record without duplicating schedule state in Room. */
+  suspend fun currentSyncWorkInfo(): WorkInfo? = currentWorkInfo(syncWorkInfos())
+
+  private suspend fun currentWorkInfo(future: ListenableFuture<List<WorkInfo>>): WorkInfo? =
+    withContext(Dispatchers.IO) {
+      runCatching { future.get().firstOrNull() }.getOrNull()
+    }
 
   internal fun collectionWorkRequest(): PeriodicWorkRequest =
     PeriodicWorkRequest

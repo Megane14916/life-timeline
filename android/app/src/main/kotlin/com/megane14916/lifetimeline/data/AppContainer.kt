@@ -39,6 +39,7 @@ interface AppContainer {
   val workerDependencies: WorkerDependencies
   val workerFactory: LifeTimelineWorkerFactory
   val backgroundWorkScheduler: BackgroundWorkScheduler
+  val backgroundExecutionCoordinator: BackgroundExecutionCoordinator
 
   fun createCollectionCoordinator(context: Context): CollectionCoordinator
 
@@ -74,11 +75,14 @@ class DefaultAppContainer(
   }
   override val preferences: AppPreferences = AppPreferences.create(context)
   override val localDataRepository: LocalDataRepository by lazy { LocalDataRepository(database) }
+  override val backgroundExecutionCoordinator: BackgroundExecutionCoordinator by lazy {
+    BackgroundExecutionCoordinator(database)
+  }
   override val workerDependencies: WorkerDependencies by lazy {
     WorkerDependencies(
       collectionCoordinatorFactory = ::createCollectionCoordinator,
       syncRepositoryFactory = ::createSyncRepository,
-      backgroundExecutionCoordinatorFactory = { BackgroundExecutionCoordinator(database) },
+      backgroundExecutionCoordinatorFactory = { backgroundExecutionCoordinator },
       pcBaseUrlProvider = preferences::getPcBaseUrl,
       syncTrigger = { backgroundWorkScheduler.enqueueSync() },
       syncSuccessRecorder = preferences::recordSync,

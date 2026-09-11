@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
   override fun onResume() {
     super.onResume()
     viewModel.refreshUsageAccess()
+    viewModel.refreshBackgroundState()
   }
 
   private fun createMainViewModel(): MainViewModel {
@@ -63,6 +64,8 @@ class MainActivity : ComponentActivity() {
       pendingCount = container.localDataRepository::countPending,
       syncRepositoryFactory = { endpoint -> container.createSyncRepository(appContext, endpoint) },
       onPcBaseUrlSaved = container.backgroundWorkScheduler::enqueueSync,
+      backgroundExecutionCoordinator = container.backgroundExecutionCoordinator,
+      backgroundWorkScheduler = container.backgroundWorkScheduler,
     )
   }
 }
@@ -80,7 +83,11 @@ private fun MainScreen(
   onCollectAndSync: () -> Unit,
 ) {
   var endpoint by rememberSaveable(state.pcBaseUrl) { mutableStateOf(state.pcBaseUrl.orEmpty()) }
-  val busy = state.status == MainStatus.COLLECTING || state.status == MainStatus.SYNCING
+  val busy =
+    state.status == MainStatus.COLLECTING ||
+      state.status == MainStatus.SYNCING ||
+      state.status == MainStatus.BACKGROUND_BUSY ||
+      state.backgroundBusy
 
   Surface(modifier = Modifier.fillMaxSize()) {
     Column(
@@ -117,8 +124,21 @@ private fun MainScreen(
         Text("PC URLを保存")
       }
 
-      Text("最終収集: ${state.lastCollectionAtMs?.toString() ?: "未実行"}")
-      Text("最終同期: ${state.lastSyncAtMs?.toString() ?: "未実行"}")
+      Text("最終収集: ${formatDeviceTimestamp(state.lastCollectionAtMs)}")
+      Text("最終同期: ${formatDeviceTimestamp(state.lastSyncAtMs)}")
+      Text("自動収集スケジュール: ${if (state.collectionScheduled) "スケジュール済み" else "未スケジュール"}")
+      Text("次回の自動収集: ${formatDeviceTimestamp(state.nextCollectionAtMs)}")
+      Text(
+        "自動収集の直近結果: ${state.automaticCollectionResult ?: "未実行"} " +
+          "(${formatDeviceTimestamp(state.automaticCollectionSuccessAtMs)})",
+      )
+      Text(
+        "自動同期の直近結果: ${state.automaticSyncResult ?: "未実行"} " +
+          "(${formatDeviceTimestamp(state.automaticSyncSuccessAtMs)})",
+      )
+      state.recentAutomaticErrorKind?.let { errorKind ->
+        Text("自動処理エラー: $errorKind", color = MaterialTheme.colorScheme.error)
+      }
       Text("Pending: ${state.pendingCount}")
       Text("状態: ${state.status.toDisplayText()}")
       state.errorMessage?.let { error ->
@@ -146,6 +166,7 @@ private fun MainStatus.toDisplayText(): String =
     MainStatus.NO_DATA -> "新しいデータはありません"
     MainStatus.CONNECTION_FAILED -> "PCに接続できません"
     MainStatus.FAILED -> "処理に失敗しました"
+    MainStatus.BACKGROUND_BUSY -> "バックグラウンド処理が実行中です"
   }
 
 @Composable
