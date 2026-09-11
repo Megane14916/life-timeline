@@ -234,6 +234,20 @@ battery開始 / 終了（参考値）:
 失敗時の対応Issue:
 ```
 
+### 7.2 自動検証の既存証跡
+
+実機操作とは分離して、p3-07の[PR #65](https://github.com/Megane14916/life-timeline/pull/65)で次を確認済みである。
+
+- `frontend-ci`
+- `backend-ci (ubuntu)`
+- `backend-ci (windows)`
+- `android-ci`
+- `pc-core-e2e`
+- `android-instrumentation-ci`
+- WorkManagerのperiod、constraints、retry、unique workの統合テスト30件（skip 0、failure 0）
+
+この証跡はコードとCI gateの回帰確認であり、実機のDoze、OEM電池最適化、Tailscale、端末再起動、24時間運転のPASSを意味しない。実機結果は利用者操作後にこの記録へ追記する。
+
 ## 8. 失敗時の切り分け
 
 | 症状 | 確認順 | 期待する対応 |
