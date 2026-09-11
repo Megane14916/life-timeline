@@ -22,6 +22,7 @@
 | Android compile SDK   | API `36`     | `android/app/build.gradle.kts`                                       | Android 16のAPIでcompileし、現在のGoogle Play target要件と揃える                                    |
 | Android target SDK    | API `36`     | `android/app/build.gradle.kts`                                       | 2026年8月31日以降の新規アプリ・更新のGoogle Play要件に合わせる                                      |
 | Android min SDK       | API `26`     | `android/app/build.gradle.kts`                                       | 個人利用の初期版ではAndroid 8.0以降を対象にし、バックグラウンド実行制約が導入された世代を下限にする |
+| AndroidX WorkManager  | `2.11.2`     | `android/gradle/libs.versions.toml`                                 | 2026-09-11時点のstable。compile SDK 36 / min SDK 26を満たし、Phase 3の定期work・coroutine worker・testingを提供する |
 
 Pythonのpatch version、Node.jsのLTS version、uvのversionは更新頻度が高い。Issue開始時に更新を必要とする理由がなければ、この表の値をそのまま使う。後続Issueの途中で暗黙に最新版へ変更しない。
 
@@ -44,6 +45,12 @@ P2-01では、既存のKotlin・AGP・compile SDKを変更せず、次の依存�
 | AndroidX Test Ext JUnit | `1.3.0` | `AndroidJUnit4` runnerでinstrumentation testを実行する |
 
 依存の一次資料は、[Room release notes](https://developer.android.com/jetpack/androidx/releases/room)、[DataStore release notes](https://developer.android.com/jetpack/androidx/releases/datastore)、[Lifecycle release notes](https://developer.android.com/jetpack/androidx/releases/lifecycle)、[KSP releases](https://github.com/google/ksp/releases)、[Retrofit releases](https://github.com/square/retrofit/releases)、[OkHttp repository](https://github.com/square/okhttp)、[Kotlin serialization documentation](https://kotlinlang.org/docs/serialization.html)、[Kotlin coroutines releases](https://github.com/Kotlin/kotlinx.coroutines/releases)を参照した。
+
+### Phase 3 Android依存
+
+P3-01では、WorkManagerのruntime KTXとtesting helperを追加した。定期workのruntimeは`androidx.work:work-runtime-ktx:2.11.2`、integration test用helperは`androidx.work:work-testing:2.11.2`へ固定する。公式release notesでは2.11.2がstableであり、network constraint、`NetworkStateTracker`、未捕捉例外後のperiodic work再scheduleに関する修正を含む。WorkManagerは`compileSdk 33`以上を要求するため、既存のcompile SDK 36と互換である。
+
+一次資料: [WorkManager release notes](https://developer.android.com/jetpack/androidx/releases/work)
 
 ## 3. Androidアプリの識別子
 
