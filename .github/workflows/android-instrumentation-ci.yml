@@ -43,11 +43,7 @@ jobs:
             test_status=$?
             mkdir -p android-instrumentation-artifacts
             adb logcat -d > android-instrumentation-artifacts/logcat.txt
-            if grep -F "LifeTimelineWorkInfo" android-instrumentation-artifacts/logcat.txt > android-instrumentation-artifacts/workinfo-summary.txt; then
-              true
-            else
-              echo "No WorkManager summary was emitted." > android-instrumentation-artifacts/workinfo-summary.txt
-            fi
+            grep -F "LifeTimelineWorkInfo" android-instrumentation-artifacts/logcat.txt > android-instrumentation-artifacts/workinfo-summary.txt || echo "No WorkManager summary was emitted." > android-instrumentation-artifacts/workinfo-summary.txt
             cp -R android/app/schemas android-instrumentation-artifacts/room-schemas
             exit $test_status
 
