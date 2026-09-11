@@ -24,7 +24,7 @@ class BackgroundWorkScheduler(
     workManager.enqueueUniquePeriodicWork(
       AutomaticSyncPolicy.COLLECTION_WORK_NAME,
       ExistingPeriodicWorkPolicy.UPDATE,
-      createCollectionRequest(),
+      collectionWorkRequest(),
     )
     enqueueSync()
   }
@@ -34,7 +34,7 @@ class BackgroundWorkScheduler(
     workManager.enqueueUniqueWork(
       AutomaticSyncPolicy.SYNC_WORK_NAME,
       ExistingWorkPolicy.KEEP,
-      createSyncRequest(),
+      syncWorkRequest(),
     )
   }
 
@@ -43,19 +43,19 @@ class BackgroundWorkScheduler(
     workManager.getWorkInfosForUniqueWork(AutomaticSyncPolicy.COLLECTION_WORK_NAME)
 
   /** Returns the WorkManager records for the unique sync work. */
-  fun syncWorkInfos(): ListenableFuture<List<WorkInfo>> =
-    workManager.getWorkInfosForUniqueWork(AutomaticSyncPolicy.SYNC_WORK_NAME)
+  fun syncWorkInfos(): ListenableFuture<List<WorkInfo>> = workManager.getWorkInfosForUniqueWork(AutomaticSyncPolicy.SYNC_WORK_NAME)
 
-  private fun createCollectionRequest(): PeriodicWorkRequest =
-    PeriodicWorkRequest.Builder(
-      collectionWorkerClass,
-      AutomaticSyncPolicy.COLLECTION_INTERVAL_MINUTES,
-      TimeUnit.MINUTES,
-      AutomaticSyncPolicy.COLLECTION_FLEX_MINUTES,
-      TimeUnit.MINUTES,
-    ).build()
+  internal fun collectionWorkRequest(): PeriodicWorkRequest =
+    PeriodicWorkRequest
+      .Builder(
+        collectionWorkerClass,
+        AutomaticSyncPolicy.COLLECTION_INTERVAL_MINUTES,
+        TimeUnit.MINUTES,
+        AutomaticSyncPolicy.COLLECTION_FLEX_MINUTES,
+        TimeUnit.MINUTES,
+      ).build()
 
-  private fun createSyncRequest(): OneTimeWorkRequest =
+  internal fun syncWorkRequest(): OneTimeWorkRequest =
     OneTimeWorkRequest
       .Builder(syncWorkerClass)
       .setConstraints(

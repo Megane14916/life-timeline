@@ -3,6 +3,7 @@ package com.megane14916.lifetimeline.data
 import android.content.Context
 import android.os.Build
 import androidx.room.Room
+import androidx.work.WorkManager
 import com.megane14916.lifetimeline.collector.AndroidPackageLabelResolver
 import com.megane14916.lifetimeline.collector.AndroidUsageEventsSource
 import com.megane14916.lifetimeline.collector.UsageAccessChecker
@@ -20,7 +21,6 @@ import com.megane14916.lifetimeline.repository.LocalDataRepository
 import com.megane14916.lifetimeline.repository.SyncRepository
 import com.megane14916.lifetimeline.worker.BackgroundWorkScheduler
 import com.megane14916.lifetimeline.worker.LifeTimelineWorkerFactory
-import androidx.work.WorkManager
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
