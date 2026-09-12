@@ -75,7 +75,7 @@ function timelineUrl(date = seededDate, selectedTimezone = timezone) {
   return `/timeline?date=${date}&timezone=${encodeURIComponent(selectedTimezone)}`
 }
 
-function photoStorageSnapshot() {
+function photoStorageSnapshot(currentPhotoId: string = photoId) {
   const dataDirectory = process.env.LIFE_TIMELINE_E2E_DATA_DIR
   if (!dataDirectory) throw new Error('E2E database path is not configured.')
 
@@ -94,7 +94,7 @@ function photoStorageSnapshot() {
         : 'python3')
   const result = execFileSync(
     python,
-    ['-c', pythonSqliteSnapshot, dataDirectory, photoId],
+    ['-c', pythonSqliteSnapshot, dataDirectory, currentPhotoId],
     { encoding: 'utf8' },
   )
   return JSON.parse(result) as {
@@ -258,7 +258,17 @@ test.describe('PC core real database flow', () => {
 
   test('syncs a synthetic photo idempotently through SQLite, thumbnail storage, and the UI', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    const currentPhotoId =
+      testInfo.retry === 0 ? photoId : `${photoId.slice(0, -1)}R`
+    const currentPhotoPayload = {
+      ...photoPayload,
+      photos: photoPayload.photos.map((photo) => ({
+        ...photo,
+        id: currentPhotoId,
+        sourceId: `fixture-volume:photo-e2e-${testInfo.retry}`,
+      })),
+    }
     await page.goto(timelineUrl(photoTokyoDate))
     const dashboardStats = [
       await page.getByTestId('dashboard-usage').innerText(),
@@ -271,10 +281,10 @@ test.describe('PC core real database flow', () => {
       const boundary = 'life-timeline-synthetic-photo-e2e'
       const body = Buffer.concat([
         Buffer.from(
-          `--${boundary}\r\nContent-Disposition: form-data; name="metadata"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(photoPayload)}\r\n`,
+          `--${boundary}\r\nContent-Disposition: form-data; name="metadata"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(currentPhotoPayload)}\r\n`,
         ),
         Buffer.from(
-          `--${boundary}\r\nContent-Disposition: form-data; name="thumbnail_${photoId}"; filename="thumbnail.webp"\r\nContent-Type: image/webp\r\n\r\n`,
+          `--${boundary}\r\nContent-Disposition: form-data; name="thumbnail_${currentPhotoId}"; filename="thumbnail.webp"\r\nContent-Type: image/webp\r\n\r\n`,
         ),
         syntheticThumbnail,
         Buffer.from(`\r\n--${boundary}--\r\n`),
@@ -291,9 +301,9 @@ test.describe('PC core real database flow', () => {
     expect(firstUpload.status()).toBe(200)
     await expect(firstUpload.json()).resolves.toEqual({
       schemaVersion: 1,
-      accepted: [photoId],
+      accepted: [currentPhotoId],
     })
-    const afterFirstUpload = photoStorageSnapshot()
+    const afterFirstUpload = photoStorageSnapshot(currentPhotoId)
     expect(afterFirstUpload).toMatchObject({
       rows: 1,
       thumbnail_refs: 1,
@@ -315,24 +325,26 @@ test.describe('PC core real database flow', () => {
     )
 
     const thumbnailResponse = await page.request.get(
-      `/api/v1/media/${photoId}/thumbnail`,
+      `/api/v1/media/${currentPhotoId}/thumbnail`,
     )
     expect(thumbnailResponse.status()).toBe(200)
     expect(thumbnailResponse.headers()['content-type']).toContain('image/webp')
     await expect(
-      page.getByRole('img', { name: 'synthetic-fixture.jpgの写真サムネイル' }),
+      page
+        .getByTestId('photo-timeline-card')
+        .getByRole('img', { name: 'synthetic-fixture.jpgの写真サムネイル' }),
     ).toHaveJSProperty('naturalWidth', 3)
 
     const replay = await postPhoto()
     expect(replay.status()).toBe(200)
     await expect(replay.json()).resolves.toEqual({
       schemaVersion: 1,
-      accepted: [photoId],
+      accepted: [currentPhotoId],
     })
     await page.reload()
     await expect(page.getByTestId('timeline-photo-item')).toHaveCount(1)
     await expect(page.getByTestId('photo-grid-card')).toHaveCount(1)
-    expect(photoStorageSnapshot()).toEqual(afterFirstUpload)
+    expect(photoStorageSnapshot(currentPhotoId)).toEqual(afterFirstUpload)
 
     await page.goto(timelineUrl('2026-09-06', 'UTC'))
     await expect(page.getByText('この日の写真はありません。')).toBeVisible()
@@ -343,7 +355,7 @@ test.describe('PC core real database flow', () => {
     await expect(page.getByTestId('timeline-photo-item')).toHaveCount(1)
     await expect(page.locator('.photo-grid-card time')).toHaveText('08:30')
 
-    await page.route(`**/api/v1/media/${photoId}/thumbnail`, (route) =>
+    await page.route(`**/api/v1/media/${currentPhotoId}/thumbnail`, (route) =>
       route.fulfill({
         status: 404,
         contentType: 'application/json',
