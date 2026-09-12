@@ -4,7 +4,9 @@ import android.content.Context
 import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.Worker
@@ -39,6 +41,8 @@ class BackgroundWorkManagerIntegrationTest {
     logWorkInfo("unique-schedule sync", sync.singleOrNull())
     assertEquals(1, collection.size)
     assertEquals(1, sync.size)
+    assertEquals(1, scheduler.photoCollectionWorkInfos().get().size)
+    assertEquals(1, scheduler.photoSyncWorkInfos().get().size)
   }
 
   @Test
@@ -117,6 +121,61 @@ class BackgroundWorkManagerIntegrationTest {
     logWorkInfo("keep-policy", info.singleOrNull())
     assertEquals(1, info.size)
     assertEquals(first.id, info.single().id)
+  }
+
+  @Test
+  fun photoWorkersUseIndependentConstraintsBackoffAndNames() {
+    val scheduler = scheduler()
+    val collection = scheduler.photoCollectionWorkRequest()
+    val sync = scheduler.photoSyncWorkRequest()
+
+    assertEquals(15L * 60 * 1_000L, collection.workSpec.intervalDuration)
+    assertEquals(5L * 60 * 1_000L, collection.workSpec.flexDuration)
+    assertEquals(
+      Constraints
+        .Builder()
+        .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+        .setRequiresBatteryNotLow(true)
+        .setRequiresStorageNotLow(true)
+        .build(),
+      collection.workSpec.constraints,
+    )
+    assertEquals(
+      Constraints
+        .Builder()
+        .setRequiredNetworkType(NetworkType.UNMETERED)
+        .setRequiresBatteryNotLow(true)
+        .setRequiresStorageNotLow(true)
+        .build(),
+      sync.workSpec.constraints,
+    )
+    assertEquals(30L * 60 * 1_000L, sync.workSpec.backoffDelayDuration)
+    assertEquals(0, workManager.getWorkInfosForUniqueWork(PhotoWorkPolicy.SYNC_WORK_NAME).get().size)
+  }
+
+  @Test
+  fun immediatePhotoScanDoesNotReplaceThePeriodicPhotoSchedule() {
+    val scheduler = scheduler()
+    scheduler.ensurePhotoCollectionScheduled()
+    val before =
+      scheduler
+        .photoCollectionWorkInfos()
+        .get()
+        .single()
+        .id
+
+    scheduler.enqueuePhotoCollectionNow()
+    scheduler.enqueuePhotoCollectionNow()
+
+    val after =
+      scheduler
+        .photoCollectionWorkInfos()
+        .get()
+        .single()
+        .id
+    val immediate = workManager.getWorkInfosForUniqueWork(PhotoWorkPolicy.IMMEDIATE_COLLECTION_WORK_NAME).get()
+    assertEquals(before, after)
+    assertEquals(1, immediate.size)
   }
 
   private fun scheduler(): BackgroundWorkScheduler = BackgroundWorkScheduler(workManager)

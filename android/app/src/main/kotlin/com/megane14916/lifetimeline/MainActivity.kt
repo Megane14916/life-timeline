@@ -42,6 +42,9 @@ class MainActivity : ComponentActivity() {
       registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.refreshPhotoAccess()
       }
+    val scheduler = (application as LifeTimelineApplication).appContainer.backgroundWorkScheduler
+    scheduler.photoCollectionWorkInfosLiveData().observe(this) { viewModel.refreshBackgroundState() }
+    scheduler.photoSyncWorkInfosLiveData().observe(this) { viewModel.refreshBackgroundState() }
     setContent {
       LifeTimelineTheme {
         val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -61,6 +64,7 @@ class MainActivity : ComponentActivity() {
           },
           onSaveEndpoint = viewModel::savePcBaseUrl,
           onCollectAndSync = viewModel::collectAndSync,
+          onCollectPhotosNow = viewModel::collectPhotosNow,
         )
       }
     }
@@ -84,9 +88,12 @@ class MainActivity : ComponentActivity() {
       collectionCoordinator = container.createCollectionCoordinator(appContext),
       pendingCount = container.localDataRepository::countPending,
       syncRepositoryFactory = { endpoint -> container.createSyncRepository(appContext, endpoint) },
-      onPcBaseUrlSaved = container.backgroundWorkScheduler::enqueueSync,
+      onPcBaseUrlSaved = container.backgroundWorkScheduler::enqueueAllSync,
       backgroundExecutionCoordinator = container.backgroundExecutionCoordinator,
       backgroundWorkScheduler = container.backgroundWorkScheduler,
+      pendingPhotoCount = { container.database.androidMediaItemDao().countPendingSync() },
+      pendingPhotoThumbnailCount = { container.database.androidMediaItemDao().countPendingThumbnails() },
+      localPhotoThumbnailBytes = { container.database.androidMediaItemDao().totalStoredThumbnailBytes() },
     )
   }
 }
@@ -105,6 +112,7 @@ private fun MainScreen(
   onReselectPhotos: () -> Unit,
   onSaveEndpoint: (String) -> Unit,
   onCollectAndSync: () -> Unit,
+  onCollectPhotosNow: () -> Unit,
 ) {
   var endpoint by rememberSaveable(state.pcBaseUrl) { mutableStateOf(state.pcBaseUrl.orEmpty()) }
   val busy =
@@ -169,6 +177,14 @@ private fun MainScreen(
           Text("写真収集を無効にする")
         }
       }
+      if (state.photoCollectionEnabled) {
+        Button(
+          onClick = onCollectPhotosNow,
+          enabled = state.photoAccessState != PhotoAccessState.DENIED,
+        ) {
+          Text("写真を今すぐ確認")
+        }
+      }
 
       OutlinedTextField(
         value = endpoint,
@@ -181,6 +197,24 @@ private fun MainScreen(
       )
       Button(onClick = { onSaveEndpoint(endpoint) }, enabled = !busy && endpoint.isNotBlank()) {
         Text("PC URLを保存")
+      }
+
+      Text("写真の自動収集: ${if (state.photoCollectionScheduled) "スケジュール済み" else "未スケジュール"}")
+      Text("次回の写真確認: ${formatDeviceTimestamp(state.nextPhotoCollectionAtMs)}")
+      Text(
+        "写真の最終scan: ${state.photoCollectionResult ?: "未実行"} " +
+          "(試行 ${formatDeviceTimestamp(state.photoCollectionAttemptAtMs)} / 成功 ${formatDeviceTimestamp(state.photoCollectionSuccessAtMs)})",
+      )
+      Text(
+        "写真の最終sync: ${state.photoSyncResult ?: "未実行"} " +
+          "(試行 ${formatDeviceTimestamp(state.photoSyncAttemptAtMs)} / 成功 ${formatDeviceTimestamp(state.photoSyncSuccessAtMs)})",
+      )
+      Text("thumbnail生成待ち: ${state.pendingPhotoThumbnailCount}")
+      Text("写真pending: ${state.pendingPhotoCount}")
+      Text("端末内thumbnail容量: ${state.localPhotoThumbnailBytes} bytes")
+      Text("写真同期状態: ${state.photoSyncStatusToDisplay()}")
+      state.photoRecentErrorKind?.let { errorKind ->
+        Text("写真の直近エラー: $errorKind", color = MaterialTheme.colorScheme.error)
       }
 
       Text("最終収集: ${formatDeviceTimestamp(state.lastCollectionAtMs)}")
@@ -240,6 +274,7 @@ private fun MainScreenPreview() {
       onReselectPhotos = {},
       onSaveEndpoint = {},
       onCollectAndSync = {},
+      onCollectPhotosNow = {},
     )
   }
 }
@@ -249,4 +284,14 @@ private fun PhotoAccessState.toDisplayText(): String =
     PhotoAccessState.FULL -> "有効（すべての写真）"
     PhotoAccessState.PARTIAL -> "制限付き（選択した写真のみ）"
     PhotoAccessState.DENIED -> "権限が必要"
+  }
+
+private fun MainUiState.photoSyncStatusToDisplay(): String =
+  when {
+    pendingPhotoCount > 0 && pcBaseUrl.isNullOrBlank() -> "PC URL設定後に同期"
+    photoSyncWorkState == androidx.work.WorkInfo.State.RUNNING -> "同期中"
+    photoSyncWorkState == androidx.work.WorkInfo.State.ENQUEUED && photoSyncRunAttemptCount > 0 -> "再試行待ち"
+    photoSyncWorkState == androidx.work.WorkInfo.State.ENQUEUED -> "制約条件待ち（UNMETERED / バッテリー / ストレージ）"
+    photoRecentErrorKind != null -> "要確認（$photoRecentErrorKind）"
+    else -> "待機中"
   }
