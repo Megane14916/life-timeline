@@ -74,7 +74,9 @@ def _validate_record(record: MediaItemRecord) -> None:
         (record.mime_type, "media_item.mime_type", 100),
     ):
         if not value.strip() or len(value) > max_length:
-            raise RepositoryValidationError(f"{field} must be nonblank and within its length limit.")
+            raise RepositoryValidationError(
+                f"{field} must be nonblank and within its length limit."
+            )
     if record.mime_type[:6] != "image/":
         raise RepositoryValidationError("media_item.mime_type must identify an image.")
     if any(ord(character) < 32 or ord(character) == 127 for character in record.filename):
@@ -123,7 +125,11 @@ def _validate_record(record: MediaItemRecord) -> None:
     if not LOWERCASE_SHA256.fullmatch(record.thumbnail_sha256):
         raise RepositoryValidationError("media_item thumbnail hash is invalid.")
     path = record.thumbnail_path
-    if path.startswith("/") or "\\" in path or any(part in {"", ".", ".."} for part in path.split("/")):
+    if (
+        path.startswith("/")
+        or "\\" in path
+        or any(part in {"", ".", ".."} for part in path.split("/"))
+    ):
         raise RepositoryValidationError("media_item thumbnail path must be relative and safe.")
 
 
@@ -181,8 +187,10 @@ class MediaRepository:
             raise MediaItemConflictError("id")
         incoming_thumbnail = record.thumbnail_sha256 is not None
         stored_thumbnail = existing.thumbnail_sha256 is not None
-        if incoming_thumbnail and stored_thumbnail and _thumbnail_content(existing) != _thumbnail_content(
-            record
+        if (
+            incoming_thumbnail
+            and stored_thumbnail
+            and _thumbnail_content(existing) != _thumbnail_content(record)
         ):
             raise MediaItemConflictError("thumbnail.sha256")
         return existing

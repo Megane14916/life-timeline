@@ -72,8 +72,14 @@ def test_media_migration_preserves_existing_rows_and_adds_constraints(
         } == {"uq_media_items_device_source_source_id"}
         with engine.connect() as connection:
             assert connection.scalar(text("SELECT count(*) FROM devices")) == 1
-            assert connection.scalar(
-                text("SELECT count(*) FROM alembic_version WHERE version_num = '0002_media_items'")
-            ) == 1
+            assert (
+                connection.scalar(
+                    text(
+                        "SELECT count(*) FROM alembic_version "
+                        "WHERE version_num = '0002_media_items'"
+                    )
+                )
+                == 1
+            )
     finally:
         engine.dispose()

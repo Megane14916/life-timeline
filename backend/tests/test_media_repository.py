@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import Settings
 from app.db import create_engine_for_settings, create_session_factory
-from app.models import Device, MediaItem
+from app.models import MediaItem
 from app.repositories import (
     DeviceRecord,
     MasterRepository,
