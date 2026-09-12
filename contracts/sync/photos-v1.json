@@ -1,0 +1,120 @@
+{
+  "endpoint": "/api/v1/sync/photos",
+  "contentType": "multipart/form-data",
+  "metadataPart": {
+    "name": "metadata",
+    "contentType": "application/json"
+  },
+  "thumbnailPartNameFormat": "thumbnail_<photo-id>",
+  "thumbnailPartFilename": "thumbnail.webp",
+  "policy": {
+    "maxPhotosPerBatch": 20,
+    "maxThumbnailBytes": 1048576,
+    "maxRequestBytes": 20971520,
+    "maxThumbnailDimensionPx": 512,
+    "thumbnailMimeType": "image/webp",
+    "thumbnailQuality": 65,
+    "maxFilenameLength": 255
+  },
+  "request": {
+    "schemaVersion": 1,
+    "device": {
+      "id": "01K4N6Q2N6N8YJ7W4M2D3A9B5C",
+      "name": "Synthetic Android device",
+      "platform": "android"
+    },
+    "photos": [
+      {
+        "id": "01K4N70E3Q6N9D6E6G0C8M2H1P",
+        "source": "android_media_store",
+        "sourceId": "fixture-volume:101",
+        "filename": "synthetic-fixture.jpg",
+        "capturedAtMs": 1789052400000,
+        "width": 3,
+        "height": 2,
+        "mimeType": "image/jpeg",
+        "latitude": null,
+        "longitude": null,
+        "thumbnail": {
+          "mimeType": "image/webp",
+          "width": 3,
+          "height": 2,
+          "byteSize": 60,
+          "sha256": "5c6b7be15722d51b915b1fab25d3f8d42e37fe294a57028516a3eb6ae1bd0be8"
+        }
+      },
+      {
+        "id": "01K4N70E3Q6N9D6E6G0C8M2H1Q",
+        "source": "android_media_store",
+        "sourceId": "fixture-volume:102",
+        "filename": "metadata-only-fixture.png",
+        "capturedAtMs": 1789052460000,
+        "width": null,
+        "height": null,
+        "mimeType": "image/png",
+        "latitude": null,
+        "longitude": null,
+        "thumbnail": null
+      }
+    ]
+  },
+  "success": {
+    "schemaVersion": 1,
+    "accepted": [
+      "01K4N70E3Q6N9D6E6G0C8M2H1P",
+      "01K4N70E3Q6N9D6E6G0C8M2H1Q"
+    ]
+  },
+  "errors": [
+    {
+      "status": 413,
+      "payload": {
+        "error": {
+          "code": "payload_too_large",
+          "message": "The photo sync request exceeds the size limit.",
+          "field": null
+        }
+      }
+    },
+    {
+      "status": 422,
+      "payload": {
+        "error": {
+          "code": "invalid_request",
+          "message": "The photo sync request is invalid.",
+          "field": "photos[0].thumbnail.sha256"
+        }
+      }
+    },
+    {
+      "status": 409,
+      "payload": {
+        "error": {
+          "code": "sync_conflict",
+          "message": "A photo ID is already stored with different content.",
+          "field": "photos[0].id"
+        }
+      }
+    },
+    {
+      "status": 503,
+      "payload": {
+        "error": {
+          "code": "temporarily_unavailable",
+          "message": "The PC is temporarily unavailable.",
+          "field": null
+        }
+      }
+    },
+    {
+      "status": 500,
+      "payload": {
+        "error": {
+          "code": "internal_error",
+          "message": "The photo sync request could not be completed.",
+          "field": null
+        }
+      }
+    }
+  ]
+}
