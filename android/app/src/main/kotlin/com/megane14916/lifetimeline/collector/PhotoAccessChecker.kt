@@ -1,6 +1,7 @@
 package com.megane14916.lifetimeline.collector
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -34,6 +35,7 @@ class PhotoAccessChecker(
           },
       )
 
+    @SuppressLint("InlinedApi")
     fun permissionsFor(apiLevel: Int): Array<String> =
       when {
         apiLevel >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> {
@@ -52,6 +54,7 @@ class PhotoAccessChecker(
         }
       }
 
+    @SuppressLint("InlinedApi")
     fun resolveAccess(
       apiLevel: Int,
       isGranted: (String) -> Boolean,

@@ -163,7 +163,6 @@ private fun MainScreen(
           }
 
           PhotoAccessState.FULL -> {
-            Unit
           }
         }
         Button(onClick = onDisablePhotoCollection, enabled = !busy) {
