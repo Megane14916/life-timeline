@@ -212,6 +212,7 @@ class LifeTimelineDatabaseTest {
           )
         }
       }
+      Unit
     }
 
   @Test
@@ -226,6 +227,7 @@ class LifeTimelineDatabaseTest {
       assertThrows(RuntimeException::class.java) {
         runBlocking { database.androidMediaItemDao().insertIfAbsent(invalid) }
       }
+      Unit
     }
 
   private fun collectionInput(sessions: List<AndroidAppSessionEntity>) =
