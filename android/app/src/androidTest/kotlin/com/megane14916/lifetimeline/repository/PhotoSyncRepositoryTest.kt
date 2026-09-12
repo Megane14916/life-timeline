@@ -97,7 +97,7 @@ class PhotoSyncRepositoryTest {
       assertEquals(AndroidMediaItemEntity.SYNC_PENDING, pending.syncStatus)
       assertEquals(AndroidMediaItemEntity.THUMBNAIL_UNAVAILABLE, pending.thumbnailState)
       assertEquals(1, database.androidMediaItemDao().countPendingSync())
-      assertEquals(0, database.androidMediaItemDao().countPendingSyncable())
+      assertEquals(1, database.androidMediaItemDao().countPendingSyncable())
       assertNotNull(unavailable.id)
     }
 
