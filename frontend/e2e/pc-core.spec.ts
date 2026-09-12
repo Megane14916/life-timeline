@@ -14,7 +14,6 @@ const syncedSessionId = '01K4N70E3Q6N9D6E6G0C8M2H1P'
 const syncedStartedAtMs = Date.UTC(2026, 8, 5, 1, 0)
 const photoId = '01K4N70E3Q6N9D6E6G0C8M2H1Q'
 const photoCapturedAtMs = Date.UTC(2026, 8, 5, 23, 30)
-const photoTokyoDate = '2026-09-06'
 const repositoryDirectory = resolve(
   dirname(fileURLToPath(import.meta.url)),
   '../..',
@@ -261,15 +260,31 @@ test.describe('PC core real database flow', () => {
   }, testInfo) => {
     const currentPhotoId =
       testInfo.retry === 0 ? photoId : `${photoId.slice(0, -1)}R`
+    const currentCapturedAtMs =
+      photoCapturedAtMs + testInfo.retry * 24 * 60 * 60 * 1_000
+    const currentPhotoTokyoDate = new Date(
+      currentCapturedAtMs + 9 * 60 * 60 * 1_000,
+    )
+      .toISOString()
+      .slice(0, 10)
+    const currentPhotoUtcDate = new Date(currentCapturedAtMs)
+      .toISOString()
+      .slice(0, 10)
+    const nextPhotoUtcDate = new Date(
+      currentCapturedAtMs + 24 * 60 * 60 * 1_000,
+    )
+      .toISOString()
+      .slice(0, 10)
     const currentPhotoPayload = {
       ...photoPayload,
       photos: photoPayload.photos.map((photo) => ({
         ...photo,
         id: currentPhotoId,
         sourceId: `fixture-volume:photo-e2e-${testInfo.retry}`,
+        capturedAtMs: currentCapturedAtMs,
       })),
     }
-    await page.goto(timelineUrl(photoTokyoDate))
+    await page.goto(timelineUrl(currentPhotoTokyoDate))
     const dashboardStats = [
       await page.getByTestId('dashboard-usage').innerText(),
       await page.getByTestId('dashboard-session-count').innerText(),
@@ -346,12 +361,12 @@ test.describe('PC core real database flow', () => {
     await expect(page.getByTestId('photo-grid-card')).toHaveCount(1)
     expect(photoStorageSnapshot(currentPhotoId)).toEqual(afterFirstUpload)
 
-    await page.goto(timelineUrl('2026-09-06', 'UTC'))
+    await page.goto(timelineUrl(nextPhotoUtcDate, 'UTC'))
     await expect(page.getByText('この日の写真はありません。')).toBeVisible()
-    await page.goto(timelineUrl('2026-09-05', 'UTC'))
+    await page.goto(timelineUrl(currentPhotoUtcDate, 'UTC'))
     await expect(page.getByTestId('timeline-photo-item')).toHaveCount(1)
     await expect(page.locator('.photo-grid-card time')).toHaveText('23:30')
-    await page.goto(timelineUrl(photoTokyoDate, timezone))
+    await page.goto(timelineUrl(currentPhotoTokyoDate, timezone))
     await expect(page.getByTestId('timeline-photo-item')).toHaveCount(1)
     await expect(page.locator('.photo-grid-card time')).toHaveText('08:30')
 
@@ -364,10 +379,10 @@ test.describe('PC core real database flow', () => {
         }),
       }),
     )
-    await page.goto(timelineUrl(photoTokyoDate, timezone))
+    await page.goto(timelineUrl(currentPhotoTokyoDate, timezone))
     await page.getByTestId('timeline-photo-item').scrollIntoViewIfNeeded()
     await expect(
-      page.getByRole('img', {
+      page.getByTestId('photo-timeline-card').getByRole('img', {
         name: 'synthetic-fixture.jpgのサムネイルを読み込めません',
       }),
     ).toBeVisible()
