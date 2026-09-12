@@ -43,7 +43,7 @@ jobs:
           emulator-boot-timeout: 1800
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics -accel off
           script: |
-            set -euo pipefail
+            set -eu
             fixture_path=/sdcard/DCIM/LifeTimelineTest/synthetic-photo.jpg
             adb shell mkdir -p /sdcard/DCIM/LifeTimelineTest
             adb push android/app/src/androidTest/assets/synthetic-photo.jpg "$fixture_path"
