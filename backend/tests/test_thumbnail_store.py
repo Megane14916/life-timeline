@@ -51,7 +51,7 @@ def test_store_promotes_valid_webp_to_server_generated_relative_path(tmp_path: P
     content = THUMBNAIL_PATH.read_bytes()
     photo = _photo()
 
-    async def stage():
+    async def stage() -> StagedThumbnail:
         return await _stage(store, photo, content)
 
     staged = asyncio.run(stage())
@@ -74,7 +74,7 @@ def test_store_reuses_same_hash_file_and_rejects_different_hash_for_same_key(
     photo = _photo()
     content = THUMBNAIL_PATH.read_bytes()
 
-    async def stage_twice():
+    async def stage_twice() -> tuple[StagedThumbnail, StagedThumbnail]:
         return await _stage(store, photo, content), await _stage(store, photo, content)
 
     first, second = asyncio.run(stage_twice())
@@ -100,7 +100,7 @@ def test_store_reuses_same_hash_file_and_rejects_different_hash_for_same_key(
         }
     )
 
-    async def stage_different():
+    async def stage_different() -> StagedThumbnail:
         return await _stage(store, different_photo, different_bytes)
 
     different_staged = asyncio.run(stage_different())
@@ -115,11 +115,13 @@ def test_store_rejects_size_dimension_and_webp_mismatches(tmp_path: Path) -> Non
     store = ThumbnailStore(tmp_path / "data" / "thumbnails")
     photo = _photo()
     content = THUMBNAIL_PATH.read_bytes()
+    thumbnail = photo.thumbnail
+    assert thumbnail is not None
     wrong_dimensions = photo.model_copy(
-        update={"thumbnail": photo.thumbnail.model_copy(update={"width": 2, "height": 3})}
+        update={"thumbnail": thumbnail.model_copy(update={"width": 2, "height": 3})}
     )
 
-    async def invalid_cases():
+    async def invalid_cases() -> None:
         await store.stage(wrong_dimensions, _upload(content))
 
     with pytest.raises(InvalidThumbnailError, match="pixel size"):
@@ -127,7 +129,7 @@ def test_store_rejects_size_dimension_and_webp_mismatches(tmp_path: Path) -> Non
 
     oversized = content + b"x" * (1_048_577 - len(content))
 
-    async def oversized_case():
+    async def oversized_case() -> None:
         await store.stage(photo, _upload(oversized))
 
     with pytest.raises(ThumbnailTooLargeError):

@@ -7,8 +7,9 @@ import copy
 import hashlib
 import io
 import json
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pytest
@@ -36,7 +37,7 @@ MAX_THUMBNAIL_BYTES = 1_048_576
 
 
 def _fixture() -> dict[str, Any]:
-    return json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(CONTRACT_PATH.read_text(encoding="utf-8")))
 
 
 def _database(
@@ -60,7 +61,9 @@ def _post(
 ) -> httpx.Response:
     async def request() -> httpx.Response:
         transport = httpx.ASGITransport(app=application, raise_app_exceptions=False)
-        parts = [("metadata", (None, json.dumps(metadata), "application/json"))]
+        parts: list[tuple[str, tuple[str | None, str | bytes, str]]] = [
+            ("metadata", (None, json.dumps(metadata), "application/json"))
+        ]
         parts.extend(files or [])
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             return await client.post(
@@ -96,7 +99,9 @@ def test_sync_saves_fixture_idempotently_and_keeps_server_generated_paths(
     try:
         first = _post(application, metadata, [_file(metadata["photos"][0]["id"], image)])
         with factory() as session:
-            created_at = session.get(MediaItem, metadata["photos"][0]["id"]).created_at_ms
+            item = session.get(MediaItem, metadata["photos"][0]["id"])
+            assert item is not None
+            created_at = item.created_at_ms
         second = _post(application, metadata, [_file(metadata["photos"][0]["id"], image)])
 
         expected = {"schemaVersion": 1, "accepted": [photo["id"] for photo in metadata["photos"]]}
@@ -300,7 +305,7 @@ def test_unbounded_request_stream_is_limited_without_content_length(
 ) -> None:
     engine, _factory, application = _database(tmp_path, monkeypatch)
 
-    async def chunks():
+    async def chunks() -> AsyncIterator[bytes]:
         yield b"x" * (MAX_REQUEST_BYTES // 2)
         yield b"x" * (MAX_REQUEST_BYTES // 2 + 1)
 
