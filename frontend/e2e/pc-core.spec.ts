@@ -1,3 +1,8 @@
+import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
 
 const seededDate = '2026-09-03'
@@ -7,9 +12,97 @@ const syncedDeviceId = '01K4N6Q2N6N8YJ7W4M2D3A9B5C'
 const syncedAppId = '01K4N6R7KQJ8J2W9VQW4B6M0TN'
 const syncedSessionId = '01K4N70E3Q6N9D6E6G0C8M2H1P'
 const syncedStartedAtMs = Date.UTC(2026, 8, 5, 1, 0)
+const photoId = '01K4N70E3Q6N9D6E6G0C8M2H1Q'
+const photoCapturedAtMs = Date.UTC(2026, 8, 5, 23, 30)
+const photoTokyoDate = '2026-09-06'
+const repositoryDirectory = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../..',
+)
+const syntheticThumbnail = readFileSync(
+  new URL(
+    '../../contracts/sync/fixtures/synthetic-thumbnail.webp',
+    import.meta.url,
+  ),
+)
+const photoPayload = {
+  schemaVersion: 1,
+  device: {
+    id: syncedDeviceId,
+    name: 'P2 E2E Android',
+    platform: 'android',
+  },
+  photos: [
+    {
+      id: photoId,
+      source: 'android_media_store',
+      sourceId: 'fixture-volume:photo-e2e',
+      filename: 'synthetic-fixture.jpg',
+      capturedAtMs: photoCapturedAtMs,
+      width: 3,
+      height: 2,
+      mimeType: 'image/jpeg',
+      latitude: null,
+      longitude: null,
+      thumbnail: {
+        mimeType: 'image/webp',
+        width: 3,
+        height: 2,
+        byteSize: syntheticThumbnail.byteLength,
+        sha256: createHash('sha256').update(syntheticThumbnail).digest('hex'),
+      },
+    },
+  ],
+}
+const pythonSqliteSnapshot = [
+  'from pathlib import Path',
+  'import json, sqlite3, sys',
+  'data_dir = Path(sys.argv[1])',
+  'photo_id = sys.argv[2]',
+  "connection = sqlite3.connect((data_dir / 'lifelog.db').as_uri() + '?mode=ro', uri=True)",
+  'try:',
+  '    row = connection.execute(',
+  '        "SELECT COUNT(*), COALESCE(SUM(CASE WHEN thumbnail_path IS NOT NULL THEN 1 ELSE 0 END), 0) FROM media_items WHERE id = ? AND type = \'photo\'",',
+  '        (photo_id,),',
+  '    ).fetchone()',
+  'finally:',
+  '    connection.close()',
+  "files = [path for path in (data_dir / 'thumbnails').rglob('*.webp') if path.is_file()]",
+  "print(json.dumps({'rows': row[0], 'thumbnail_refs': row[1], 'files': len(files), 'bytes': sum(path.stat().st_size for path in files)}))",
+].join('\n')
 
-function timelineUrl(date = seededDate) {
-  return `/timeline?date=${date}&timezone=${encodeURIComponent(timezone)}`
+function timelineUrl(date = seededDate, selectedTimezone = timezone) {
+  return `/timeline?date=${date}&timezone=${encodeURIComponent(selectedTimezone)}`
+}
+
+function photoStorageSnapshot() {
+  const dataDirectory = process.env.LIFE_TIMELINE_E2E_DATA_DIR
+  if (!dataDirectory) throw new Error('E2E database path is not configured.')
+
+  const virtualEnvironmentPython = join(
+    repositoryDirectory,
+    'backend',
+    '.venv',
+    process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python',
+  )
+  const python =
+    process.env.E2E_PYTHON ??
+    (existsSync(virtualEnvironmentPython)
+      ? virtualEnvironmentPython
+      : process.platform === 'win32'
+        ? 'python'
+        : 'python3')
+  const result = execFileSync(
+    python,
+    ['-c', pythonSqliteSnapshot, dataDirectory, photoId],
+    { encoding: 'utf8' },
+  )
+  return JSON.parse(result) as {
+    rows: number
+    thumbnail_refs: number
+    files: number
+    bytes: number
+  }
 }
 
 function syncPayload(durationMs = 120_000) {
@@ -161,5 +254,112 @@ test.describe('PC core real database flow', () => {
       page.getByRole('heading', { name: 'P2 E2E Browser' }),
     ).toBeVisible()
     await expect(page.getByTestId('timeline-item-duration')).toHaveText('2分')
+  })
+
+  test('syncs a synthetic photo idempotently through SQLite, thumbnail storage, and the UI', async ({
+    page,
+  }) => {
+    await page.goto(timelineUrl(photoTokyoDate))
+    const dashboardStats = [
+      await page.getByTestId('dashboard-usage').innerText(),
+      await page.getByTestId('dashboard-session-count').innerText(),
+      await page.getByTestId('dashboard-app-count').innerText(),
+    ]
+    await expect(page.getByText('この日の写真はありません。')).toBeVisible()
+
+    const postPhoto = () => {
+      const boundary = 'life-timeline-synthetic-photo-e2e'
+      const body = Buffer.concat([
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="metadata"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(photoPayload)}\r\n`,
+        ),
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="thumbnail_${photoId}"; filename="thumbnail.webp"\r\nContent-Type: image/webp\r\n\r\n`,
+        ),
+        syntheticThumbnail,
+        Buffer.from(`\r\n--${boundary}--\r\n`),
+      ])
+      return page.request.post('/api/v1/sync/photos', {
+        data: body,
+        headers: {
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        },
+      })
+    }
+
+    const firstUpload = await postPhoto()
+    expect(firstUpload.status()).toBe(200)
+    await expect(firstUpload.json()).resolves.toEqual({
+      schemaVersion: 1,
+      accepted: [photoId],
+    })
+    const afterFirstUpload = photoStorageSnapshot()
+    expect(afterFirstUpload).toMatchObject({
+      rows: 1,
+      thumbnail_refs: 1,
+      files: 1,
+      bytes: syntheticThumbnail.byteLength,
+    })
+
+    await page.reload()
+    await expect(page.getByTestId('timeline-photo-item')).toHaveCount(1)
+    await expect(page.getByTestId('photo-grid-card')).toHaveCount(1)
+    await expect(page.getByTestId('dashboard-usage')).toHaveText(
+      dashboardStats[0],
+    )
+    await expect(page.getByTestId('dashboard-session-count')).toHaveText(
+      dashboardStats[1],
+    )
+    await expect(page.getByTestId('dashboard-app-count')).toHaveText(
+      dashboardStats[2],
+    )
+
+    const thumbnailResponse = await page.request.get(
+      `/api/v1/media/${photoId}/thumbnail`,
+    )
+    expect(thumbnailResponse.status()).toBe(200)
+    expect(thumbnailResponse.headers()['content-type']).toContain('image/webp')
+    await expect(
+      page.getByRole('img', { name: 'synthetic-fixture.jpgの写真サムネイル' }),
+    ).toHaveJSProperty('naturalWidth', 3)
+
+    const replay = await postPhoto()
+    expect(replay.status()).toBe(200)
+    await expect(replay.json()).resolves.toEqual({
+      schemaVersion: 1,
+      accepted: [photoId],
+    })
+    await page.reload()
+    await expect(page.getByTestId('timeline-photo-item')).toHaveCount(1)
+    await expect(page.getByTestId('photo-grid-card')).toHaveCount(1)
+    expect(photoStorageSnapshot()).toEqual(afterFirstUpload)
+
+    await page.goto(timelineUrl('2026-09-06', 'UTC'))
+    await expect(page.getByText('この日の写真はありません。')).toBeVisible()
+    await page.goto(timelineUrl('2026-09-05', 'UTC'))
+    await expect(page.getByTestId('timeline-photo-item')).toHaveCount(1)
+    await expect(page.locator('.photo-grid-card time')).toHaveText('23:30')
+    await page.goto(timelineUrl(photoTokyoDate, timezone))
+    await expect(page.getByTestId('timeline-photo-item')).toHaveCount(1)
+    await expect(page.locator('.photo-grid-card time')).toHaveText('08:30')
+
+    await page.route(`**/api/v1/media/${photoId}/thumbnail`, (route) =>
+      route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: { code: 'not_found', message: 'not found' },
+        }),
+      }),
+    )
+    await page.goto(timelineUrl(photoTokyoDate, timezone))
+    await page.getByTestId('timeline-photo-item').scrollIntoViewIfNeeded()
+    await expect(
+      page.getByRole('img', {
+        name: 'synthetic-fixture.jpgのサムネイルを読み込めません',
+      }),
+    ).toBeVisible()
+    await expect(page.getByTestId('timeline-photo-item')).toHaveCount(1)
+    await expect(page.getByTestId('photo-grid-card')).toHaveCount(1)
   })
 })

@@ -1,20 +1,21 @@
-import { closeSync, existsSync, mkdirSync, openSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { spawn, spawnSync } from 'node:child_process'
 
 const frontendDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repositoryDirectory = resolve(frontendDirectory, '..')
 const backendDirectory = join(repositoryDirectory, 'backend')
-const artifactDirectory = resolve(
-  process.env.E2E_ARTIFACT_DIR ?? join(repositoryDirectory, 'e2e-artifacts'),
-)
-const dataDirectory = resolve(
-  process.env.LIFE_TIMELINE_E2E_DATA_DIR ?? join(artifactDirectory, 'database'),
-)
+const configuredDataDirectory = process.env.LIFE_TIMELINE_E2E_DATA_DIR
+const ownsDataDirectory = configuredDataDirectory === undefined
+const dataDirectory = ownsDataDirectory
+  ? mkdtempSync(join(tmpdir(), 'life-timeline-e2e-'))
+  : resolve(configuredDataDirectory)
 
-mkdirSync(artifactDirectory, { recursive: true })
-mkdirSync(dataDirectory, { recursive: true })
+if (ownsDataDirectory) {
+  process.env.LIFE_TIMELINE_E2E_DATA_DIR = dataDirectory
+}
 
 function pythonExecutable() {
   if (process.env.E2E_PYTHON) return process.env.E2E_PYTHON
@@ -27,17 +28,14 @@ function pythonExecutable() {
   return process.platform === 'win32' ? 'python' : 'python3'
 }
 
-function startProcess(command, args, cwd, logName, extraEnvironment = {}) {
-  const logPath = join(artifactDirectory, logName)
-  const logFileDescriptor = openSync(logPath, 'w')
+function startProcess(command, args, cwd, extraEnvironment = {}) {
   const child = spawn(command, args, {
     cwd,
     env: { ...process.env, ...extraEnvironment },
-    stdio: ['ignore', logFileDescriptor, logFileDescriptor],
+    stdio: 'ignore',
     shell: false,
     windowsHide: true,
   })
-  child.logFileDescriptor = logFileDescriptor
   return child
 }
 
@@ -51,9 +49,6 @@ function stopProcess(child) {
   } else {
     child.kill('SIGTERM')
   }
-  const logFileDescriptor = child.logFileDescriptor
-  child.logFileDescriptor = undefined
-  if (logFileDescriptor !== undefined) closeSync(logFileDescriptor)
 }
 
 async function waitForUrl(url, child, timeoutMs = 120_000) {
@@ -79,13 +74,13 @@ let frontend
 process.once('exit', () => {
   stopProcess(frontend)
   stopProcess(backend)
+  if (ownsDataDirectory) rmSync(dataDirectory, { recursive: true, force: true })
 })
 
 backend = startProcess(
   pythonExecutable(),
   ['scripts/e2e_server.py', '--data-dir', dataDirectory],
   backendDirectory,
-  'backend.log',
   {
     LIFE_TIMELINE_DATA_DIR: dataDirectory,
     PYTHONUNBUFFERED: '1',
@@ -104,7 +99,6 @@ try {
       '5173',
     ],
     frontendDirectory,
-    'frontend.log',
   )
 
   let stopping = false
