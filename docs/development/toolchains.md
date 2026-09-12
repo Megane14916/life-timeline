@@ -54,6 +54,18 @@ WorkManagerのscheduler、worker、Room v2 migration、期限付きlease、retry
 
 一次資料: [WorkManager release notes](https://developer.android.com/jetpack/androidx/releases/work)
 
+### Phase 4 写真依存のstable version確認
+
+Phase 4の実装開始時に公式配布元を確認したstable versionを以下に記録する。依存は最初に使用する実装Issueで追加し、そのIssueの同じ変更にversion catalogまたは`pyproject.toml` / `uv.lock`を更新する。
+
+| 対象 | 確認したstable version | 初めて固定する場所 | 用途 |
+| --- | --- | --- | --- |
+| AndroidX ExifInterface | `1.4.2` | Android version catalog | MediaStore原本からのEXIF orientation / 位置読み取り |
+| `python-multipart` | `0.0.32` | `backend/pyproject.toml`、`backend/uv.lock` | `POST /api/v1/sync/photos` multipart parser |
+| Pillow | `12.3.0` | `backend/pyproject.toml`、`backend/uv.lock` | 受信WebPのformat・dimension検証 |
+
+version確認日: 2026年9月12日。ExifInterfaceは[Android Developersのrelease notes](https://developer.android.com/jetpack/androidx/releases/exifinterface)、Python packagesは[python-multipart on PyPI](https://pypi.org/project/python-multipart/)および[Pillow on PyPI](https://pypi.org/project/pillow/)を参照する。P4-01ではversion決定を共有契約へ記録し、runtimeでまだ使用しない依存を先行導入しない。
+
 ## 3. Androidアプリの識別子
 
 Androidプロジェクトでは次の値を使う。
