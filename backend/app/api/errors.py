@@ -35,3 +35,11 @@ class TemporarilyUnavailableError(RuntimeError):
     def __init__(self, message: str = "The PC is temporarily unavailable.") -> None:
         super().__init__(message)
         self.message = message
+
+
+class ResourceNotFoundError(LookupError):
+    """Raised when a requested normalized resource or thumbnail is unavailable."""
+
+
+class ThumbnailUnavailableError(RuntimeError):
+    """Raised when a DB-referenced thumbnail cannot be safely read."""

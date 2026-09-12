@@ -13,11 +13,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.api.errors import (
     InvalidRequestError,
     PayloadTooLargeError,
+    ResourceNotFoundError,
     SyncConflictError,
     TemporarilyUnavailableError,
+    ThumbnailUnavailableError,
 )
 from app.api.photo_limits import PhotoRequestSizeLimitMiddleware
 from app.api.photo_sync import router as photo_sync_router
+from app.api.photos import router as photos_router
 from app.api.statistics import router as statistics_router
 from app.api.sync import router as sync_router
 from app.api.timeline import router as timeline_router
@@ -92,6 +95,20 @@ def create_app(
     ) -> JSONResponse:
         return _error_response("temporarily_unavailable", exc.message, status_code=503)
 
+    @application.exception_handler(ResourceNotFoundError)
+    async def resource_not_found_handler(
+        _request: Request, _exc: ResourceNotFoundError
+    ) -> JSONResponse:
+        return _error_response(
+            "not_found", "The requested resource was not found.", status_code=404
+        )
+
+    @application.exception_handler(ThumbnailUnavailableError)
+    async def thumbnail_unavailable_handler(
+        _request: Request, _exc: ThumbnailUnavailableError
+    ) -> JSONResponse:
+        return _error_response("internal_error", "Internal server error.", status_code=500)
+
     @application.exception_handler(RequestValidationError)
     async def request_validation_handler(
         _request: Request, exc: RequestValidationError
@@ -108,6 +125,7 @@ def create_app(
     application.include_router(statistics_router)
     application.include_router(sync_router)
     application.include_router(photo_sync_router)
+    application.include_router(photos_router)
     application.add_middleware(PhotoRequestSizeLimitMiddleware)
 
     @application.get("/api/v1/health", response_model=HealthResponse)
