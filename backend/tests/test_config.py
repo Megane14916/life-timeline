@@ -19,6 +19,7 @@ def test_settings_normalize_the_database_path() -> None:
 
     assert settings.data_dir.is_absolute()
     assert settings.database_path == settings.data_dir / "lifelog.db"
+    assert settings.thumbnail_dir == settings.data_dir / "thumbnails"
 
 
 def test_default_data_dir_uses_local_app_data_on_windows() -> None:
