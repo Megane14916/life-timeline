@@ -29,11 +29,34 @@ jobs:
         with:
           packages: platform-tools platforms;android-36 build-tools;36.0.0
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
       - name: Check formatting, lint, test, and build
         run: ./android/gradlew --no-daemon -p android spotlessCheck lintDebug testDebugUnitTest assembleDebug
+
+      - name: Sanitize unit test diagnostics and enforce test gate
+        if: always()
+        run: >-
+          python scripts/ci/sanitize_junit.py
+          --input-dir android/app/build/test-results/testDebugUnitTest
+          --output "$RUNNER_TEMP/android-ci-safe/android-unit-junit.xml"
+          --summary "$RUNNER_TEMP/android-ci-safe/summary.json"
+
+      - name: Upload privacy-safe Android unit test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-unit-junit
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/android-ci-safe/android-unit-junit.xml
+            ${{ runner.temp }}/android-ci-safe/summary.json
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
