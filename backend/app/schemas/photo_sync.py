@@ -7,7 +7,15 @@ import hmac
 from collections.abc import Iterable
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictFloat,
+    StrictInt,
+    field_validator,
+    model_validator,
+)
 
 from app.ids import InvalidUlidError, validate_ulid
 
@@ -145,9 +153,7 @@ class PhotoSyncResponse(PhotoSyncModel):
 def expected_thumbnail_part_names(request: PhotoSyncRequest) -> tuple[str, ...]:
     """Return the exact part names required for photos with a thumbnail."""
 
-    return tuple(
-        f"thumbnail_{photo.id}" for photo in request.photos if photo.thumbnail is not None
-    )
+    return tuple(f"thumbnail_{photo.id}" for photo in request.photos if photo.thumbnail is not None)
 
 
 def validate_thumbnail_part_names(

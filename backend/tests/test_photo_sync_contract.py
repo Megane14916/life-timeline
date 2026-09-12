@@ -169,6 +169,8 @@ def test_ack_requires_a_unique_ordered_subset_and_required_field() -> None:
             ),
         )
     with pytest.raises(ValueError, match="request order"):
-        validate_accepted_ids(request, response.model_copy(update={"accepted": list(reversed(response.accepted))}))
+        validate_accepted_ids(
+            request, response.model_copy(update={"accepted": list(reversed(response.accepted))})
+        )
     with pytest.raises(ValidationError):
         PhotoSyncResponse.model_validate({"schemaVersion": 1})
