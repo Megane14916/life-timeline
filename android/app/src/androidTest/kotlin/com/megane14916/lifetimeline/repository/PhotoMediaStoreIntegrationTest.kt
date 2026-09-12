@@ -3,6 +3,7 @@ package com.megane14916.lifetimeline.repository
 import android.Manifest
 import android.content.Context
 import android.os.Build
+import android.provider.MediaStore
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -68,7 +69,7 @@ class PhotoMediaStoreIntegrationTest {
       val result =
         repository.collect(
           access = PhotoAccessState.FULL,
-          collectionStartedAtMs = System.currentTimeMillis() - 5 * 60 * 1_000L,
+          collectionStartedAtMs = collectionStartBeforeSyntheticPhoto(context),
         )
 
       assertEquals(PhotoCollectionStatus.COMPLETED, result.status)
@@ -101,5 +102,24 @@ class PhotoMediaStoreIntegrationTest {
 
   private companion object {
     const val SYNTHETIC_FILENAME = "synthetic-photo.jpg"
+
+    fun collectionStartBeforeSyntheticPhoto(context: Context): Long {
+      val cursor =
+        context.contentResolver.query(
+          MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+          arrayOf(MediaStore.Images.Media.DATE_ADDED, MediaStore.Images.Media.DATA),
+          "${MediaStore.Images.Media.DISPLAY_NAME} = ?",
+          arrayOf(SYNTHETIC_FILENAME),
+          null,
+        ) ?: error("Synthetic MediaStore image is unavailable.")
+      return cursor.use {
+        check(it.moveToFirst()) { "Synthetic MediaStore image is unavailable." }
+        val path = it.getString(1)
+        check(path.split('/').any { segment -> segment.equals("DCIM", ignoreCase = true) }) {
+          "Synthetic MediaStore image is outside DCIM."
+        }
+        (it.getLong(0) * 1_000L - 60_000L).coerceAtLeast(0L)
+      }
+    }
   }
 }
