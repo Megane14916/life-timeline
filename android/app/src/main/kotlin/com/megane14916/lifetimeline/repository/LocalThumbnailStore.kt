@@ -1,5 +1,6 @@
 package com.megane14916.lifetimeline.repository
 
+import android.graphics.BitmapFactory
 import com.megane14916.lifetimeline.collector.PhotoThumbnailGenerator
 import com.megane14916.lifetimeline.collector.hasWebpSignature
 import com.megane14916.lifetimeline.collector.sha256
@@ -13,6 +14,12 @@ data class StoredPhotoThumbnail(
   val relativePath: String,
   val sha256: String,
   val sizeBytes: Long,
+)
+
+data class LocalPhotoThumbnail(
+  val bytes: ByteArray,
+  val width: Int,
+  val height: Int,
 )
 
 /** Stores only verified generated WebP bytes below the app-private photo thumbnail root. */
@@ -60,6 +67,32 @@ class LocalThumbnailStore(
     return !file.exists() || file.delete()
   }
 
+  /** Reads a bounded, hash-checked WebP below the fixed private root for multipart upload. */
+  fun readVerified(
+    relativePath: String,
+    expectedSha256: String,
+    expectedSizeBytes: Long,
+  ): LocalPhotoThumbnail {
+    require(expectedSha256.matches(LOWERCASE_SHA256_PATTERN)) { "Thumbnail digest is invalid." }
+    require(expectedSizeBytes in 1..PhotoThumbnailGenerator.MAX_THUMBNAIL_BYTES.toLong()) {
+      "Thumbnail size is invalid."
+    }
+    val file = resolve(relativePath)
+    if (!file.isFile || file.length() != expectedSizeBytes) throw IOException("Thumbnail file is unavailable.")
+    val bytes = file.readBytes()
+    if (bytes.size.toLong() != expectedSizeBytes || bytes.sha256() != expectedSha256 || !bytes.hasWebpSignature()) {
+      throw IOException("Thumbnail file verification failed.")
+    }
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    if (bounds.outWidth !in 1..PhotoThumbnailGenerator.MAX_EDGE_PX ||
+      bounds.outHeight !in 1..PhotoThumbnailGenerator.MAX_EDGE_PX
+    ) {
+      throw IOException("Thumbnail dimensions are invalid.")
+    }
+    return LocalPhotoThumbnail(bytes, bounds.outWidth, bounds.outHeight)
+  }
+
   /** Removes only aged thumbnail temp/final files not referenced by Room. */
   fun cleanupOrphans(
     referencedPaths: Set<String>,
@@ -105,5 +138,6 @@ class LocalThumbnailStore(
     val RELATIVE_PATH_PATTERN = Regex("[0-9A-HJKMNP-TV-Z]{2}/[0-9A-HJKMNP-TV-Z]{26}\\.webp")
     val FINAL_FILE_PATTERN = Regex("[0-9A-HJKMNP-TV-Z]{26}\\.webp")
     val TEMP_FILE_PATTERN = Regex("[0-9A-HJKMNP-TV-Z]{26}\\.webp\\.tmp-[0-9a-fA-F-]{36}")
+    val LOWERCASE_SHA256_PATTERN = Regex("[0-9a-f]{64}")
   }
 }

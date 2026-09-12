@@ -50,8 +50,48 @@ interface AndroidMediaItemDao {
   @Query("SELECT * FROM android_media_items WHERE thumbnail_state = 'pending' ORDER BY captured_at_ms ASC, id ASC LIMIT :limit")
   suspend fun getPendingThumbnails(limit: Int = 20): List<AndroidMediaItemEntity>
 
+  @Query("SELECT COUNT(*) FROM android_media_items WHERE thumbnail_state = 'pending'")
+  suspend fun countPendingThumbnails(): Int
+
   @Query("SELECT COUNT(*) FROM android_media_items WHERE sync_status = 'pending'")
   suspend fun countPendingSync(): Int
+
+  @Query("SELECT COUNT(*) FROM android_media_items WHERE sync_status = 'pending' AND thumbnail_state IN ('ready', 'unavailable')")
+  suspend fun countPendingSyncable(): Int
+
+  @Query("SELECT COALESCE(SUM(thumbnail_size_bytes), 0) FROM android_media_items WHERE thumbnail_relative_path IS NOT NULL")
+  suspend fun totalStoredThumbnailBytes(): Long
+
+  @Query(
+    """
+    SELECT * FROM android_media_items
+    WHERE sync_status = 'pending' AND thumbnail_state IN ('ready', 'unavailable')
+    ORDER BY captured_at_ms ASC, id ASC LIMIT :limit
+    """,
+  )
+  suspend fun getPendingSyncBatch(limit: Int): List<AndroidMediaItemEntity>
+
+  @Query(
+    """
+    UPDATE android_media_items
+    SET sync_status = 'synced',
+        synced_at_ms = :syncedAtMs,
+        thumbnail_state = CASE WHEN thumbnail_state = 'ready' THEN 'cleaned' ELSE thumbnail_state END,
+        thumbnail_relative_path = CASE WHEN thumbnail_state = 'ready' THEN NULL ELSE thumbnail_relative_path END
+    WHERE id = :id
+      AND sync_status = 'pending'
+      AND thumbnail_state = :expectedThumbnailState
+      AND thumbnail_sha256 IS :expectedSha256
+      AND thumbnail_relative_path IS :expectedRelativePath
+    """,
+  )
+  suspend fun acknowledgeSynced(
+    id: String,
+    expectedThumbnailState: String,
+    expectedSha256: String?,
+    expectedRelativePath: String?,
+    syncedAtMs: Long,
+  ): Int
 
   @Query("SELECT thumbnail_relative_path FROM android_media_items WHERE thumbnail_relative_path IS NOT NULL")
   suspend fun getReferencedThumbnailPaths(): List<String>

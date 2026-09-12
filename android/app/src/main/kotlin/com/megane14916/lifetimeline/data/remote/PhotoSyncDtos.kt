@@ -7,6 +7,12 @@ import java.security.MessageDigest
 
 object PhotoSyncPolicy {
   const val MAX_PHOTOS_PER_BATCH = 20
+  const val MAX_BATCHES_PER_RUN = 10
+  const val MAX_RUN_MINUTES = 8L
+  const val COLLECTION_INTERVAL_MINUTES = 15L
+  const val COLLECTION_FLEX_MINUTES = 5L
+  const val SYNC_BACKOFF_MINUTES = 30L
+  const val LEASE_TTL_MINUTES = 15L
   const val MAX_THUMBNAIL_BYTES = 1_048_576
   const val MAX_REQUEST_BYTES = 20_971_520
   const val MAX_THUMBNAIL_DIMENSION_PX = 512
