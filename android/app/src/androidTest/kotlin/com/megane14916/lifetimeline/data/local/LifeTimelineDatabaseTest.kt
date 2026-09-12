@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,6 +35,7 @@ class LifeTimelineDatabaseTest {
           ApplicationProvider.getApplicationContext(),
           LifeTimelineDatabase::class.java,
         ).allowMainThreadQueries()
+        .addCallback(LifeTimelineDatabase.PHOTO_INTEGRITY_CALLBACK)
         .build()
     app =
       AndroidAppEntity(
@@ -192,6 +194,42 @@ class LifeTimelineDatabaseTest {
       Unit
     }
 
+  @Test
+  fun mediaItemSourceIsUniqueAndReadyStateRequiresCompleteThumbnail() =
+    runBlocking {
+      val item = mediaItem(1)
+      assertTrue(database.androidMediaItemDao().insertIfAbsent(item) > 0)
+      assertEquals(-1L, database.androidMediaItemDao().insertIfAbsent(item.copy(id = generateUlid(1_780_000_000_002))))
+
+      assertThrows(RuntimeException::class.java) {
+        runBlocking {
+          database.androidMediaItemDao().insertIfAbsent(
+            item.copy(
+              id = generateUlid(1_780_000_000_003),
+              sourceId = "external:2",
+              thumbnailState = AndroidMediaItemEntity.THUMBNAIL_READY,
+            ),
+          )
+        }
+      }
+      Unit
+    }
+
+  @Test
+  fun cleanedMediaItemMustBeSyncedAndKeepAuditMetadata() =
+    runBlocking {
+      val invalid =
+        mediaItem(4).copy(
+          thumbnailState = AndroidMediaItemEntity.THUMBNAIL_CLEANED,
+          thumbnailSha256 = "a".repeat(64),
+          thumbnailSizeBytes = 100,
+        )
+      assertThrows(RuntimeException::class.java) {
+        runBlocking { database.androidMediaItemDao().insertIfAbsent(invalid) }
+      }
+      Unit
+    }
+
   private fun collectionInput(sessions: List<AndroidAppSessionEntity>) =
     CollectionInput(
       apps = listOf(app),
@@ -217,6 +255,21 @@ class LifeTimelineDatabaseTest {
       sourceKey = "source-key-$index",
       syncStatus = "pending",
       collectedAtMs = 1_780_000_000_500,
+    )
+
+  private fun mediaItem(index: Int) =
+    AndroidMediaItemEntity(
+      id = generateUlid(1_780_000_000_000 + index),
+      sourceId = "external:$index",
+      volumeName = "external",
+      mediaStoreId = index.toLong(),
+      filename = "IMG_$index.jpg",
+      capturedAtMs = 1_780_000_000_000 + index,
+      capturedAtSource = "date_taken",
+      width = 1920,
+      height = 1080,
+      mimeType = "image/jpeg",
+      discoveredAtMs = 1_780_000_000_500,
     )
 
   private fun usageEvent(

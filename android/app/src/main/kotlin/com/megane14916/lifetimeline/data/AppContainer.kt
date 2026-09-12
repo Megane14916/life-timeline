@@ -4,8 +4,11 @@ import android.content.Context
 import android.os.Build
 import androidx.room.Room
 import androidx.work.WorkManager
+import com.megane14916.lifetimeline.collector.AndroidMediaStorePhotoBackend
 import com.megane14916.lifetimeline.collector.AndroidPackageLabelResolver
 import com.megane14916.lifetimeline.collector.AndroidUsageEventsSource
+import com.megane14916.lifetimeline.collector.MediaStorePhotoSource
+import com.megane14916.lifetimeline.collector.PhotoThumbnailGenerator
 import com.megane14916.lifetimeline.collector.UsageAccessChecker
 import com.megane14916.lifetimeline.collector.UsageEventMapper
 import com.megane14916.lifetimeline.collector.UsageEventsCollector
@@ -19,6 +22,8 @@ import com.megane14916.lifetimeline.repository.BackgroundExecutionCoordinator
 import com.megane14916.lifetimeline.repository.CollectionCoordinator
 import com.megane14916.lifetimeline.repository.CollectionRepository
 import com.megane14916.lifetimeline.repository.LocalDataRepository
+import com.megane14916.lifetimeline.repository.LocalThumbnailStore
+import com.megane14916.lifetimeline.repository.PhotoCollectionRepository
 import com.megane14916.lifetimeline.repository.SyncRepository
 import com.megane14916.lifetimeline.worker.BackgroundWorkScheduler
 import com.megane14916.lifetimeline.worker.LifeTimelineWorkerFactory
@@ -40,6 +45,7 @@ interface AppContainer {
   val workerFactory: LifeTimelineWorkerFactory
   val backgroundWorkScheduler: BackgroundWorkScheduler
   val backgroundExecutionCoordinator: BackgroundExecutionCoordinator
+  val photoCollectionRepository: PhotoCollectionRepository
 
   fun createCollectionCoordinator(context: Context): CollectionCoordinator
 
@@ -70,13 +76,22 @@ class DefaultAppContainer(
   override val database: LifeTimelineDatabase by lazy {
     Room
       .databaseBuilder(context, LifeTimelineDatabase::class.java, DATABASE_NAME)
-      .addMigrations(LifeTimelineDatabase.MIGRATION_1_2)
+      .addMigrations(LifeTimelineDatabase.MIGRATION_1_2, LifeTimelineDatabase.MIGRATION_2_3)
+      .addCallback(LifeTimelineDatabase.PHOTO_INTEGRITY_CALLBACK)
       .build()
   }
   override val preferences: AppPreferences = AppPreferences.create(context)
   override val localDataRepository: LocalDataRepository by lazy { LocalDataRepository(database) }
   override val backgroundExecutionCoordinator: BackgroundExecutionCoordinator by lazy {
     BackgroundExecutionCoordinator(database)
+  }
+  override val photoCollectionRepository: PhotoCollectionRepository by lazy {
+    PhotoCollectionRepository(
+      database = database,
+      photoSource = MediaStorePhotoSource(Build.VERSION.SDK_INT, AndroidMediaStorePhotoBackend(context)),
+      thumbnailGenerator = PhotoThumbnailGenerator(context),
+      thumbnailStore = LocalThumbnailStore(java.io.File(context.filesDir, PHOTO_THUMBNAIL_DIRECTORY)),
+    )
   }
   override val workerDependencies: WorkerDependencies by lazy {
     WorkerDependencies(
@@ -148,6 +163,7 @@ class DefaultAppContainer(
 
   private companion object {
     const val DATABASE_NAME = "lifetimeline.db"
+    const val PHOTO_THUMBNAIL_DIRECTORY = "photo-thumbnails"
     const val PLACEHOLDER_BASE_URL = "https://placeholder.invalid/"
     val JSON_MEDIA_TYPE = "application/json".toMediaType()
   }

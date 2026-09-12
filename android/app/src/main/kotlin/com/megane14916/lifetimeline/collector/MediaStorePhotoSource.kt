@@ -201,6 +201,7 @@ data class MediaStorePhotoCandidate(
   val sourceId: String,
   val filename: String,
   val capturedAtMs: Long,
+  val capturedAtSource: String,
   val mimeType: String,
   val width: Int?,
   val height: Int?,
@@ -245,6 +246,7 @@ enum class MediaStorePhotoScanStatus {
 data class MediaStorePhotoPage(
   val status: MediaStorePhotoScanStatus,
   val photos: List<MediaStorePhotoCandidate>,
+  val scannedRowCount: Int,
   val nextCursor: MediaStorePhotoCursor?,
   val nextSelectionCursor: MediaStoreSelectionCursor?,
   val hasMore: Boolean,
@@ -270,6 +272,7 @@ class MediaStorePhotoSource(
       return MediaStorePhotoPage(
         status = MediaStorePhotoScanStatus.PHOTO_ACCESS_REQUIRED,
         photos = emptyList(),
+        scannedRowCount = 0,
         nextCursor = cursor,
         nextSelectionCursor = selectionCursor,
         hasMore = false,
@@ -301,6 +304,7 @@ class MediaStorePhotoSource(
       return MediaStorePhotoPage(
         status = MediaStorePhotoScanStatus.ACCESS_REVOKED,
         photos = emptyList(),
+        scannedRowCount = 0,
         nextCursor = cursor,
         nextSelectionCursor = selectionCursor,
         hasMore = false,
@@ -373,6 +377,7 @@ class MediaStorePhotoSource(
     return MediaStorePhotoPage(
       status = MediaStorePhotoScanStatus.SUCCESS,
       photos = photos,
+      scannedRowCount = rows.size,
       nextCursor = nextCursor,
       nextSelectionCursor = nextSelectionCursor,
       hasMore = hasMore,
@@ -411,6 +416,7 @@ class MediaStorePhotoSource(
       sourceId = "$volumeName:$mediaStoreId",
       filename = filename,
       capturedAtMs = capturedAtMs,
+      capturedAtSource = if (dateTakenMs != null && dateTakenMs > 0) "date_taken" else "date_added_fallback",
       mimeType = mime,
       width = width?.takeIf { it > 0 },
       height = height?.takeIf { it > 0 },

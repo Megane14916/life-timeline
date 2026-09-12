@@ -30,6 +30,7 @@ class MediaStorePhotoSourceTest {
     assertEquals(MediaStorePhotoScanStatus.SUCCESS, page.status)
     assertEquals("external:7", page.photos.single().sourceId)
     assertEquals(20_000L, page.photos.single().capturedAtMs)
+    assertEquals("date_added_fallback", page.photos.single().capturedAtSource)
     assertTrue(backend.lastPlan!!.useLegacyDataPath)
     assertTrue(backend.lastPlan!!.selection.contains(MediaStore.Images.Media.DATE_ADDED))
     assertFalse(backend.lastPlan!!.selection.contains(MediaStore.MediaColumns.RELATIVE_PATH))

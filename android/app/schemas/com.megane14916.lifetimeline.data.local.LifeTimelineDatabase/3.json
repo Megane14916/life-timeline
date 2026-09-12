@@ -1,0 +1,537 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "b50000e624e9174a831c95b0d63dc6ea",
+    "entities": [
+      {
+        "tableName": "android_apps",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `package_name` TEXT NOT NULL, `display_name` TEXT NOT NULL, `updated_at_ms` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "package_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updated_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_android_apps_package_name",
+            "unique": true,
+            "columnNames": [
+              "package_name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_android_apps_package_name` ON `${TABLE_NAME}` (`package_name`)"
+          }
+        ]
+      },
+      {
+        "tableName": "android_app_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `app_id` TEXT NOT NULL, `started_at_ms` INTEGER NOT NULL, `ended_at_ms` INTEGER NOT NULL, `duration_ms` INTEGER NOT NULL, `source` TEXT NOT NULL, `source_key` TEXT NOT NULL, `sync_status` TEXT NOT NULL, `collected_at_ms` INTEGER NOT NULL, `synced_at_ms` INTEGER, PRIMARY KEY(`id`), FOREIGN KEY(`app_id`) REFERENCES `android_apps`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "appId",
+            "columnName": "app_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAtMs",
+            "columnName": "started_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endedAtMs",
+            "columnName": "ended_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMs",
+            "columnName": "duration_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceKey",
+            "columnName": "source_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "sync_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "collectedAtMs",
+            "columnName": "collected_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAtMs",
+            "columnName": "synced_at_ms",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_android_app_sessions_app_id",
+            "unique": false,
+            "columnNames": [
+              "app_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_android_app_sessions_app_id` ON `${TABLE_NAME}` (`app_id`)"
+          },
+          {
+            "name": "index_android_app_sessions_source_key",
+            "unique": true,
+            "columnNames": [
+              "source_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_android_app_sessions_source_key` ON `${TABLE_NAME}` (`source_key`)"
+          },
+          {
+            "name": "index_android_app_sessions_sync_status_started_at_ms_id",
+            "unique": false,
+            "columnNames": [
+              "sync_status",
+              "started_at_ms",
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_android_app_sessions_sync_status_started_at_ms_id` ON `${TABLE_NAME}` (`sync_status`, `started_at_ms`, `id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "android_apps",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "app_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "collector_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`collector` TEXT NOT NULL, `cursor_at_ms` INTEGER NOT NULL, `cursor_key` TEXT NOT NULL, `last_collected_at_ms` INTEGER NOT NULL, PRIMARY KEY(`collector`))",
+        "fields": [
+          {
+            "fieldPath": "collector",
+            "columnName": "collector",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cursorAtMs",
+            "columnName": "cursor_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cursorKey",
+            "columnName": "cursor_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastCollectedAtMs",
+            "columnName": "last_collected_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "collector"
+          ]
+        }
+      },
+      {
+        "tableName": "open_activities",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`activity_key` TEXT NOT NULL, `package_name` TEXT NOT NULL, `class_name` TEXT NOT NULL, `started_at_ms` INTEGER NOT NULL, `start_event_key` TEXT NOT NULL, PRIMARY KEY(`activity_key`))",
+        "fields": [
+          {
+            "fieldPath": "activityKey",
+            "columnName": "activity_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "package_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "className",
+            "columnName": "class_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAtMs",
+            "columnName": "started_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startEventKey",
+            "columnName": "start_event_key",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "activity_key"
+          ]
+        }
+      },
+      {
+        "tableName": "background_work_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`work_key` TEXT NOT NULL, `lease_owner` TEXT, `lease_acquired_at_ms` INTEGER, `lease_expires_at_ms` INTEGER, `last_attempt_at_ms` INTEGER, `last_success_at_ms` INTEGER, `last_result` TEXT, `last_error_kind` TEXT, `consecutive_failures` INTEGER NOT NULL DEFAULT 0, `updated_at_ms` INTEGER NOT NULL, PRIMARY KEY(`work_key`))",
+        "fields": [
+          {
+            "fieldPath": "workKey",
+            "columnName": "work_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "leaseOwner",
+            "columnName": "lease_owner",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "leaseAcquiredAtMs",
+            "columnName": "lease_acquired_at_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "leaseExpiresAtMs",
+            "columnName": "lease_expires_at_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastAttemptAtMs",
+            "columnName": "last_attempt_at_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastSuccessAtMs",
+            "columnName": "last_success_at_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastResult",
+            "columnName": "last_result",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "lastErrorKind",
+            "columnName": "last_error_kind",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "consecutiveFailures",
+            "columnName": "consecutive_failures",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updated_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "work_key"
+          ]
+        }
+      },
+      {
+        "tableName": "android_media_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `source` TEXT NOT NULL, `source_id` TEXT NOT NULL, `volume_name` TEXT NOT NULL, `media_store_id` INTEGER NOT NULL, `filename` TEXT NOT NULL, `captured_at_ms` INTEGER NOT NULL, `captured_at_source` TEXT NOT NULL, `width` INTEGER, `height` INTEGER, `mime_type` TEXT NOT NULL, `latitude` REAL, `longitude` REAL, `thumbnail_state` TEXT NOT NULL, `thumbnail_relative_path` TEXT, `thumbnail_sha256` TEXT, `thumbnail_size_bytes` INTEGER, `sync_status` TEXT NOT NULL, `discovered_at_ms` INTEGER NOT NULL, `synced_at_ms` INTEGER, `last_error_kind` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "source_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "volumeName",
+            "columnName": "volume_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaStoreId",
+            "columnName": "media_store_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "filename",
+            "columnName": "filename",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capturedAtMs",
+            "columnName": "captured_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capturedAtSource",
+            "columnName": "captured_at_source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "width",
+            "columnName": "width",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "height",
+            "columnName": "height",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "mimeType",
+            "columnName": "mime_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "thumbnailState",
+            "columnName": "thumbnail_state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "thumbnailRelativePath",
+            "columnName": "thumbnail_relative_path",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "thumbnailSha256",
+            "columnName": "thumbnail_sha256",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "thumbnailSizeBytes",
+            "columnName": "thumbnail_size_bytes",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "syncStatus",
+            "columnName": "sync_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "discoveredAtMs",
+            "columnName": "discovered_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncedAtMs",
+            "columnName": "synced_at_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastErrorKind",
+            "columnName": "last_error_kind",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_android_media_items_source_source_id",
+            "unique": true,
+            "columnNames": [
+              "source",
+              "source_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_android_media_items_source_source_id` ON `${TABLE_NAME}` (`source`, `source_id`)"
+          },
+          {
+            "name": "index_android_media_items_sync_status_captured_at_ms_id",
+            "unique": false,
+            "columnNames": [
+              "sync_status",
+              "captured_at_ms",
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_android_media_items_sync_status_captured_at_ms_id` ON `${TABLE_NAME}` (`sync_status`, `captured_at_ms`, `id`)"
+          },
+          {
+            "name": "index_android_media_items_thumbnail_state_captured_at_ms_id",
+            "unique": false,
+            "columnNames": [
+              "thumbnail_state",
+              "captured_at_ms",
+              "id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_android_media_items_thumbnail_state_captured_at_ms_id` ON `${TABLE_NAME}` (`thumbnail_state`, `captured_at_ms`, `id`)"
+          }
+        ]
+      },
+      {
+        "tableName": "media_collection_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`volume_name` TEXT NOT NULL, `media_store_version` TEXT, `generation_cursor` INTEGER, `date_added_cursor_sec` INTEGER, `media_id_cursor` INTEGER, `collection_started_at_ms` INTEGER NOT NULL, `last_scan_at_ms` INTEGER, `updated_at_ms` INTEGER NOT NULL, PRIMARY KEY(`volume_name`))",
+        "fields": [
+          {
+            "fieldPath": "volumeName",
+            "columnName": "volume_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaStoreVersion",
+            "columnName": "media_store_version",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "generationCursor",
+            "columnName": "generation_cursor",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "dateAddedCursorSeconds",
+            "columnName": "date_added_cursor_sec",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "mediaIdCursor",
+            "columnName": "media_id_cursor",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "collectionStartedAtMs",
+            "columnName": "collection_started_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastScanAtMs",
+            "columnName": "last_scan_at_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "updatedAtMs",
+            "columnName": "updated_at_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "volume_name"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b50000e624e9174a831c95b0d63dc6ea')"
+    ]
+  }
+}
