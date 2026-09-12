@@ -1,5 +1,6 @@
 import type {
   ApiErrorBody,
+  PhotosResponse,
   StatisticsResponse,
   TimelineResponse,
 } from './types'
@@ -63,6 +64,15 @@ export function getTimeline(
     `/api/v1/timeline?${params.toString()}`,
     signal,
   )
+}
+
+export function getPhotos(
+  date: string,
+  timezone: string,
+  signal?: AbortSignal,
+): Promise<PhotosResponse> {
+  const params = new URLSearchParams({ date, timezone })
+  return getJson<PhotosResponse>(`/api/v1/photos?${params.toString()}`, signal)
 }
 
 export function getAppStatistics(

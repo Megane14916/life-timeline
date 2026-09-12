@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react'
 
-import { ApiClientError, getAppStatistics, getTimeline } from '../../api/client'
-import type { StatisticsResponse, TimelineResponse } from '../../api/types'
+import {
+  ApiClientError,
+  getAppStatistics,
+  getPhotos,
+  getTimeline,
+} from '../../api/client'
+import type {
+  PhotosResponse,
+  StatisticsResponse,
+  TimelineResponse,
+} from '../../api/types'
 import { Dashboard } from './Dashboard'
 import {
   readTimelineLocation,
@@ -12,6 +21,7 @@ import {
 import { DateNavigator } from './DateNavigator'
 import { nextCalendarDate } from './date'
 import { TimelineItem } from './TimelineItem'
+import { PhotosSection } from './PhotosSection'
 
 interface PanelState<T> {
   key: string
@@ -53,11 +63,15 @@ export function TimelinePage() {
     useState<PanelState<TimelineResponse>>(initialPanelState)
   const [statisticsState, setStatisticsState] =
     useState<PanelState<StatisticsResponse>>(initialPanelState)
+  const [photosState, setPhotosState] =
+    useState<PanelState<PhotosResponse>>(initialPanelState)
   const [timelineRetry, setTimelineRetry] = useState(0)
   const [statisticsRetry, setStatisticsRetry] = useState(0)
+  const [photosRetry, setPhotosRetry] = useState(0)
   const currentKey = locationKey(location)
   const timelineRequestKey = `${currentKey}|${timelineRetry}`
   const statisticsRequestKey = `${currentKey}|${statisticsRetry}`
+  const photosRequestKey = `${currentKey}|${photosRetry}`
   const nextDate = nextCalendarDate(location.date)
   const locationIsValid = location.isValid
 
@@ -149,16 +163,45 @@ export function TimelinePage() {
     statisticsRequestKey,
   ])
 
+  useEffect(() => {
+    if (!locationIsValid) return
+
+    const controller = new AbortController()
+    void getPhotos(location.date, location.timezone, controller.signal)
+      .then((response) => {
+        if (controller.signal.aborted) return
+        setPhotosState({
+          key: photosRequestKey,
+          data: response,
+          error: null,
+        })
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        setPhotosState({
+          key: photosRequestKey,
+          data: null,
+          error: errorMessage(error),
+        })
+      })
+
+    return () => controller.abort()
+  }, [location.date, location.timezone, locationIsValid, photosRequestKey])
+
   const timelineMatches =
     locationIsValid && timelineState.key === timelineRequestKey
   const statisticsMatches =
     locationIsValid && statisticsState.key === statisticsRequestKey
+  const photosMatches = locationIsValid && photosState.key === photosRequestKey
   const timeline = timelineMatches ? timelineState.data : null
   const statistics = statisticsMatches ? statisticsState.data : null
+  const photos = photosMatches ? photosState.data : null
   const timelineError = timelineMatches ? timelineState.error : null
   const statisticsError = statisticsMatches ? statisticsState.error : null
+  const photosError = photosMatches ? photosState.error : null
   const timelineLoading = locationIsValid && !timelineMatches
   const statisticsLoading = locationIsValid && !statisticsMatches
+  const photosLoading = locationIsValid && !photosMatches
 
   const changeDate = (value: string) => {
     const date =
@@ -182,6 +225,10 @@ export function TimelinePage() {
 
   const retryStatistics = () => {
     setStatisticsRetry((value) => value + 1)
+  }
+
+  const retryPhotos = () => {
+    setPhotosRetry((value) => value + 1)
   }
 
   return (
@@ -254,7 +301,7 @@ export function TimelinePage() {
                   ○
                 </span>
                 <strong>この日の記録はありません</strong>
-                <p>別の日付を指定すると、記録されたSessionを確認できます。</p>
+                <p>アプリ利用履歴や写真がある別の日付を確認できます。</p>
               </div>
             ) : (
               <ol className="timeline-list" data-testid="timeline-list">
@@ -268,6 +315,13 @@ export function TimelinePage() {
               </ol>
             ))}
         </section>
+
+        <PhotosSection
+          data={photos}
+          error={photosError}
+          loading={photosLoading}
+          onRetry={retryPhotos}
+        />
       </div>
     </main>
   )

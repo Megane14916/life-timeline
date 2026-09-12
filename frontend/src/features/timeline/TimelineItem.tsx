@@ -1,12 +1,23 @@
-import type { TimelineItem as TimelineItemData } from '../../api/types'
+import type {
+  AppSessionTimelineItem as AppSessionTimelineItemData,
+  PhotoTimelineItem as PhotoTimelineItemData,
+  TimelineItem as TimelineItemData,
+} from '../../api/types'
 import { formatDuration, formatPlatform, formatTime } from './format'
+import { PhotoTimelineCard } from './PhotoTimelineCard'
 
 interface TimelineItemProps {
   item: TimelineItemData
   timezone: string
 }
 
-export function TimelineItem({ item, timezone }: TimelineItemProps) {
+function AppSessionItem({
+  item,
+  timezone,
+}: {
+  item: AppSessionTimelineItemData
+  timezone: string
+}) {
   const flags = [
     item.display.continuesFromPreviousDay ? '前日から継続' : null,
     item.display.continuesToNextDay ? '翌日に継続' : null,
@@ -50,4 +61,40 @@ export function TimelineItem({ item, timezone }: TimelineItemProps) {
       </article>
     </li>
   )
+}
+
+function PhotoItem({
+  item,
+  timezone,
+}: {
+  item: PhotoTimelineItemData
+  timezone: string
+}) {
+  return (
+    <li
+      className="timeline-item photo-timeline-item"
+      data-testid="timeline-photo-item"
+    >
+      <div className="timeline-time" aria-label="撮影時刻">
+        <time
+          dateTime={item.takenAt}
+          aria-label={`撮影時刻 ${formatTime(item.takenAt, timezone)}`}
+        >
+          {formatTime(item.takenAt, timezone)}
+        </time>
+      </div>
+      <div
+        className="timeline-marker photo-timeline-marker"
+        aria-hidden="true"
+      />
+      <PhotoTimelineCard item={item} />
+    </li>
+  )
+}
+
+export function TimelineItem({ item, timezone }: TimelineItemProps) {
+  if (item.type === 'photo') {
+    return <PhotoItem item={item} timezone={timezone} />
+  }
+  return <AppSessionItem item={item} timezone={timezone} />
 }
