@@ -19,12 +19,14 @@ import com.megane14916.lifetimeline.repository.SyncResult
 import com.megane14916.lifetimeline.repository.SyncRunStatus
 import com.megane14916.lifetimeline.worker.AutomaticSyncPolicy
 import com.megane14916.lifetimeline.worker.BackgroundWorkScheduler
+import com.megane14916.lifetimeline.worker.PhotoWorkPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -61,6 +63,20 @@ data class MainUiState(
   val automaticSyncResult: String? = null,
   val recentAutomaticErrorKind: String? = null,
   val backgroundBusy: Boolean = false,
+  val photoCollectionScheduled: Boolean = false,
+  val nextPhotoCollectionAtMs: Long? = null,
+  val photoCollectionAttemptAtMs: Long? = null,
+  val photoCollectionSuccessAtMs: Long? = null,
+  val photoCollectionResult: String? = null,
+  val photoSyncAttemptAtMs: Long? = null,
+  val photoSyncSuccessAtMs: Long? = null,
+  val photoSyncResult: String? = null,
+  val photoRecentErrorKind: String? = null,
+  val pendingPhotoCount: Int = 0,
+  val pendingPhotoThumbnailCount: Int = 0,
+  val localPhotoThumbnailBytes: Long = 0,
+  val photoSyncWorkState: WorkInfo.State? = null,
+  val photoSyncRunAttemptCount: Int = 0,
 )
 
 class MainViewModel(
@@ -74,6 +90,9 @@ class MainViewModel(
   private val nowMs: () -> Long = { System.currentTimeMillis() },
   private val backgroundExecutionCoordinator: BackgroundExecutionCoordinator? = null,
   private val backgroundWorkScheduler: BackgroundWorkScheduler? = null,
+  private val pendingPhotoCount: suspend () -> Int = { 0 },
+  private val pendingPhotoThumbnailCount: suspend () -> Int = { 0 },
+  private val localPhotoThumbnailBytes: suspend () -> Long = { 0L },
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(MainUiState())
   val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -114,7 +133,16 @@ class MainViewModel(
 
   /** Re-reads the OS state whenever the app resumes or a permission result returns. */
   fun refreshPhotoAccess() {
-    _uiState.value = _uiState.value.copy(photoAccessState = photoAccessChecker.currentAccess())
+    val access = photoAccessChecker.currentAccess()
+    _uiState.value = _uiState.value.copy(photoAccessState = access)
+    if (access != PhotoAccessState.DENIED) {
+      viewModelScope.launch {
+        if (preferences.settings.first().photoCollectionEnabled) {
+          backgroundWorkScheduler?.ensurePhotoCollectionScheduled()
+          backgroundWorkScheduler?.enqueuePhotoCollectionNow()
+        }
+      }
+    }
   }
 
   fun enablePhotoCollection(onRequestPermissions: () -> Unit) {
@@ -128,8 +156,16 @@ class MainViewModel(
   fun disablePhotoCollection() {
     viewModelScope.launch {
       preferences.disablePhotoCollection()
+      backgroundWorkScheduler?.cancelPhotoCollection()
       _uiState.value = _uiState.value.copy(photoCollectionEnabled = false)
     }
+  }
+
+  /** Requests one bounded photo scan without replacing the periodic work request. */
+  fun collectPhotosNow() {
+    if (!_uiState.value.photoCollectionEnabled || _uiState.value.photoAccessState == PhotoAccessState.DENIED) return
+    backgroundWorkScheduler?.enqueuePhotoCollectionNow()
+    refreshBackgroundState()
   }
 
   fun refreshBackgroundState() {
@@ -328,8 +364,15 @@ class MainViewModel(
     val coordinator = backgroundExecutionCoordinator
     val collectionState = coordinator?.findState(AutomaticSyncPolicy.COLLECTION_LEASE_KEY)
     val syncState = coordinator?.findState(AutomaticSyncPolicy.SYNC_LEASE_KEY)
+    val photoCollectionState = coordinator?.findState(PhotoWorkPolicy.COLLECTION_LEASE_KEY)
+    val photoSyncState = coordinator?.findState(PhotoWorkPolicy.SYNC_LEASE_KEY)
     val collectionWorkInfo = backgroundWorkScheduler?.currentCollectionWorkInfo()
     val syncWorkInfo = backgroundWorkScheduler?.currentSyncWorkInfo()
+    val photoCollectionWorkInfo = backgroundWorkScheduler?.currentPhotoCollectionWorkInfo()
+    val photoSyncWorkInfo = backgroundWorkScheduler?.currentPhotoSyncWorkInfo()
+    val pendingPhotos = pendingPhotoCount()
+    val pendingThumbnails = pendingPhotoThumbnailCount()
+    val thumbnailBytes = localPhotoThumbnailBytes()
     val now = nowMs()
     val leaseBusy =
       listOf(collectionState, syncState).any { state ->
@@ -355,6 +398,22 @@ class MainViewModel(
         automaticSyncSuccessAtMs = syncState?.lastSuccessAtMs,
         automaticSyncResult = syncState?.lastResult,
         recentAutomaticErrorKind = syncState?.lastErrorKind ?: collectionState?.lastErrorKind,
+        photoCollectionScheduled =
+          _uiState.value.photoCollectionEnabled &&
+            photoCollectionWorkInfo?.state != WorkInfo.State.CANCELLED && photoCollectionWorkInfo != null,
+        nextPhotoCollectionAtMs = photoCollectionWorkInfo?.nextScheduleTimeMillis?.takeIf { it > 0 },
+        photoCollectionAttemptAtMs = photoCollectionState?.lastAttemptAtMs,
+        photoCollectionSuccessAtMs = photoCollectionState?.lastSuccessAtMs,
+        photoCollectionResult = photoCollectionState?.lastResult,
+        photoSyncAttemptAtMs = photoSyncState?.lastAttemptAtMs,
+        photoSyncSuccessAtMs = photoSyncState?.lastSuccessAtMs,
+        photoSyncResult = photoSyncState?.lastResult,
+        photoRecentErrorKind = photoSyncState?.lastErrorKind ?: photoCollectionState?.lastErrorKind,
+        pendingPhotoCount = pendingPhotos,
+        pendingPhotoThumbnailCount = pendingThumbnails,
+        localPhotoThumbnailBytes = thumbnailBytes,
+        photoSyncWorkState = photoSyncWorkInfo?.state,
+        photoSyncRunAttemptCount = photoSyncWorkInfo?.runAttemptCount ?: 0,
         status = status,
         errorMessage = if (status == MainStatus.READY) null else _uiState.value.errorMessage,
         backgroundBusy = backgroundBusy,

@@ -25,6 +25,31 @@ import retrofit2.Response
 @RunWith(AndroidJUnit4::class)
 class LifeTimelineWorkerFactoryTest {
   @Test
+  fun createsBothPhotoWorkerTypesFromTheirStableNames() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val dependencies =
+      WorkerDependencies(
+        collectionCoordinatorFactory = { error("Collection is not used in this test.") },
+        syncRepositoryFactory = { _, _ -> error("Sync is not used in this test.") },
+      )
+    val factory = LifeTimelineWorkerFactory(dependencies)
+
+    val collection =
+      TestListenableWorkerBuilder
+        .from(context, PhotoCollectionWorker::class.java)
+        .setWorkerFactory(factory)
+        .build(PhotoCollectionWorker::class.java)
+    val sync =
+      TestListenableWorkerBuilder
+        .from(context, PhotoSyncWorker::class.java)
+        .setWorkerFactory(factory)
+        .build(PhotoSyncWorker::class.java)
+
+    assertEquals(PhotoCollectionWorker::class.java, collection.javaClass)
+    assertEquals(PhotoSyncWorker::class.java, sync.javaClass)
+  }
+
+  @Test
   fun createsCoroutineWorkerWithFakeRepositoryDependencies() =
     runBlocking {
       val context = ApplicationProvider.getApplicationContext<Context>()

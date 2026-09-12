@@ -8,12 +8,16 @@ import com.megane14916.lifetimeline.collector.AndroidMediaStorePhotoBackend
 import com.megane14916.lifetimeline.collector.AndroidPackageLabelResolver
 import com.megane14916.lifetimeline.collector.AndroidUsageEventsSource
 import com.megane14916.lifetimeline.collector.MediaStorePhotoSource
+import com.megane14916.lifetimeline.collector.PhotoAccessChecker
 import com.megane14916.lifetimeline.collector.PhotoThumbnailGenerator
 import com.megane14916.lifetimeline.collector.UsageAccessChecker
 import com.megane14916.lifetimeline.collector.UsageEventMapper
 import com.megane14916.lifetimeline.collector.UsageEventsCollector
 import com.megane14916.lifetimeline.data.local.LifeTimelineDatabase
 import com.megane14916.lifetimeline.data.preferences.AppPreferences
+import com.megane14916.lifetimeline.data.remote.PhotoSyncApiFactory
+import com.megane14916.lifetimeline.data.remote.PhotoSyncDevice
+import com.megane14916.lifetimeline.data.remote.RetrofitPhotoSyncUploader
 import com.megane14916.lifetimeline.data.remote.SyncApiFactory
 import com.megane14916.lifetimeline.data.remote.SyncAppDto
 import com.megane14916.lifetimeline.data.remote.SyncContractJson
@@ -24,9 +28,11 @@ import com.megane14916.lifetimeline.repository.CollectionRepository
 import com.megane14916.lifetimeline.repository.LocalDataRepository
 import com.megane14916.lifetimeline.repository.LocalThumbnailStore
 import com.megane14916.lifetimeline.repository.PhotoCollectionRepository
+import com.megane14916.lifetimeline.repository.PhotoSyncRepository
 import com.megane14916.lifetimeline.repository.SyncRepository
 import com.megane14916.lifetimeline.worker.BackgroundWorkScheduler
 import com.megane14916.lifetimeline.worker.LifeTimelineWorkerFactory
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -53,6 +59,11 @@ interface AppContainer {
     context: Context,
     endpoint: String,
   ): SyncRepository
+
+  suspend fun createPhotoSyncRepository(
+    context: Context,
+    endpoint: String,
+  ): PhotoSyncRepository
 }
 
 class DefaultAppContainer(
@@ -101,6 +112,15 @@ class DefaultAppContainer(
       pcBaseUrlProvider = preferences::getPcBaseUrl,
       syncTrigger = { backgroundWorkScheduler.enqueueSync() },
       syncSuccessRecorder = preferences::recordSync,
+      photoAccessCheckerFactory = { photoContext -> PhotoAccessChecker.from(photoContext) },
+      photoCollectionRepositoryFactory = { photoCollectionRepository },
+      photoCollectionEnabledProvider = { preferences.settings.first().photoCollectionEnabled },
+      photoCollectionStartedAtProvider = { preferences.settings.first().photoCollectionStartedAtMs },
+      photoSyncRepositoryFactory = ::createPhotoSyncRepository,
+      photoCollectionTrigger = { backgroundWorkScheduler.enqueuePhotoCollectionContinuation() },
+      photoSyncTrigger = { backgroundWorkScheduler.enqueuePhotoSync() },
+      pendingPhotoSyncableCountProvider = { database.androidMediaItemDao().countPendingSyncable() },
+      pendingPhotoThumbnailCountProvider = { database.androidMediaItemDao().countPendingThumbnails() },
     )
   }
   override val workerFactory: LifeTimelineWorkerFactory by lazy {
@@ -158,6 +178,31 @@ class DefaultAppContainer(
         ),
     )
   }
+
+  override suspend fun createPhotoSyncRepository(
+    context: Context,
+    endpoint: String,
+  ): PhotoSyncRepository =
+    PhotoSyncRepository(
+      database = database,
+      thumbnailStore = LocalThumbnailStore(java.io.File(context.filesDir, PHOTO_THUMBNAIL_DIRECTORY)),
+      uploader =
+        RetrofitPhotoSyncUploader(
+          PhotoSyncApiFactory.create(
+            baseUrl = endpoint,
+            retrofitBuilder =
+              Retrofit
+                .Builder()
+                .client(httpClient.newBuilder().callTimeout(90, TimeUnit.SECONDS).build()),
+          ),
+        ),
+      device =
+        PhotoSyncDevice(
+          id = preferences.ensureDeviceId(),
+          name = deviceName(context),
+          platform = "android",
+        ),
+    )
 
   private fun deviceName(context: Context): String = "${Build.MANUFACTURER} ${Build.MODEL}".trim().ifBlank { "Android device" }
 

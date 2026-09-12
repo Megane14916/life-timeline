@@ -30,6 +30,18 @@ class MainActivityTest {
       .onNodeWithText("次回の自動収集:", substring = true)
       .performScrollTo()
       .assertIsDisplayed()
+    composeRule
+      .onNodeWithText("次回の写真確認:", substring = true)
+      .performScrollTo()
+      .assertIsDisplayed()
+    composeRule
+      .onNodeWithText("thumbnail生成待ち:", substring = true)
+      .performScrollTo()
+      .assertIsDisplayed()
+    composeRule
+      .onNodeWithText("写真同期状態:", substring = true)
+      .performScrollTo()
+      .assertIsDisplayed()
     composeRule.onNodeWithText("収集して同期").performScrollTo().assertIsDisplayed()
   }
 }
