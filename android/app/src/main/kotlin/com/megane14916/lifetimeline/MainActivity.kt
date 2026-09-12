@@ -3,6 +3,8 @@ package com.megane14916.lifetimeline
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -25,13 +27,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.megane14916.lifetimeline.collector.PhotoAccessChecker
+import com.megane14916.lifetimeline.collector.PhotoAccessState
 import com.megane14916.lifetimeline.collector.UsageAccessChecker
 
 class MainActivity : ComponentActivity() {
   private val viewModel: MainViewModel by viewModels { MainViewModel.Factory { createMainViewModel() } }
+  private val photoAccessChecker by lazy { PhotoAccessChecker.from(applicationContext) }
+  private lateinit var photoPermissionLauncher: ActivityResultLauncher<Array<String>>
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    photoPermissionLauncher =
+      registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        viewModel.refreshPhotoAccess()
+      }
     setContent {
       LifeTimelineTheme {
         val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -39,6 +49,15 @@ class MainActivity : ComponentActivity() {
           state = state,
           onOpenUsageAccessSettings = {
             startActivity(UsageAccessChecker.from(this).usageAccessSettingsIntent())
+          },
+          onEnablePhotoCollection = {
+            viewModel.enablePhotoCollection {
+              photoPermissionLauncher.launch(photoAccessChecker.runtimePermissions())
+            }
+          },
+          onDisablePhotoCollection = viewModel::disablePhotoCollection,
+          onReselectPhotos = {
+            photoPermissionLauncher.launch(photoAccessChecker.runtimePermissions())
           },
           onSaveEndpoint = viewModel::savePcBaseUrl,
           onCollectAndSync = viewModel::collectAndSync,
@@ -50,6 +69,7 @@ class MainActivity : ComponentActivity() {
   override fun onResume() {
     super.onResume()
     viewModel.refreshUsageAccess()
+    viewModel.refreshPhotoAccess()
     viewModel.refreshBackgroundState()
   }
 
@@ -60,6 +80,7 @@ class MainActivity : ComponentActivity() {
     return MainViewModel(
       preferences = container.preferences,
       usageAccessChecker = accessChecker,
+      photoAccessChecker = photoAccessChecker,
       collectionCoordinator = container.createCollectionCoordinator(appContext),
       pendingCount = container.localDataRepository::countPending,
       syncRepositoryFactory = { endpoint -> container.createSyncRepository(appContext, endpoint) },
@@ -79,6 +100,9 @@ private fun LifeTimelineTheme(content: @Composable () -> Unit) {
 private fun MainScreen(
   state: MainUiState,
   onOpenUsageAccessSettings: () -> Unit,
+  onEnablePhotoCollection: () -> Unit,
+  onDisablePhotoCollection: () -> Unit,
+  onReselectPhotos: () -> Unit,
   onSaveEndpoint: (String) -> Unit,
   onCollectAndSync: () -> Unit,
 ) {
@@ -108,6 +132,42 @@ private fun MainScreen(
       if (!state.usageAccessGranted) {
         Button(onClick = onOpenUsageAccessSettings, enabled = !busy) {
           Text("利用状況へのアクセス設定")
+        }
+      }
+
+      Text(text = "写真の収集", style = MaterialTheme.typography.titleMedium)
+      Text(
+        text =
+          "写真の原本はPCへ送らず、DCIM内の新しい写真のthumbnailとmetadataを同期します。" +
+            "選択した写真のみのアクセスでは、選択済みの写真が対象です。",
+        style = MaterialTheme.typography.bodyMedium,
+      )
+      Text("写真へのアクセス: ${state.photoAccessState.toDisplayText()}")
+      Text("写真収集の設定: ${if (state.photoCollectionEnabled) "有効" else "無効"}")
+      if (!state.photoCollectionEnabled) {
+        Button(onClick = onEnablePhotoCollection, enabled = !busy) {
+          Text("写真収集を有効にする")
+        }
+      } else {
+        when (state.photoAccessState) {
+          PhotoAccessState.DENIED -> {
+            Button(onClick = onReselectPhotos, enabled = !busy) {
+              Text("写真へのアクセスを許可")
+            }
+          }
+
+          PhotoAccessState.PARTIAL -> {
+            Button(onClick = onReselectPhotos, enabled = !busy) {
+              Text("選択する写真を変更")
+            }
+          }
+
+          PhotoAccessState.FULL -> {
+            Unit
+          }
+        }
+        Button(onClick = onDisablePhotoCollection, enabled = !busy) {
+          Text("写真収集を無効にする")
         }
       }
 
@@ -176,8 +236,18 @@ private fun MainScreenPreview() {
     MainScreen(
       state = MainUiState(usageAccessGranted = true, pcBaseUrl = "https://pc.example.ts.net/"),
       onOpenUsageAccessSettings = {},
+      onEnablePhotoCollection = {},
+      onDisablePhotoCollection = {},
+      onReselectPhotos = {},
       onSaveEndpoint = {},
       onCollectAndSync = {},
     )
   }
 }
+
+private fun PhotoAccessState.toDisplayText(): String =
+  when (this) {
+    PhotoAccessState.FULL -> "有効（すべての写真）"
+    PhotoAccessState.PARTIAL -> "制限付き（選択した写真のみ）"
+    PhotoAccessState.DENIED -> "権限が必要"
+  }

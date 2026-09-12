@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -21,6 +22,8 @@ data class AppSettings(
   val pcBaseUrl: String?,
   val lastCollectionAtMs: Long?,
   val lastSyncAtMs: Long?,
+  val photoCollectionEnabled: Boolean = false,
+  val photoCollectionStartedAtMs: Long? = null,
 )
 
 private val Context.lifeTimelineDataStore: DataStore<Preferences> by preferencesDataStore(
@@ -37,6 +40,8 @@ class AppPreferences private constructor(
         pcBaseUrl = preferences[PC_BASE_URL_KEY],
         lastCollectionAtMs = preferences[LAST_COLLECTION_AT_KEY],
         lastSyncAtMs = preferences[LAST_SYNC_AT_KEY],
+        photoCollectionEnabled = preferences[PHOTO_COLLECTION_ENABLED_KEY] ?: false,
+        photoCollectionStartedAtMs = preferences[PHOTO_COLLECTION_STARTED_AT_KEY],
       )
     }
 
@@ -70,11 +75,30 @@ class AppPreferences private constructor(
     dataStore.edit { preferences -> preferences[LAST_SYNC_AT_KEY] = atMs }
   }
 
+  /** Records explicit user opt-in before the runtime permission dialog is opened. */
+  suspend fun enablePhotoCollection(startedAtMs: Long) {
+    require(startedAtMs >= 0) { "Photo collection timestamp must be non-negative." }
+    dataStore.edit { preferences ->
+      val wasEnabled = preferences[PHOTO_COLLECTION_ENABLED_KEY] == true
+      preferences[PHOTO_COLLECTION_ENABLED_KEY] = true
+      if (!wasEnabled || preferences[PHOTO_COLLECTION_STARTED_AT_KEY] == null) {
+        preferences[PHOTO_COLLECTION_STARTED_AT_KEY] = startedAtMs
+      }
+    }
+  }
+
+  /** Stops future collection while leaving any discovered or pending photo data intact. */
+  suspend fun disablePhotoCollection() {
+    dataStore.edit { preferences -> preferences[PHOTO_COLLECTION_ENABLED_KEY] = false }
+  }
+
   companion object {
     private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
     private val PC_BASE_URL_KEY = stringPreferencesKey("pc_base_url")
     private val LAST_COLLECTION_AT_KEY = longPreferencesKey("last_collection_at_ms")
     private val LAST_SYNC_AT_KEY = longPreferencesKey("last_sync_at_ms")
+    private val PHOTO_COLLECTION_ENABLED_KEY = booleanPreferencesKey("photo_collection_enabled")
+    private val PHOTO_COLLECTION_STARTED_AT_KEY = longPreferencesKey("photo_collection_started_at_ms")
 
     fun create(context: Context): AppPreferences = AppPreferences(context.lifeTimelineDataStore)
 
