@@ -14,6 +14,7 @@ import android.os.CancellationSignal
 import android.os.OperationCanceledException
 import android.provider.MediaStore
 import android.util.Size
+import androidx.core.graphics.scale
 import androidx.exifinterface.media.ExifInterface
 import com.megane14916.lifetimeline.data.local.AndroidMediaItemEntity
 import java.io.ByteArrayOutputStream
@@ -168,7 +169,7 @@ open class PhotoThumbnailGenerator(
     val scale = MAX_EDGE_PX.toFloat() / longestEdge
     val width = (bitmap.width * scale).roundToInt().coerceAtLeast(1)
     val height = (bitmap.height * scale).roundToInt().coerceAtLeast(1)
-    return Bitmap.createScaledBitmap(bitmap, width, height, true)
+    return bitmap.scale(width, height, filter = true)
   }
 
   @SuppressLint("NewApi")
