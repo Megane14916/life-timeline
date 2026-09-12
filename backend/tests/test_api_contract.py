@@ -17,7 +17,7 @@ from app.cli.seed import main as seed_main
 from app.config import Settings
 from app.db import create_engine_for_settings, create_session_factory
 from app.main import create_app
-from app.models import AppSession
+from app.models import AppSession, MediaItem
 from app.services.time_range import build_day_range
 
 
@@ -77,6 +77,64 @@ def test_timeline_returns_clipped_master_joined_items_in_stable_order(
             "continuesToNextDay": False,
             "endsAtDayBoundary": False,
         }
+    finally:
+        engine.dispose()
+
+
+def test_timeline_merges_photo_and_app_session_items_in_stable_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine, factory = _migrated_seeded_database(tmp_path, monkeypatch)
+    try:
+        day_start = build_day_range("2026-09-03", "Asia/Tokyo")[1].start_ms
+        with factory.begin() as session:
+            session.add(
+                MediaItem(
+                    id="01J00000000000000000001401",
+                    device_id="01J00000000000000000001001",
+                    type="photo",
+                    source="android_media_store",
+                    source_id="content://media/401",
+                    filename="photo.jpg",
+                    captured_at_ms=day_start + 9 * 60 * 60 * 1000,
+                    width=640,
+                    height=480,
+                    duration_ms=None,
+                    latitude=None,
+                    longitude=None,
+                    thumbnail_path=None,
+                    thumbnail_mime_type=None,
+                    thumbnail_width=None,
+                    thumbnail_height=None,
+                    thumbnail_size_bytes=None,
+                    thumbnail_sha256=None,
+                    mime_type="image/jpeg",
+                    created_at_ms=day_start,
+                )
+            )
+
+        response = _get(
+            create_app(factory),
+            "/api/v1/timeline",
+            date="2026-09-03",
+            timezone="Asia/Tokyo",
+        )
+        assert response.status_code == 200
+        items = response.json()["items"]
+        at_nine_am = [
+            item
+            for item in items
+            if item.get("startedAt", item.get("takenAt")) == "2026-09-03T00:00:00.000Z"
+        ]
+        assert [item["type"] for item in at_nine_am] == [
+            "app_session",
+            "app_session",
+            "photo",
+        ]
+        photo = at_nine_am[-1]
+        assert photo["id"] == "01J00000000000000000001401"
+        assert photo["takenAt"] == "2026-09-03T00:00:00.000Z"
+        assert photo["thumbnailUrl"] is None
     finally:
         engine.dispose()
 

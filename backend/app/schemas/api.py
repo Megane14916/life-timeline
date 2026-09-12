@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,7 +30,7 @@ class TimelineDisplay(ApiModel):
     ends_at_day_boundary: bool = Field(alias="endsAtDayBoundary")
 
 
-class TimelineItem(ApiModel):
+class AppSessionTimelineItem(ApiModel):
     type: Literal["app_session"]
     id: str
     device_id: str = Field(alias="deviceId")
@@ -46,12 +46,42 @@ class TimelineItem(ApiModel):
     display: TimelineDisplay
 
 
+class PhotoTimelineItem(ApiModel):
+    type: Literal["photo"]
+    id: str
+    device_id: str = Field(alias="deviceId")
+    device_name: str = Field(alias="deviceName")
+    source: Literal["android_media_store"]
+    taken_at: str = Field(alias="takenAt")
+    filename: str
+    mime_type: str = Field(alias="mimeType")
+    width: int | None
+    height: int | None
+    latitude: float | None
+    longitude: float | None
+    thumbnail_url: str | None = Field(alias="thumbnailUrl")
+
+
+TimelineItem = Annotated[
+    AppSessionTimelineItem | PhotoTimelineItem,
+    Field(discriminator="type"),
+]
+
+
 class TimelineResponse(ApiModel):
     date: str
     timezone: str
     range_start: str = Field(alias="rangeStart")
     range_end: str = Field(alias="rangeEnd")
     items: list[TimelineItem]
+
+
+class PhotosResponse(ApiModel):
+    date: str
+    timezone: str
+    range_start: str = Field(alias="rangeStart")
+    range_end: str = Field(alias="rangeEnd")
+    items: list[PhotoTimelineItem]
 
 
 class StatisticsTotals(ApiModel):

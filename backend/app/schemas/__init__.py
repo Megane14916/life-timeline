@@ -1,8 +1,11 @@
 """Pydantic schemas for the public API."""
 
 from app.schemas.api import (
+    AppSessionTimelineItem,
     ErrorDetail,
     ErrorResponse,
+    PhotosResponse,
+    PhotoTimelineItem,
     StatisticsAppItem,
     StatisticsResponse,
     StatisticsTotals,
@@ -19,8 +22,11 @@ from app.schemas.sync import (
 )
 
 __all__ = [
+    "AppSessionTimelineItem",
     "ErrorDetail",
     "ErrorResponse",
+    "PhotoTimelineItem",
+    "PhotosResponse",
     "StatisticsAppItem",
     "StatisticsResponse",
     "StatisticsTotals",

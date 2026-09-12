@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import App, AppSession, Device
+from app.models import App, AppSession, Device, MediaItem
 from app.services.time_range import QueryRange
 
 
@@ -16,6 +16,12 @@ class SessionWithMasters:
     app_session: AppSession
     device: Device
     app: App
+
+
+@dataclass(frozen=True, slots=True)
+class PhotoWithDevice:
+    media_item: MediaItem
+    device: Device
 
 
 def find_sessions(session: Session, query_range: QueryRange) -> list[SessionWithMasters]:
@@ -36,4 +42,23 @@ def find_sessions(session: Session, query_range: QueryRange) -> list[SessionWith
     return [
         SessionWithMasters(app_session=app_session, device=device, app=app)
         for app_session, device, app in session.execute(statement).tuples()
+    ]
+
+
+def find_photos(session: Session, query_range: QueryRange) -> list[PhotoWithDevice]:
+    """Find photos captured inside a timezone-aware half-open day range."""
+
+    statement = (
+        select(MediaItem, Device)
+        .join(Device, Device.id == MediaItem.device_id)
+        .where(
+            MediaItem.type == "photo",
+            MediaItem.captured_at_ms >= query_range.start_ms,
+            MediaItem.captured_at_ms < query_range.end_ms,
+        )
+        .order_by(MediaItem.captured_at_ms.desc(), MediaItem.id.desc())
+    )
+    return [
+        PhotoWithDevice(media_item=media_item, device=device)
+        for media_item, device in session.execute(statement).tuples()
     ]
