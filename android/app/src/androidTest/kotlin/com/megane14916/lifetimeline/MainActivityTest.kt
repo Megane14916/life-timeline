@@ -22,8 +22,14 @@ class MainActivityTest {
     composeRule.onNodeWithText("写真へのアクセス: 権限が必要").performScrollTo().assertIsDisplayed()
     composeRule.onNodeWithText("写真収集を有効にする").performScrollTo().assertIsDisplayed()
     composeRule.onNodeWithText("PC endpoint (HTTPS)").assertIsDisplayed()
-    composeRule.onNodeWithText("自動収集スケジュール:", substring = true).assertIsDisplayed()
-    composeRule.onNodeWithText("次回の自動収集:", substring = true).assertIsDisplayed()
+    composeRule
+      .onNodeWithText("自動収集スケジュール:", substring = true)
+      .performScrollTo()
+      .assertIsDisplayed()
+    composeRule
+      .onNodeWithText("次回の自動収集:", substring = true)
+      .performScrollTo()
+      .assertIsDisplayed()
     composeRule.onNodeWithText("収集して同期").performScrollTo().assertIsDisplayed()
   }
 }
