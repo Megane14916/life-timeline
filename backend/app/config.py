@@ -61,6 +61,12 @@ class Settings:
     def database_path(self) -> Path:
         return self.data_dir / "lifelog.db"
 
+    @property
+    def thumbnail_dir(self) -> Path:
+        """Return the one managed directory used for server-side thumbnails."""
+
+        return self.data_dir / "thumbnails"
+
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
         environment = os.environ if environ is None else environ

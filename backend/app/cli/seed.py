@@ -51,7 +51,14 @@ def _require_absolute_data_dir(raw_data_dir: str) -> Path:
 
 
 def _assert_migrated(engine: Engine) -> None:
-    expected_tables = {"alembic_version", "categories", "devices", "apps", "app_sessions"}
+    expected_tables = {
+        "alembic_version",
+        "categories",
+        "devices",
+        "apps",
+        "app_sessions",
+        "media_items",
+    }
     actual_tables = set(inspect(engine).get_table_names())
     if not expected_tables.issubset(actual_tables):
         raise SeedError(

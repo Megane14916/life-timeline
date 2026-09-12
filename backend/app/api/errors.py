@@ -21,6 +21,14 @@ class SyncConflictError(ValueError):
         self.field = field
 
 
+class PayloadTooLargeError(ValueError):
+    """Raised when the request body or one thumbnail exceeds its fixed limit."""
+
+    def __init__(self, message: str = "The photo sync request exceeds the size limit.") -> None:
+        super().__init__(message)
+        self.message = message
+
+
 class TemporarilyUnavailableError(RuntimeError):
     """Raised when SQLite cannot accept a sync transaction before its timeout."""
 

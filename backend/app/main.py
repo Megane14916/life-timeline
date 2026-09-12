@@ -12,9 +12,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.errors import (
     InvalidRequestError,
+    PayloadTooLargeError,
     SyncConflictError,
     TemporarilyUnavailableError,
 )
+from app.api.photo_limits import PhotoRequestSizeLimitMiddleware
+from app.api.photo_sync import router as photo_sync_router
 from app.api.statistics import router as statistics_router
 from app.api.sync import router as sync_router
 from app.api.timeline import router as timeline_router
@@ -77,6 +80,12 @@ def create_app(
     async def sync_conflict_handler(_request: Request, exc: SyncConflictError) -> JSONResponse:
         return _error_response("sync_conflict", exc.message, exc.field, status_code=409)
 
+    @application.exception_handler(PayloadTooLargeError)
+    async def payload_too_large_handler(
+        _request: Request, exc: PayloadTooLargeError
+    ) -> JSONResponse:
+        return _error_response("payload_too_large", exc.message, status_code=413)
+
     @application.exception_handler(TemporarilyUnavailableError)
     async def temporarily_unavailable_handler(
         _request: Request, exc: TemporarilyUnavailableError
@@ -98,6 +107,8 @@ def create_app(
     application.include_router(timeline_router)
     application.include_router(statistics_router)
     application.include_router(sync_router)
+    application.include_router(photo_sync_router)
+    application.add_middleware(PhotoRequestSizeLimitMiddleware)
 
     @application.get("/api/v1/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
