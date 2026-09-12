@@ -9,7 +9,7 @@ export interface TimelineDisplay {
   endsAtDayBoundary: boolean
 }
 
-export interface TimelineItem {
+export interface AppSessionTimelineItem {
   type: 'app_session'
   id: string
   deviceId: string
@@ -25,12 +25,38 @@ export interface TimelineItem {
   display: TimelineDisplay
 }
 
+export interface PhotoTimelineItem {
+  type: 'photo'
+  id: string
+  deviceId: string
+  deviceName: string
+  source: 'android_media_store'
+  takenAt: string
+  filename: string
+  mimeType: string
+  width: number | null
+  height: number | null
+  latitude: number | null
+  longitude: number | null
+  thumbnailUrl: string | null
+}
+
+export type TimelineItem = AppSessionTimelineItem | PhotoTimelineItem
+
 export interface TimelineResponse {
   date: string
   timezone: string
   rangeStart: string
   rangeEnd: string
   items: TimelineItem[]
+}
+
+export interface PhotosResponse {
+  date: string
+  timezone: string
+  rangeStart: string
+  rangeEnd: string
+  items: PhotoTimelineItem[]
 }
 
 export interface StatisticsTotals {
