@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
+import com.megane14916.lifetimeline.collector.PhotoAccessChecker
+import com.megane14916.lifetimeline.collector.PhotoAccessState
 import com.megane14916.lifetimeline.collector.UsageAccessChecker
 import com.megane14916.lifetimeline.data.preferences.AppPreferences
 import com.megane14916.lifetimeline.repository.BackgroundExecutionCoordinator
@@ -41,6 +43,8 @@ enum class MainStatus {
 
 data class MainUiState(
   val usageAccessGranted: Boolean = false,
+  val photoAccessState: PhotoAccessState = PhotoAccessState.DENIED,
+  val photoCollectionEnabled: Boolean = false,
   val pcBaseUrl: String? = null,
   val lastCollectionAtMs: Long? = null,
   val lastSyncAtMs: Long? = null,
@@ -62,6 +66,7 @@ data class MainUiState(
 class MainViewModel(
   private val preferences: AppPreferences,
   private val usageAccessChecker: UsageAccessChecker,
+  private val photoAccessChecker: PhotoAccessChecker,
   private val collectionCoordinator: CollectionCoordinator,
   private val pendingCount: suspend () -> Int,
   private val syncRepositoryFactory: suspend (String) -> SyncRepository,
@@ -82,10 +87,12 @@ class MainViewModel(
             lastCollectionAtMs = settings.lastCollectionAtMs,
             lastSyncAtMs = settings.lastSyncAtMs,
             usageAccessGranted = usageAccessChecker.isUsageAccessGranted(),
+            photoCollectionEnabled = settings.photoCollectionEnabled,
             pendingCount = pendingCount(),
           )
       }
     }
+    refreshPhotoAccess()
     refreshBackgroundState()
   }
 
@@ -103,6 +110,26 @@ class MainViewModel(
             _uiState.value.status
           },
       )
+  }
+
+  /** Re-reads the OS state whenever the app resumes or a permission result returns. */
+  fun refreshPhotoAccess() {
+    _uiState.value = _uiState.value.copy(photoAccessState = photoAccessChecker.currentAccess())
+  }
+
+  fun enablePhotoCollection(onRequestPermissions: () -> Unit) {
+    viewModelScope.launch {
+      preferences.enablePhotoCollection(nowMs())
+      _uiState.value = _uiState.value.copy(photoCollectionEnabled = true)
+      onRequestPermissions()
+    }
+  }
+
+  fun disablePhotoCollection() {
+    viewModelScope.launch {
+      preferences.disablePhotoCollection()
+      _uiState.value = _uiState.value.copy(photoCollectionEnabled = false)
+    }
   }
 
   fun refreshBackgroundState() {
