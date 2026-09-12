@@ -8,7 +8,7 @@ adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file
 
 indexed=false
 for attempt in $(seq 1 30); do
-  if adb shell content query --uri content://media/external/images/media --projection _id --where "display_name='synthetic-photo.jpg'" | grep -q '_id='; then
+  if adb shell content query --uri content://media/external/images/media --projection _id --where "_display_name='synthetic-photo.jpg'" | grep -q '_id='; then
     indexed=true
     break
   fi
