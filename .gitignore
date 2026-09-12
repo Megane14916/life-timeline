@@ -48,6 +48,7 @@ coverage/
 playwright-report/
 test-results/
 blob-report/
+frontend/vitest-junit.xml
 
 # Android / Gradle
 .gradle/

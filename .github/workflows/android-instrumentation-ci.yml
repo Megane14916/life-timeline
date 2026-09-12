@@ -26,6 +26,11 @@ jobs:
         with:
           packages: platform-tools platforms;android-36 build-tools;36.0.0
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+
       - name: Run instrumentation tests on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -38,42 +43,39 @@ jobs:
           emulator-boot-timeout: 1800
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -no-metrics -accel off
           script: |
-            set +e
+            set -euo pipefail
+            fixture_path=/sdcard/DCIM/LifeTimelineTest/synthetic-photo.jpg
+            adb shell mkdir -p /sdcard/DCIM/LifeTimelineTest
+            adb push android/app/src/androidTest/assets/synthetic-photo.jpg "$fixture_path"
+            adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file://$fixture_path"
+            indexed=false
+            for attempt in $(seq 1 30); do
+              if adb shell content query --uri content://media/external/images/media --projection _id --where "display_name='synthetic-photo.jpg'" | grep -q '_id='; then
+                indexed=true
+                break
+              fi
+              sleep 1
+            done
+            if [ "$indexed" != true ]; then
+              echo "Synthetic MediaStore image was not indexed."
+              exit 1
+            fi
             ./android/gradlew --no-daemon -p android connectedDebugAndroidTest
-            test_status=$?
-            mkdir -p android-instrumentation-artifacts
-            adb logcat -d > android-instrumentation-artifacts/logcat.txt
-            grep -F "LifeTimelineWorkInfo" android-instrumentation-artifacts/logcat.txt > android-instrumentation-artifacts/workinfo-summary.txt || echo "No WorkManager summary was emitted." > android-instrumentation-artifacts/workinfo-summary.txt
-            cp -R android/app/schemas android-instrumentation-artifacts/room-schemas
-            exit $test_status
 
-      - name: Verify instrumentation test results
+      - name: Sanitize instrumentation diagnostics and enforce test gate
         if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          result_directory="android/app/build/outputs/androidTest-results/connected"
-          if [ ! -d "$result_directory" ]; then
-            echo "Instrumentation result directory is missing."
-            exit 1
-          fi
-          result_files=$(find "$result_directory" -type f -name 'TEST-*.xml' -print)
-          if [ -z "$result_files" ]; then
-            echo "No instrumentation JUnit result files were produced."
-            exit 1
-          fi
-          if ! grep -R -E 'tests="[1-9][0-9]*"' "$result_directory"; then
-            echo "Instrumentation produced zero executed tests."
-            exit 1
-          fi
+        run: >-
+          python scripts/ci/sanitize_junit.py
+          --input-dir android/app/build/outputs/androidTest-results/connected
+          --output "$RUNNER_TEMP/android-instrumentation-safe/android-instrumentation-junit.xml"
+          --summary "$RUNNER_TEMP/android-instrumentation-safe/summary.json"
 
-      - name: Upload instrumentation diagnostics
+      - name: Upload privacy-safe instrumentation diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: android-instrumentation-diagnostics
           if-no-files-found: warn
           path: |
-            android/app/build/outputs/androidTest-results/
-            android/app/build/reports/androidTests/
-            android-instrumentation-artifacts/
+            ${{ runner.temp }}/android-instrumentation-safe/android-instrumentation-junit.xml
+            ${{ runner.temp }}/android-instrumentation-safe/summary.json
