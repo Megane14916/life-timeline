@@ -76,11 +76,9 @@ class LocationSyncContractFixtureTest {
     }
   }
 
-  private fun fixture(): LocationSyncContractFixture =
-    LocationSyncContractJson.decodeFromString<LocationSyncContractFixture>(fixtureText())
+  private fun fixture(): LocationSyncContractFixture = LocationSyncContractJson.decodeFromString<LocationSyncContractFixture>(fixtureText())
 
-  private fun fixtureStream(): InputStream =
-    checkNotNull(javaClass.classLoader?.getResourceAsStream("sync/locations-v1.json"))
+  private fun fixtureStream(): InputStream = checkNotNull(javaClass.classLoader?.getResourceAsStream("sync/locations-v1.json"))
 
   private fun fixtureText(): String = fixtureStream().bufferedReader().use { it.readText() }
 }
