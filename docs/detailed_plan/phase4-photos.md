@@ -602,14 +602,13 @@ P4-01 Photo v1 contract・policy・合成fixture
 - **成果物:** 既存6 required checks内のPhoto testと、失敗時の安全な要約。
 - **完了条件:** test 0件やskipを成功扱いせず、合成fixtureだけでthumbnail upload・配信・表示をCI確認できる。
 
-### P4-09: 大量写真と障害復旧を実機で受け入れる
+### P4-09: 写真収集の通常系を実機で受け入れる
 
-- **目的:** OEM MediaStore、実画像codec、memory、battery、Tailscale、再起動を実測する。
+- **目的:** 新規撮影からPC表示までの基本経路を実機で確認し、結果を記録する。
 - **依存:** P4-08。
-- **作業:** §12のシナリオを専用PC DBと検証用写真で実施し、件数、合計byte、最大処理時間、pending推移、battery参考値、復旧時間だけを記録する。
-- **成果物:** `docs/development/phase4-acceptance.md`。
-- **完了条件:** AC-01〜22を満たし、通常撮影後に原本なしのthumbnailがPC Timeline / 写真一覧へ一度だけ表示される。
-
+- **作業:** 写真収集を有効にした後で検証用写真を撮影し、同期後にPC Timeline / Photosへ一度だけ表示されることを確認する。結果は`docs/development/phase4-acceptance.md`へ安全な範囲で記録する。
+- **成果物:** 通常系の受け入れ結果と、必要時に参照できる拡張シナリオ一覧。
+- **完了条件:** 自動化可能な契約のrequired CIが成功し、通常撮影後の写真がPCに一度だけ表示される。partial権限、障害復旧、burst、長時間運転などの実機シナリオは任意とし、未実施を明記する。
 ### P4-10: 文書を更新しPhase 5へ引き継ぐ
 
 - **目的:** 実装値と上位文書を一致させ、位置情報追加時の境界を残す。
@@ -681,66 +680,42 @@ framework Cursor / Bitmapの実挙動をlocal JVMだけで断定せず、adapter
 
 既存6 checksをrequiredのまま維持する。Android unitは`android-ci`、MediaStore / Room / WorkManagerは`android-instrumentation-ci`、実SQLiteとthumbnail配信を使うbrowser確認は`pc-core-e2e`へ入れる。失敗artifactはJUnit、件数、byte数、result codeだけにし、画像本体、filename、source ID、hash、座標、URI、path、hostnameを含めない。
 
-## 12. 実機受け入れ手順と完了条件
+## 12. 実機受け入れと完了条件
 
-### 12.1 専用環境
+### 12.1 通常系の実機確認
 
-1. clean checkoutで既存6 checks相当を実行する。
-2. `%TEMP%`配下の一意なPhase 4専用`LIFE_TIMELINE_DATA_DIR`へmigrationを適用する。
-3. Backendを`127.0.0.1:8000`、Frontendを`127.0.0.1:5173`で起動する。
-4. FunnelなしのTailscale Serveを設定し、実URLを文書やartifactへ保存しない。
-5. debug APKをupgrade installし、既存Room v3 dataを保持したv4 migrationと写真generation cursorの再走査を確認する。
-6. 検証用として撮影内容に個人情報・顔・住所・画面・文書を含まない写真を用意する。
-7. 写真収集を有効化し、full / partial / deniedとEXIF location許可の状態を確認する。
-8. PCの`thumbnails/`とAndroid app-private fileは内容を開示せず、件数とbyte数だけを記録する。
+1. 写真収集を有効にし、写真へのアクセスを許可する。
+2. 有効化後にDCIM/Cameraへ検証用の写真を撮影する。
+3. 自動同期、または「写真を今すぐ確認」でscanを実行する。
+4. PCの当日Timeline / Photosに写真が一度だけ表示され、再scanで重複しないことを確認する。
+5. 同期後にpendingが解消されることを確認し、実施結果だけを受け入れ記録へ残す。
 
-### 12.2 代表シナリオ
+既存の個人用DBや写真を消去しない。実写真、filename、source ID、hash、座標、hostname、端末ID、raw log、packet captureは記録やCI artifactへ含めない。実測していない件数・byte数・所要時間は記載しない。
 
-1. full access有効化前の既存DCIM写真が自動importされないことを確認する。
-2. 有効化後に縦長・横長・位置あり / なしの検証用写真を撮り、画面を閉じたまま自動収集する。
-3. Android側WebPの最大辺、件数、合計byteを確認し、original file sizeがHTTP送信量に現れないことを確認する。
-4. unmetered networkで自動同期し、PC Timelineと写真一覧へ正しい日付・時刻・向きで一度だけ表示する。
-5. Android 14以降でpartial accessへ変更し、選択写真だけが見え、状態が`full`にならないことを確認する。
-6. permissionを取消し、cursorと既存pendingが維持され、再許可後に続行することを確認する。
-7. PC / FastAPI / Tailscaleを停止して複数写真を撮り、pending fileが残ることを確認する。
-8. metered networkへ切り替え、AppSessionは既存方針で同期できてもphotoは送信待ちになることを確認する。
-9. PCとunmetered networkを復旧し、手動操作なしに古い写真から送られることを確認する。
-10. upload中にprocess killし、ACK前fileが残り、stale lease回収後に同じID / hashで再送されることを確認する。
-11. Androidを再起動し、photo periodic workとretry中workが復旧することを確認する。
-12. 1回に20枚を超えるburst撮影を行い、複数batchで欠落・重複・memory異常なく同期することを確認する。
-13. ACK済みの検証用原本をAndroidから削除し、PCの記録とthumbnailが残ることを確認する。
-14. thumbnail生成前に原本を削除する別ケースでmetadata-only placeholderとなり、queue全体が停止しないことを確認する。
-15. 24時間以上の通常scheduleで新規写真、pending推移、battery / storage参考値、復旧時間を記録する。
+### 12.2 任意の拡張実機シナリオ
 
-### 12.3 受け入れチェックリスト
+以下はOS/OEM、ネットワーク、長時間運転に関する追加確認であり、通常系の受け入れとPhase 4完了のblockerにしない。
 
-| ID    | 完了条件                                                                           | 主な証拠                     |
-| ----- | ---------------------------------------------------------------------------------- | ---------------------------- |
-| AC-01 | Phase 3の正常系受け入れと既存6 required checksが回帰していない                     | Phase 3記録、CI              |
-| AC-02 | API level別permissionを使い、Android 14以降のpartialをfullと誤認しない             | unit / 実機permission試験    |
-| AC-03 | full access初回に過去libraryをimportせず、有効化後のDCIM写真を収集する             | baseline test、実機件数      |
-| AC-04 | partial accessでは明示選択写真だけをimportし、再選択入口がある                     | API 34+実機                  |
-| AC-05 | volume / generation / legacy cursorで再走査しても同一sourceが同じULID・1件になる   | adapter / Room test          |
-| AC-06 | thumbnailは正しい向き、最大辺512px以下、WebP quality 65で、原本を保存・送信しない  | generator test、送信byte確認 |
-| AC-07 | EXIF位置は許可時だけpairで保存し、拒否・欠損でも写真同期できる                     | permission / EXIF test       |
-| AC-08 | Room migrationが既存AppSession・cursor・leaseを保持し、v3→v4で写真cursorを一度再走査する | migration test               |
-| AC-09 | crash各段階でready rowがmissing local fileを指さず、未ACK fileを失わない           | fault injection test         |
-| AC-10 | photo workはUsageStats workと別名・別leaseで一つずつ登録される                     | WorkManager integration      |
-| AC-11 | photo uploadはUNMETERED / BatteryNotLow / StorageNotLowでのみ開始する              | constraint / 実機切替        |
-| AC-12 | PC停止、Tailscale切断、metered network中もmetadataとthumbnailがpendingで残る       | 障害試験、件数・byte数       |
-| AC-13 | 復旧後に20件batchで古い順に自動同期し、部分ACK後は残件から続行する                 | worker / 実機復旧            |
-| AC-14 | APIがfile数・byte数・hash・WebP・pixel・metadata対応をserver側で検証する           | Backend API test             |
-| AC-15 | 同一ID / hash再送でPC DB件数、created_at、file数が増殖しない                       | API / E2E / 実機             |
-| AC-16 | file / DB保存失敗でDB参照切れや既存thumbnail消失を残さない                         | fault injection test         |
-| AC-17 | AndroidでACK済み原本を削除してもPC metadata / thumbnailが残る                      | 実機削除試験                 |
-| AC-18 | ACK後だけAndroid rowをcleanedへ遷移して一時thumbnailを削除し、失敗時は誤削除しない | Repository / filesystem test |
-| AC-19 | TimelineがphotoとAppSessionをtimezone日範囲で安定順に表示する                      | API / E2E                    |
-| AC-20 | Photos APIとresponsive一覧がthumbnail / placeholder / empty / errorを表示する      | component / E2E              |
-| AC-21 | thumbnail APIがID経由だけでWebPを返し、path traversalやdirectory公開を許さない     | security test                |
-| AC-22 | 20枚超burst、再起動、process kill、24時間運転で欠落・重複・memory異常がない        | Phase 4実機受け入れ記録      |
+- Android 14以降のpartial / denied / 写真再選択。
+- 縦横・EXIF位置の違い、通信量、battery、storageの長時間測定。
+- metered network、PC停止、Tailscale切断からの復旧。
+- process kill、端末再起動、stale lease、未ACK再送。
+- 20枚超burst、ACK後の端末原本削除、24時間以上のschedule。
 
-AC-01〜22、全required checks、専用実機データでの長時間・大量写真試験をもってPhase 4を完了する。
+実施が必要になった場合は専用データを使い、集計値だけを記録する。未実施のシナリオをPASSと扱わず、問題を発見した場合は個別Issueで追跡する。
 
+### 12.3 自動検証と完了条件
+
+| 確認対象 | 主な証拠 | 扱い |
+| --- | --- | --- |
+| Permission policy、MediaStore cursor、baseline、dedupe | Android unit / instrumentation CI | 必須。OS dialogの実機差は任意確認 |
+| Room v3→v4 migration、file/DB整合性、WorkManager、retry、batch ACK | instrumentation / repository tests | 必須。実機kill・再起動は任意確認 |
+| API validation、冪等性、atomic保存、thumbnail配信 | Backend tests / PC Core E2E | 必須 |
+| Timeline / Photos表示とsecurity | Frontend component / E2E / security tests | 必須 |
+| 新規撮影からPC表示までの実経路 | Android実機の通常系確認 | 必須 |
+| OEM差、partial dialog、通信断、20枚超burst、再起動、24時間運転 | 拡張実機シナリオ | 任意。未実施は未実施と記録 |
+
+Phase 4は、自動化可能な契約テストとrequired CIが成功し、通常撮影後の写真が原本なしのthumbnailとしてPC Timeline / Photosへ一度だけ表示されれば完了とする。拡張実機シナリオは追加保証として扱い、未実施でも通常系の受け入れを取り消さない。
 ## 13. セキュリティとprivacy確認
 
 - FastAPIのloopback bind、Tailscale Serve HTTPS、Funnel未使用、最小ACLを維持する。
