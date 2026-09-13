@@ -1,6 +1,11 @@
 """Public repository exports."""
 
 from app.repositories.media import MediaItemConflictError, MediaItemRecord, MediaRepository
+from app.repositories.locations import (
+    LocationPointConflictError,
+    LocationPointRecord,
+    LocationPointRepository,
+)
 from app.repositories.normalized import (
     AppRecord,
     AppSessionConflictError,
@@ -23,6 +28,9 @@ __all__ = [
     "AppSessionRepository",
     "CategoryRecord",
     "DeviceRecord",
+    "LocationPointConflictError",
+    "LocationPointRecord",
+    "LocationPointRepository",
     "MasterRepository",
     "MediaItemConflictError",
     "MediaItemRecord",

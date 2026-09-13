@@ -94,8 +94,7 @@ class LocationSyncRequest(LocationSyncModel):
     schema_version: Literal[1] = Field(alias="schemaVersion")
     device: LocationSyncDevice
     locations: list[LocationSyncLocation] = Field(
-        min_length=1,
-        max_length=LocationSyncPolicy.MAX_LOCATIONS_PER_BATCH,
+        max_length=LocationSyncPolicy.MAX_LOCATIONS_PER_BATCH
     )
 
     @model_validator(mode="after")

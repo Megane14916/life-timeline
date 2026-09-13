@@ -100,3 +100,10 @@ def test_ack_requires_a_unique_ordered_subset_and_required_field() -> None:
                 {"schemaVersion": 1, "accepted": ["01K00000000000000000000003"]}
             ),
         )
+
+
+def test_empty_location_batch_is_a_valid_no_op_request() -> None:
+    request = copy.deepcopy(_load_fixture()["request"])
+    request["locations"] = []
+    parsed = LocationSyncRequest.model_validate(request)
+    assert parsed.locations == []
