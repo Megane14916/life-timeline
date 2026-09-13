@@ -66,6 +66,18 @@ Phase 4で採用し、実装およびCIで使用している依存のstable vers
 
 version確認日: 2026年9月12日。ExifInterfaceは[Android Developersのrelease notes](https://developer.android.com/jetpack/androidx/releases/exifinterface)、Python packagesは[python-multipart on PyPI](https://pypi.org/project/python-multipart/)および[Pillow on PyPI](https://pypi.org/project/pillow/)を参照した。ExifInterfaceはP4-03のEXIF orientation / 位置読取り、python-multipartとPillowはP4-02のmultipart受信とWebP検証で使用する。各versionは現在のversion catalog、pyproject.toml、uv.lockに固定されている。
 
+### Phase 5 Location依存とprivacy境界の確定
+
+P5-01では、Androidの位置受信とPCのMap表示に必要な依存を、後続の実装より先に固定した。確認日は2026年9月13日である。
+
+| 対象 | 確認したstable version | 初めて固定する場所 | 用途 |
+| --- | --- | --- | --- |
+| Google Play services Location | `21.4.0` | Android version catalog、`android/app/build.gradle.kts` | Fused Location Providerのbatched `PendingIntent`更新。foreground serviceは使用しない |
+| Leaflet | `1.9.4` | `frontend/package.json`、`frontend/package-lock.json` | PCの日次Mapのroute / visit / photo overlay |
+| `@types/leaflet` | `1.9.22` | `frontend/package.json`、`frontend/package-lock.json` | TypeScript 6でのLeaflet型定義 |
+
+Google Play services Locationは[公式セットアップ手順](https://developers.google.com/android/guides/setup)と[release notes](https://developers.google.com/android/guides/releases)、Leafletと型定義は[npm package registry](https://www.npmjs.com/package/leaflet)および[`@types/leaflet`](https://www.npmjs.com/package/@types/leaflet)でstable tagを確認した。Mapの実装はP5-08で行うが、online basemapは初期OFFとし、利用者が明示操作したときだけOpenStreetMap tileを取得する。位置contractの固定値、合成fixture、fieldの拒否規則は`contracts/sync/locations-v1.json`を正とする。
+
 ## 3. Androidアプリの識別子
 
 Androidプロジェクトでは次の値を使う。

@@ -62,6 +62,7 @@ dependencies {
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
   implementation(libs.androidx.exifinterface)
+  implementation(libs.play.services.location)
   implementation(libs.coroutines.android)
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.okhttp)
