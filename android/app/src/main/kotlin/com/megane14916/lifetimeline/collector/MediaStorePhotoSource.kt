@@ -328,27 +328,32 @@ class MediaStorePhotoSource(
               ?.takeIf { it.mediaStoreVersion == version && it.generationCursor != null }
               ?: MediaStorePhotoCursor(mediaStoreVersion = version, generationCursor = 0, mediaStoreIdCursor = 0)
           when {
-            hasMore ->
+            hasMore -> {
               currentCursor.copy(
                 generationCursor = lastRow?.generationModified ?: currentCursor.generationCursor,
                 mediaStoreIdCursor = lastRow?.mediaStoreId ?: currentCursor.mediaStoreIdCursor,
               )
+            }
 
-            generation != null ->
+            generation != null -> {
               currentCursor.copy(
                 mediaStoreVersion = version,
                 generationCursor = maxOf(generation, currentCursor.generationCursor ?: 0),
                 mediaStoreIdCursor = Long.MAX_VALUE,
               )
+            }
 
-            lastRow?.generationModified != null ->
+            lastRow?.generationModified != null -> {
               currentCursor.copy(
                 mediaStoreVersion = version,
                 generationCursor = lastRow.generationModified,
                 mediaStoreIdCursor = lastRow.mediaStoreId,
               )
+            }
 
-            else -> currentCursor.copy(mediaStoreVersion = version)
+            else -> {
+              currentCursor.copy(mediaStoreVersion = version)
+            }
           }
         }
 

@@ -98,22 +98,24 @@ class LifeTimelineDatabaseMigrationTest {
     )
     database.close()
 
-    helper.runMigrationsAndValidate(
-      "migration-v3-photo-cursor-test",
-      4,
-      true,
-      LifeTimelineDatabase.MIGRATION_3_4,
-    ).use {
-      it.query(
-        "SELECT media_store_version, generation_cursor, media_id_cursor, collection_started_at_ms FROM media_collection_state WHERE volume_name = 'external_primary'",
-      ).use { cursor ->
-        assertTrue(cursor.moveToFirst())
-        assertEquals("store-v1", cursor.getString(0))
-        assertEquals(0L, cursor.getLong(1))
-        assertEquals(0L, cursor.getLong(2))
-        assertEquals(1000L, cursor.getLong(3))
+    helper
+      .runMigrationsAndValidate(
+        "migration-v3-photo-cursor-test",
+        4,
+        true,
+        LifeTimelineDatabase.MIGRATION_3_4,
+      ).use {
+        it
+          .query(
+            "SELECT media_store_version, generation_cursor, media_id_cursor, collection_started_at_ms FROM media_collection_state WHERE volume_name = 'external_primary'",
+          ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("store-v1", cursor.getString(0))
+            assertEquals(0L, cursor.getLong(1))
+            assertEquals(0L, cursor.getLong(2))
+            assertEquals(1000L, cursor.getLong(3))
+          }
       }
-    }
   }
 
   private fun assertRowCount(
