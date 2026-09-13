@@ -200,51 +200,51 @@ PCが以下の状態でもAndroid側のデータを消しません。
 - Tailscale未接続
 - 通信切断
 
-Phase 3ではWorkManagerが定期収集・自動retry・network constraint・指数backoffを担当します。ユーザーの「収集して同期」操作は、同じRoom leaseとRepositoryを使う診断・即時実行手段として残します。未ACKのSessionはpendingを維持し、復旧後に同じIDで再送します。
+Phase 3のAppSession workerはWorkManagerの定期収集・自動retry・network constraint・指数backoffを担当します。写真には独立したphoto collection / photo sync worker、unique work name、Room leaseを使い、AppSession workerを置き換えません。未ACKの記録はpendingを維持し、復旧後に同じIDで再送します。画面の手動操作は診断・即時実行の入口として残します。
 
 ---
 
 ## 6. 写真設計
 
-### Android
+### 収集範囲とpermission
 
-MediaStoreから新しい写真を検出します。
+- MediaStoreに公開済みで`DCIM/`配下にある画像を対象にする。DCIM外、Secure Folder、別Android userの画像は対象外になり得る。`DCIM/`はCamera撮影の保証ではなく、DCIM内の非Camera画像が含まれる場合もある。
+- 収集はユーザーのopt-inとOS permissionの両方が必要。Android 14以降のfull / selected partial / deniedを実行時に判定し、permissionだけでopt-inとみなさない。
+- full accessでは有効化時baseline以降に追加された画像を収集し、過去library全体はimportしない。partial accessでは選択済み画像を対象とし、未選択の将来画像は保証しない。
+- API 30以降はvolumeのMediaStore versionと`GENERATION_MODIFIED`で差分scanし、API 26〜29は`DATE_ADDED` / `_ID` cursorを使う。`IS_PENDING=0`を適用する。
+- EXIF位置は別permissionで取得可能な場合だけnullable metadataとして扱う。permission拒否でも写真収集・同期を継続する。
 
-保存する情報:
+### 保存するmetadataとthumbnail
 
-- MediaStore ID
-- 撮影時刻
-- ファイル名
-- MIME type
-- width / height
-- EXIF位置情報
-- サムネイル
-
-### サムネイル
-
-目安:
+MediaItemにsource ID、撮影時刻、filename、original MIME type、width / height、任意のEXIF緯度・経度を保存する。原本path、URI、byte列は永続化しない。
 
 ```text
-最大辺: 512px
-形式: WebP
-品質: 60〜70
+最大辺: 512px（拡大なし）
+形式: WebP lossy
+quality: 65
+thumbnail上限: 1 MiB / file
 ```
 
-目的は写真を識別できる程度のプレビューです。
+Androidは端末内private directoryにthumbnailをatomic保存し、ACK後に一時fileを削除する。PCはmetadataをSQLiteの`media_items`へ、WebPだけを`thumbnails/`へ保存する。Androidの原本削除はPCの記録・thumbnailへ伝播しない。thumbnail生成前に原本へアクセスできなくなった場合はmetadata-only記録となり得る。
 
-原本はPCへ送信しません。
+### Workerと同期上限
 
-### 写真削除
+| 対象 | 固定値 |
+| --- | --- |
+| periodic collection work | `life_timeline_photo_collection_v1` |
+| one-time collection work | `life_timeline_photo_collection_now_v1` |
+| photo sync work | `life_timeline_photo_sync_v1` |
+| Room lease | `photo_collection_v1` / `photo_sync_v1` |
+| collection周期 / flex | 15分 / 5分（開始時刻の保証なし） |
+| collection constraints | `BatteryNotLow`、`StorageNotLow` |
+| sync constraints | `UNMETERED`、`BatteryNotLow`、`StorageNotLow` |
+| scan上限 | 1 run 2,000 raw rows、最大200 discoveries |
+| thumbnail生成 | 1 run 最大20件 |
+| multipart batch / request | 最大20 photos / 20 MiB |
+| 1 run上限 | 8分または10 batch |
+| backoff / lease TTL | exponential初期30分 / 15分 |
 
-AndroidやGoogle Photosから原本を削除しても、life-timeline上の以下は残します。
-
-- 撮影したという記録
-- メタデータ
-- サムネイル
-
-life-timelineを「現在のスマホのミラー」ではなく「過去の記録」として扱います。
-
----
+1件のthumbnailは最大1 MiB、辺の最大値は512px。WorkerはACKされたIDのみsyncedにし、未ACKをpendingに保つ。写真APIは`POST /api/v1/sync/photos`、日別表示は`GET /api/v1/photos?date=...&timezone=...`、thumbnail配信は`GET /api/v1/media/{id}/thumbnail`を使う。Uploadの総量と時間には上限を設け、OS制約によりbackground処理の開始・完了が遅れることを前提とする。
 
 ## 7. 位置情報設計
 
@@ -361,25 +361,17 @@ Android:
 
 ## 11. バックアップ
 
-バックアップ対象:
+写真を含むPCデータの一つの完全な単位は、data root全体、特に次の二つの組み合わせです。
 
 ```text
-lifelog.db
-thumbnails/
+LIFE_TIMELINE_DATA_DIR/
+├── lifelog.db
+└── thumbnails/
 ```
 
-SQLiteの単純コピーではなく、安全なバックアップ処理を用意します。
+DB metadataとthumbnail fileを別々の時点や別snapshotから復元すると、thumbnail欠損または孤立fileが発生します。現時点では自動backup / restore UIを実装していません。運用上の手動snapshotではFastAPIを停止してdata root全体をコピーし、復旧も同一snapshotのdata root全体を置き換えます。具体的なPowerShell手順はREADMEの[手動バックアップと復旧](../README.md#手動バックアップと復旧)を参照してください。
 
-将来的なExport:
-
-- JSON
-- CSV
-- GeoJSON
-- 写真サムネイル
-
-アプリを使わなくなってもデータを取り出せることを重視します。
-
----
+将来のExport / Backup機能では、DBと関連fileの一貫性を保つsnapshot手順を実装します。候補formatはJSON、CSV、GeoJSONとthumbnail files。
 
 # 12. テスト方針
 
@@ -716,12 +708,8 @@ Issueは、1つのPull Requestで解決できる程度の大きさを基本と�
 
 # 15. Migration
 
-DB schemaの変更はAlembicで管理します。
+DB schemaの変更はAlembicで管理します。写真テーブルのmigration IDは`0002_media_items`です。
 
-Android Roomについてもmigrationを明示的に管理します。
+Android Roomについてもmigrationを明示的に管理します。最終schemaはversion 4です。Room v3で写真entityとMediaStore cursor tableを追加し、v3→v4では既存recordを保持したままphoto generation cursorを再走査します。schema JSONとmigration testもversion 4に揃えています。
 
-ライフログアプリは長期間データを保持するため、
-
-「開発中だからDBを消して作り直す」
-
-という運用からできるだけ早く脱却します。
+ライフログアプリは長期間データを保持するため、「開発中だからDBを消して作り直す」という運用からできるだけ早く脱却します。

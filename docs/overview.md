@@ -56,17 +56,11 @@ AIによる要約や分析は必須機能とせず、まずは **記録をでき
 16:30  PC: VS Code
 ```
 
-## MVP
+## 現在の実装状況
 
-最初のMVPでは、以下を実現します。
+Phase 1〜4で、Androidのアプリ利用履歴と写真を収集し、Tailscale Serve経由でローカルPCへ同期する経路を実装しています。写真は利用者が収集を有効にした後、許可されたMediaStoreの`DCIM/`画像からメタデータと最大辺512pxのWebPサムネイルを扱います。原本写真はPCへ送信しません。
 
-1. Androidからアプリ使用履歴を取得する
-2. Android内に一時保存する
-3. Tailscale経由でPCへ送信する
-4. PCのSQLiteへ保存する
-5. Reactのタイムライン画面で確認する
-
-その後、写真・位置情報・ActivityWatch連携を順次追加します。
+Phase 5では位置情報の記録と地図表示を追加します。Phase 6以降でActivityWatchなどを段階的に統合します。実装値と通常系の受け入れ結果は[Phase 4詳細計画](detailed_plan/phase4-photos.md)と[Phase 4受け入れ記録](development/phase4-acceptance.md)を参照してください。
 
 ## 非目標
 
