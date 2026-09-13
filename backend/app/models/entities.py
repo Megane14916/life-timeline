@@ -144,3 +144,88 @@ class MediaItem(Base):
     thumbnail_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
     created_at_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class LocationPoint(Base):
+    __tablename__ = "location_points"
+    __table_args__ = (
+        CheckConstraint("latitude BETWEEN -90 AND 90", name="latitude_range"),
+        CheckConstraint("longitude BETWEEN -180 AND 180", name="longitude_range"),
+        CheckConstraint(
+            "accuracy_m IS NULL OR (accuracy_m >= 0 AND accuracy_m <= 1.7976931348623157e308)",
+            name="nonnegative_accuracy",
+        ),
+        CheckConstraint(
+            "altitude_m IS NULL OR "
+            "altitude_m BETWEEN -1.7976931348623157e308 AND 1.7976931348623157e308",
+            name="finite_altitude",
+        ),
+        CheckConstraint(
+            "speed_mps IS NULL OR (speed_mps >= 0 AND speed_mps <= 1.7976931348623157e308)",
+            name="nonnegative_speed",
+        ),
+        CheckConstraint("recorded_at_ms >= 0", name="nonnegative_recorded_at"),
+        CheckConstraint("created_at_ms >= 0", name="nonnegative_created_at"),
+        CheckConstraint("source = 'android_fused_location'", name="source"),
+        Index("idx_location_points_recorded", "recorded_at_ms", "id"),
+        Index("idx_location_points_device_recorded", "device_id", "recorded_at_ms", "id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(26), primary_key=True)
+    device_id: Mapped[str] = mapped_column(
+        String(26), ForeignKey("devices.id", ondelete="RESTRICT"), nullable=False
+    )
+    recorded_at_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    latitude: Mapped[float] = mapped_column(nullable=False)
+    longitude: Mapped[float] = mapped_column(nullable=False)
+    accuracy_m: Mapped[float | None] = mapped_column(nullable=True)
+    altitude_m: Mapped[float | None] = mapped_column(nullable=True)
+    speed_mps: Mapped[float | None] = mapped_column(nullable=True)
+    source: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class PlaceVisit(Base):
+    """Derived location fact; population is added by the PlaceVisit phase."""
+
+    __tablename__ = "place_visits"
+    __table_args__ = (
+        CheckConstraint("ended_at_ms > started_at_ms", name="ended_after_started"),
+        CheckConstraint("duration_ms = ended_at_ms - started_at_ms", name="duration_matches_range"),
+        CheckConstraint("started_at_ms >= 0", name="nonnegative_started_at"),
+        CheckConstraint("created_at_ms >= 0", name="nonnegative_created_at"),
+        CheckConstraint("center_latitude BETWEEN -90 AND 90", name="center_latitude_range"),
+        CheckConstraint("center_longitude BETWEEN -180 AND 180", name="center_longitude_range"),
+        CheckConstraint("radius_m BETWEEN 0 AND 1.7976931348623157e308", name="nonnegative_radius"),
+        CheckConstraint("point_count >= 3", name="minimum_point_count"),
+        CheckConstraint("algorithm_version = 'stay_point_v1'", name="algorithm_version"),
+        UniqueConstraint(
+            "device_id",
+            "algorithm_version",
+            "source_first_point_id",
+            "source_last_point_id",
+            name="uq_place_visits_source_range",
+        ),
+        Index("idx_place_visits_range", "started_at_ms", "ended_at_ms", "id"),
+        Index("idx_place_visits_device_started", "device_id", "started_at_ms", "id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(26), primary_key=True)
+    device_id: Mapped[str] = mapped_column(
+        String(26), ForeignKey("devices.id", ondelete="RESTRICT"), nullable=False
+    )
+    started_at_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    ended_at_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    duration_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    center_latitude: Mapped[float] = mapped_column(nullable=False)
+    center_longitude: Mapped[float] = mapped_column(nullable=False)
+    radius_m: Mapped[float] = mapped_column(nullable=False)
+    point_count: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    algorithm_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_first_point_id: Mapped[str] = mapped_column(
+        String(26), ForeignKey("location_points.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_last_point_id: Mapped[str] = mapped_column(
+        String(26), ForeignKey("location_points.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)

@@ -18,6 +18,8 @@ from app.api.errors import (
     TemporarilyUnavailableError,
     ThumbnailUnavailableError,
 )
+from app.api.location_limits import LocationRequestSizeLimitMiddleware
+from app.api.location_sync import router as location_sync_router
 from app.api.photo_limits import PhotoRequestSizeLimitMiddleware
 from app.api.photo_sync import router as photo_sync_router
 from app.api.photos import router as photos_router
@@ -125,8 +127,10 @@ def create_app(
     application.include_router(statistics_router)
     application.include_router(sync_router)
     application.include_router(photo_sync_router)
+    application.include_router(location_sync_router)
     application.include_router(photos_router)
     application.add_middleware(PhotoRequestSizeLimitMiddleware)
+    application.add_middleware(LocationRequestSizeLimitMiddleware)
 
     @application.get("/api/v1/health", response_model=HealthResponse)
     async def health() -> HealthResponse:

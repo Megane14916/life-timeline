@@ -13,6 +13,7 @@ from app.schemas.api import (
     TimelineItem,
     TimelineResponse,
 )
+from app.schemas.location_sync import LocationSyncRequest, LocationSyncResponse
 from app.schemas.sync import (
     SyncApp,
     SyncAppSession,
@@ -25,6 +26,8 @@ __all__ = [
     "AppSessionTimelineItem",
     "ErrorDetail",
     "ErrorResponse",
+    "LocationSyncRequest",
+    "LocationSyncResponse",
     "PhotoTimelineItem",
     "PhotosResponse",
     "StatisticsAppItem",
