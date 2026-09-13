@@ -178,7 +178,7 @@ class BackgroundWorkManagerIntegrationTest {
   }
 
   @Test
-  fun immediatePhotoScanDoesNotReplaceThePeriodicPhotoSchedule() {
+  fun immediatePhotoScanQueuesFollowUpWithoutReplacingThePeriodicPhotoSchedule() {
     val scheduler = scheduler()
     scheduler.ensurePhotoCollectionScheduled()
     val before =
@@ -199,7 +199,9 @@ class BackgroundWorkManagerIntegrationTest {
         .id
     val immediate = workManager.getWorkInfosForUniqueWork(PhotoWorkPolicy.IMMEDIATE_COLLECTION_WORK_NAME).get()
     assertEquals(before, after)
-    assertEquals(1, immediate.size)
+    assertEquals(2, immediate.size)
+    assertEquals(2, immediate.map { it.id }.toSet().size)
+    assertEquals(setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED), immediate.map { it.state }.toSet())
   }
 
   private fun scheduler(): BackgroundWorkScheduler = BackgroundWorkScheduler(workManager)
