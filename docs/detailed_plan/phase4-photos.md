@@ -25,7 +25,7 @@ Phase 3は実装完了であり、正常系の自動収集・自動同期、Room
 - Android 14以降のSelected Photos Accessを正しく判定するため、`READ_MEDIA_VISUAL_USER_SELECTED`をmanifestへ宣言し、full / partial / deniedを実行時に毎回判定する。permission状態をDataStoreへ正として保存しない。[Selected Photos Access](https://developer.android.com/about/versions/14/changes/partial-photo-video-access)
 - runtime permissionはアプリ起動時に突然要求せず、写真収集を有効にするユーザー操作から要求する。partial access時には再選択入口を表示する。
 - Android 10以降でunredacted EXIF位置を読む場合だけ`ACCESS_MEDIA_LOCATION`と`MediaStore.setRequireOriginal()`を使う。位置権限が拒否されても写真同期は継続し、緯度・経度を`null`にする。[共有ストレージ上のmediaへのアクセス](https://developer.android.com/training/data-storage/shared/media)
-- API 30以降はvolumeごとの`MediaStore.getVersion()`と`GENERATION_ADDED`を使う。version変更時はgenerationがresetされたものとして、収集開始時刻以降を再走査する。API 26〜29は`DATE_ADDED`と`_ID`の複合cursorを使う。[MediaStore API](https://developer.android.com/reference/android/provider/MediaStore)
+- API 30以降はvolumeごとの`MediaStore.getVersion()`と`GENERATION_MODIFIED`を使う。`IS_PENDING`から公開済みへの更新を拾い、`DATE_ADDED`で収集開始時刻以降へ絞る。version変更時はmodified generationとMediaStore IDを先頭へ戻して対象範囲を再走査する。API 26〜29は`DATE_ADDED`と`_ID`の複合cursorを使う。[MediaStore API](https://developer.android.com/reference/android/provider/MediaStore)
 - API 29以降は`ContentResolver.loadThumbnail()`でbounded decodeする。API 26〜28は`BitmapFactory`のbounds / sample decodeとEXIF orientation補正をadapterへ閉じ込める。[thumbnail生成](https://developer.android.com/social-and-messaging/guides/media-thumbnails)
 - WebPはAPI 30以降で`Bitmap.CompressFormat.WEBP_LOSSY`、API 26〜29で互換用`WEBP`を使う。[Bitmap.CompressFormat](https://developer.android.com/reference/android/graphics/Bitmap.CompressFormat)
 - `androidx.exifinterface:exifinterface:1.4.2`を採用候補とし、実装Issue開始時にstable releaseを再確認してversion catalogとtoolchainsへ固定する。[ExifInterface release notes](https://developer.android.com/jetpack/androidx/releases/exifinterface)
@@ -220,7 +220,7 @@ updated_at_ms           INTEGER
 
 `content://` URIやabsolute original pathは永続化しない。必要時に`volume_name`と`media_store_id`からURIを再構成する。app-private thumbnail pathはDBに絶対パスを保存せず、固定rootからのrelative pathだけを保存する。
 
-`MIGRATION_2_3`とRoom schema JSONをcommitし、v1→v2→v3およびv2→v3の両方をinstrumentation testする。migrationで既存Session、cursor、open activity、background leaseを変更しない。
+`MIGRATION_2_3`とRoom schema JSONをcommitし、v1→v2→v3およびv2→v3の両方をinstrumentation testする。写真generation cursorの意味を`GENERATION_ADDED`から`GENERATION_MODIFIED`へ変更するv3→v4では、既存のgeneration cursorとMediaStore IDを0へ戻し、登録済みsource IDを保ったまま対象写真を再照合する。
 
 ### 4.2 MediaStore差分走査
 
@@ -230,9 +230,9 @@ API 30以降:
 
 1. `getExternalVolumeNames()`の現在mount済みvolumeを列挙する。
 2. 保存した`media_store_version`と現在の`getVersion()`を比較する。
-3. 同じversionなら`GENERATION_ADDED > cursor`を昇順で最大200件queryする。
-4. versionが変わった場合はgenerationを信用せず、`collection_started_at_ms`以降を`DATE_ADDED + _ID`で再走査する。
-5. batch内で取得した最大generationを、対象rowのRoom保存が完了した後だけcommitする。
+3. 同じversionなら`(GENERATION_MODIFIED > cursor) OR (GENERATION_MODIFIED = cursor AND _ID > mediaIdCursor)`を昇順で最大200件queryする。`DATE_ADDED >= collection_started_at_ms`と`IS_PENDING = 0`も適用する。
+4. 初回またはversion変更時はmodified generationとMediaStore IDを0から始め、収集開始時刻以降のrowだけを追走する。v3からのmigrationでは同じ再照合を一度行い、従来cursorで見落とした写真を回復する。
+5. ページ途中は最終rowのgeneration / IDを保存し、最後のページでは取得済みのMediaStore generation snapshotまで進める。rowのRoom保存とcursor更新は同一transactionでcommitする。
 
 API 26〜29:
 
@@ -242,7 +242,7 @@ API 26〜29:
 
 全versionで、row単位のSecurityException / IOException / unsupported imageは他rowから分離する。検出済みrowを先に`thumbnail_state=pending`で保存するため、一つの壊れた写真がcursorを塞がず、後続写真も処理できる。
 
-partial accessでは、古い画像が権限の再選択によって新しく見える場合があり、`GENERATION_ADDED > cursor`だけでは検出できない。この状態では見えている選択集合を200件ずつ全照合し、既存`source_key`でdedupeする。選択集合から消えたrowは削除せず、PCへのdeleteも送らない。
+partial accessでは、古い画像が権限の再選択によって新しく見える場合があり、generation cursorだけでは検出できない。この状態では見えている選択集合を200件ずつ全照合し、既存`source_key`でdedupeする。選択集合から消えたrowは削除せず、PCへのdeleteも送らない。
 
 volumeが一時的にunmountされた場合はstateを削除せず、次回mount時に続行する。full accessからpartial / deniedへ変わった場合も、見えなくなったsourceをPC削除とは解釈しない。
 
@@ -636,7 +636,7 @@ framework Cursor / Bitmapの実挙動をlocal JVMだけで断定せず、adapter
 
 ### 11.2 Room / Android instrumentation test
 
-- v1 fixture→v2→v3とv2 fixture→v3で既存全tableを保持する。
+- v1 fixture→v2→v3とv2 fixture→v3で既存全tableを保持し、v3→v4で既存データを保ちながら旧写真generation cursorだけを再走査する。
 - source unique、pending順、ready / cleaned invariant、ACK conditional update、synced後cleanup対象取得。
 - local temp→final→Room参照、各段階の例外、orphan temp cleanup、別ID fileの非削除。
 - Emulator MediaStoreへ合成JPEG / PNGをinsertし、scan、512px WebP、orientation、Room保存を確認する。
@@ -689,7 +689,7 @@ framework Cursor / Bitmapの実挙動をlocal JVMだけで断定せず、adapter
 2. `%TEMP%`配下の一意なPhase 4専用`LIFE_TIMELINE_DATA_DIR`へmigrationを適用する。
 3. Backendを`127.0.0.1:8000`、Frontendを`127.0.0.1:5173`で起動する。
 4. FunnelなしのTailscale Serveを設定し、実URLを文書やartifactへ保存しない。
-5. debug APKをupgrade installし、既存Room v2 dataを保持したv3 migrationを確認する。
+5. debug APKをupgrade installし、既存Room v3 dataを保持したv4 migrationと写真generation cursorの再走査を確認する。
 6. 検証用として撮影内容に個人情報・顔・住所・画面・文書を含まない写真を用意する。
 7. 写真収集を有効化し、full / partial / deniedとEXIF location許可の状態を確認する。
 8. PCの`thumbnails/`とAndroid app-private fileは内容を開示せず、件数とbyte数だけを記録する。
@@ -723,7 +723,7 @@ framework Cursor / Bitmapの実挙動をlocal JVMだけで断定せず、adapter
 | AC-05 | volume / generation / legacy cursorで再走査しても同一sourceが同じULID・1件になる   | adapter / Room test          |
 | AC-06 | thumbnailは正しい向き、最大辺512px以下、WebP quality 65で、原本を保存・送信しない  | generator test、送信byte確認 |
 | AC-07 | EXIF位置は許可時だけpairで保存し、拒否・欠損でも写真同期できる                     | permission / EXIF test       |
-| AC-08 | Room v3 migrationが既存AppSession・cursor・leaseを保持する                         | migration test               |
+| AC-08 | Room migrationが既存AppSession・cursor・leaseを保持し、v3→v4で写真cursorを一度再走査する | migration test               |
 | AC-09 | crash各段階でready rowがmissing local fileを指さず、未ACK fileを失わない           | fault injection test         |
 | AC-10 | photo workはUsageStats workと別名・別leaseで一つずつ登録される                     | WorkManager integration      |
 | AC-11 | photo uploadはUNMETERED / BatteryNotLow / StorageNotLowでのみ開始する              | constraint / 実機切替        |
