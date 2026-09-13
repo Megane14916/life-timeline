@@ -107,29 +107,30 @@ Phase 3で確定した主な運用値は、collectionの15分周期 / 5分flex�
 
 ## Phase 4: Photos
 
-開始条件: Phase 3の正常系、CI gate、Room / WorkManagerの統合テスト、受け入れ手順がmainへ反映されていること。Phase 3で確定したscheduler、WorkerFactory、期限付きlease、retry分類、safe diagnosticsを再利用します。
+状態: P4-01〜P4-09の実装と写真収集の通常系受け入れが完了しています。P4-10では主要文書とPhase 5引き継ぎをこのPRで反映します。受け入れ結果と任意シナリオの範囲は[Phase 4受け入れ記録](development/phase4-acceptance.md)、固定値と非保証は[Phase 4詳細計画](detailed_plan/phase4-photos.md)を参照してください。
+
+開始条件: Phase 3の正常系、CI gate、Room / WorkManagerの統合テスト、受け入れ手順がmainへ反映されていること。Phase 3のscheduler、WorkerFactory、期限付きlease、retry分類、safe diagnosticsを再利用し、写真用work nameとleaseは独立させます。
 
 目的:
 
-その日に撮った写真をライフログとして表示する。
+写真のmetadataと軽量thumbnailをローカルPCへ集め、Timelineと日別Photosで振り返れるようにする。
 
 内容:
 
-- MediaStore
-- 写真メタデータ
-- サムネイル生成
-- WebP圧縮
-- PCへのアップロード
-- Timeline表示
-- 写真一覧
+- MediaStore / Android 14以降のfull・partial access
+- 有効化後のDCIM写真を対象にするbaselineと差分scan
+- metadataと最大辺512px、WebP lossy quality 65のthumbnail生成
+- unmetered network限定の写真同期、冪等なAPI保存
+- Timeline union、Photos一覧、thumbnail配信
+- 実装値・運用・backup対象・Phase 5引き継ぎの文書
 
 完成条件:
 
-原本を送らず、撮影写真をPC上で識別できる。
-
----
+原本を送らず、許可範囲内の写真がPC上で識別でき、required CIと通常系の実機確認が受け入れ記録に残る。拡張実機シナリオは任意とする。
 
 ## Phase 5: Location
+
+開始条件: Phase 4の文書引き継ぎがmainへ反映されていること。Photosの正規化media_items、timezone日範囲query、EXIF latitude / longitude、写真固有worker / lease / retry、privacy用合成fixtureを再利用します。LocationPointの連続記録・PlaceVisitは独立した保存モデルとし、写真workerやACCESS_MEDIA_LOCATIONへ混在させません。実装前にLocation固有のpermission、work name、周期、battery budget、同期batch、Map表示を決定します。
 
 目的:
 
@@ -147,8 +148,6 @@ Phase 3で確定した主な運用値は、collectionの15分周期 / 5分flex�
 完成条件:
 
 その日の移動経路と主な滞在場所をPCで確認できる。
-
----
 
 ## Phase 6: ActivityWatch
 
