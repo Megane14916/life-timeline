@@ -89,6 +89,33 @@ class LifeTimelineDatabaseMigrationTest {
     }
   }
 
+  @Test
+  @Throws(IOException::class)
+  fun resetsLegacyPhotoGenerationCursorWhenMigratingToVersionFour() {
+    val database = helper.createDatabase("migration-v3-photo-cursor-test", 3)
+    database.execSQL(
+      "INSERT INTO media_collection_state (volume_name, media_store_version, generation_cursor, date_added_cursor_sec, media_id_cursor, collection_started_at_ms, last_scan_at_ms, updated_at_ms) VALUES ('external_primary', 'store-v1', 923, NULL, 811, 1000, 2000, 2000)",
+    )
+    database.close()
+
+    helper.runMigrationsAndValidate(
+      "migration-v3-photo-cursor-test",
+      4,
+      true,
+      LifeTimelineDatabase.MIGRATION_3_4,
+    ).use {
+      it.query(
+        "SELECT media_store_version, generation_cursor, media_id_cursor, collection_started_at_ms FROM media_collection_state WHERE volume_name = 'external_primary'",
+      ).use { cursor ->
+        assertTrue(cursor.moveToFirst())
+        assertEquals("store-v1", cursor.getString(0))
+        assertEquals(0L, cursor.getLong(1))
+        assertEquals(0L, cursor.getLong(2))
+        assertEquals(1000L, cursor.getLong(3))
+      }
+    }
+  }
+
   private fun assertRowCount(
     database: androidx.sqlite.db.SupportSQLiteDatabase,
     table: String,

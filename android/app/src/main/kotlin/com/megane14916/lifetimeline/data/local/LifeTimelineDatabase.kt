@@ -22,7 +22,7 @@ import com.megane14916.lifetimeline.data.local.dao.OpenActivityDao
     AndroidMediaItemEntity::class,
     MediaCollectionStateEntity::class,
   ],
-  version = 3,
+  version = 4,
   exportSchema = true,
 )
 abstract class LifeTimelineDatabase : RoomDatabase() {
@@ -137,6 +137,16 @@ abstract class LifeTimelineDatabase : RoomDatabase() {
               PRIMARY KEY(`work_key`)
             )
             """.trimIndent(),
+          )
+        }
+      }
+
+    val MIGRATION_3_4 =
+      object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+          // Re-scan eligible rows once when moving from GENERATION_ADDED to GENERATION_MODIFIED.
+          db.execSQL(
+            "UPDATE media_collection_state SET generation_cursor = 0, media_id_cursor = 0 WHERE generation_cursor IS NOT NULL",
           )
         }
       }

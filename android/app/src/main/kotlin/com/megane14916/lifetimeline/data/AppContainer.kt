@@ -87,7 +87,11 @@ class DefaultAppContainer(
   override val database: LifeTimelineDatabase by lazy {
     Room
       .databaseBuilder(context, LifeTimelineDatabase::class.java, DATABASE_NAME)
-      .addMigrations(LifeTimelineDatabase.MIGRATION_1_2, LifeTimelineDatabase.MIGRATION_2_3)
+      .addMigrations(
+        LifeTimelineDatabase.MIGRATION_1_2,
+        LifeTimelineDatabase.MIGRATION_2_3,
+        LifeTimelineDatabase.MIGRATION_3_4,
+      )
       .addCallback(LifeTimelineDatabase.PHOTO_INTEGRITY_CALLBACK)
       .build()
   }

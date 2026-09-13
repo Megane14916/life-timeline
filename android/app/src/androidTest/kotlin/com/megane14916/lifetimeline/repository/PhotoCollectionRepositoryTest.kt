@@ -148,6 +148,7 @@ class PhotoCollectionRepositoryTest {
       relativePath = null,
       legacyDataPath = "/storage/emulated/0/DCIM/Camera/synthetic-$id.jpg",
       generationAdded = null,
+      generationModified = null,
       isPending = false,
       isTrashed = false,
     )
