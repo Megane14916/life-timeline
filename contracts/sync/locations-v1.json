@@ -1,0 +1,85 @@
+{
+  "endpoint": "/api/v1/sync/locations",
+  "contentType": "application/json",
+  "policy": {
+    "maxLocationsPerBatch": 200,
+    "maxRequestBytes": 262144,
+    "source": "android_fused_location"
+  },
+  "request": {
+    "schemaVersion": 1,
+    "device": {
+      "id": "01K00000000000000000000001",
+      "name": "Synthetic Android",
+      "platform": "android"
+    },
+    "locations": [
+      {
+        "id": "01K00000000000000000000002",
+        "recordedAtMs": 1789228800000,
+        "latitude": 0.001,
+        "longitude": 0.001,
+        "accuracyM": 25.0,
+        "altitudeM": null,
+        "speedMps": null,
+        "source": "android_fused_location"
+      }
+    ]
+  },
+  "success": {
+    "schemaVersion": 1,
+    "accepted": ["01K00000000000000000000002"]
+  },
+  "errors": [
+    {
+      "status": 413,
+      "payload": {
+        "error": {
+          "code": "payload_too_large",
+          "message": "The location sync request exceeds the size limit.",
+          "field": null
+        }
+      }
+    },
+    {
+      "status": 422,
+      "payload": {
+        "error": {
+          "code": "invalid_request",
+          "message": "The location sync request is invalid.",
+          "field": "locations[0].latitude"
+        }
+      }
+    },
+    {
+      "status": 409,
+      "payload": {
+        "error": {
+          "code": "sync_conflict",
+          "message": "A location ID is already stored with different content.",
+          "field": "locations[0].id"
+        }
+      }
+    },
+    {
+      "status": 503,
+      "payload": {
+        "error": {
+          "code": "temporarily_unavailable",
+          "message": "The PC is temporarily unavailable.",
+          "field": null
+        }
+      }
+    },
+    {
+      "status": 500,
+      "payload": {
+        "error": {
+          "code": "internal_error",
+          "message": "The location sync request could not be completed.",
+          "field": null
+        }
+      }
+    }
+  ]
+}
