@@ -46,7 +46,25 @@ jobs:
         run: uv run mypy app tests
 
       - name: Test
-        run: uv run pytest
+        run: uv run pytest --junitxml "$RUNNER_TEMP/backend-tests-raw.xml"
+
+      - name: Sanitize test diagnostics and enforce test gate
+        if: always()
+        run: >-
+          uv run python ../scripts/ci/sanitize_junit.py
+          --input "$RUNNER_TEMP/backend-tests-raw.xml"
+          --output "$RUNNER_TEMP/backend-ci-safe/backend-junit.xml"
+          --summary "$RUNNER_TEMP/backend-ci-safe/summary.json"
+
+      - name: Upload privacy-safe test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-junit-ubuntu
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/backend-ci-safe/backend-junit.xml
+            ${{ runner.temp }}/backend-ci-safe/summary.json
 
       - name: Check migration heads
         run: uv run alembic heads
@@ -94,7 +112,25 @@ jobs:
         run: uv run mypy app tests
 
       - name: Test
-        run: uv run pytest
+        run: uv run pytest --junitxml "$env:RUNNER_TEMP\backend-tests-raw.xml"
+
+      - name: Sanitize test diagnostics and enforce test gate
+        if: always()
+        run: >-
+          uv run python ..\scripts\ci\sanitize_junit.py
+          --input "$env:RUNNER_TEMP\backend-tests-raw.xml"
+          --output "$env:RUNNER_TEMP\backend-ci-safe\backend-junit.xml"
+          --summary "$env:RUNNER_TEMP\backend-ci-safe\summary.json"
+
+      - name: Upload privacy-safe test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-junit-windows
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/backend-ci-safe/backend-junit.xml
+            ${{ runner.temp }}/backend-ci-safe/summary.json
 
       - name: Check migration heads
         run: uv run alembic heads

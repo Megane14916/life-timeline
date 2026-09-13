@@ -154,6 +154,30 @@ class BackgroundWorkManagerIntegrationTest {
   }
 
   @Test
+  fun photoSyncRemainsEnqueuedUntilAllUnmeteredAndDeviceConstraintsAreMet() {
+    val scheduler =
+      BackgroundWorkScheduler(
+        workManager = workManager,
+        collectionWorkerClass = SuccessfulWorker::class.java,
+        photoSyncWorkerClass = SuccessfulWorker::class.java,
+      )
+    val request = scheduler.photoSyncWorkRequest()
+
+    workManager.enqueue(request).result.get()
+    assertEquals(
+      WorkInfo.State.ENQUEUED,
+      checkNotNull(workManager.getWorkInfoById(request.id).get()).state,
+    )
+
+    testDriver.setAllConstraintsMet(request.id)
+
+    assertEquals(
+      WorkInfo.State.SUCCEEDED,
+      checkNotNull(workManager.getWorkInfoById(request.id).get()).state,
+    )
+  }
+
+  @Test
   fun immediatePhotoScanDoesNotReplaceThePeriodicPhotoSchedule() {
     val scheduler = scheduler()
     scheduler.ensurePhotoCollectionScheduled()

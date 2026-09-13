@@ -50,16 +50,24 @@ jobs:
         working-directory: frontend
         env:
           CI: true
-          E2E_ARTIFACT_DIR: ${{ github.workspace }}/e2e-artifacts
+          E2E_JUNIT_RESULTS: ${{ runner.temp }}/pc-core-e2e-tests-raw.xml
+          LIFE_TIMELINE_E2E_DATA_DIR: ${{ runner.temp }}/life-timeline-e2e-data
         run: npm run e2e
 
-      - name: Upload E2E diagnostics
+      - name: Sanitize E2E diagnostics and enforce test gate
+        if: always()
+        run: >-
+          python scripts/ci/sanitize_junit.py
+          --input "${{ runner.temp }}/pc-core-e2e-tests-raw.xml"
+          --output "${{ runner.temp }}/pc-core-e2e-safe/pc-core-e2e-junit.xml"
+          --summary "${{ runner.temp }}/pc-core-e2e-safe/summary.json"
+
+      - name: Upload privacy-safe E2E diagnostics
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: pc-core-e2e-diagnostics
           if-no-files-found: warn
           path: |
-            e2e-artifacts/
-            frontend/playwright-report/
-            frontend/test-results/
+            ${{ runner.temp }}/pc-core-e2e-safe/pc-core-e2e-junit.xml
+            ${{ runner.temp }}/pc-core-e2e-safe/summary.json
