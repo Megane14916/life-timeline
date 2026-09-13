@@ -211,11 +211,40 @@ Windowsの専用一時DB、Android実機、Tailscale Serveを使ったUsage Acce
 
 WorkManagerによる定期収集・自動同期、Room v2、期限付きlease、retry、unique work、CI gateの実装と正常系の確認は[Phase 3受け入れ記録](docs/development/phase3-acceptance.md)に記録しています。Doze、OEMの電池最適化、端末再起動、Tailscale切替、24時間以上の運転はOS・実機依存のため、必要に応じて同記録の任意シナリオを追加確認します。
 
+## Phase 4受け入れ記録
+
+写真収集有効化後の新規撮影がPCへ同期される通常系と、任意の拡張実機シナリオは[Phase 4受け入れ記録](docs/development/phase4-acceptance.md)を参照してください。
 ## よくある問題
 
 ### `uv sync --frozen`が失敗する
 
 `python --version`と`uv --version`を確認してください。`pyproject.toml`と`uv.lock`が一致しない場合も失敗します。依存関係を意図的に変更する作業でのみlockを更新し、通常のセットアップでは`--frozen`を外して解決しないでください。
+
+次のように`Failed to create temporary virtualenv`と、存在しない`python.exe`へのpathが表示される場合は、uvが参照しているmanaged Pythonのinstall先を確認します。
+
+```powershell
+$env:UV_PYTHON_INSTALL_DIR
+uv python dir
+uv python list --only-installed
+```
+
+install先が一時ディレクトリを指し、表示されたPythonが存在しない場合は、現在のPowerShellだけでoverrideを外し、uvの既定のpersistent data directoryへPythonを再インストールします。Python install directoryは `UV_PYTHON_INSTALL_DIR` で変更できます。
+
+```powershell
+Remove-Item Env:UV_PYTHON_INSTALL_DIR -ErrorAction SilentlyContinue
+uv python dir
+uv python install --reinstall 3.13.15
+uv python find 3.13.15
+```
+
+`uv python find`がPython 3.13.15の実行ファイルを返すことを確認し、`backend`でlockを変更せずに再実行します。
+
+```powershell
+cd backend
+uv sync --all-groups --frozen
+```
+
+一時ディレクトリにあるuvのPython installを削除する必要はありません。別のPowerShellを開くとoverrideが再び設定される場合は、WindowsのUser / Machine環境変数 `UV_PYTHON_INSTALL_DIR` の設定元も確認してください。環境変数を使わない場合、uvは既定の永続data directoryを使用します。
 
 ### `npm ci`がversionまたはlock fileのエラーになる
 
