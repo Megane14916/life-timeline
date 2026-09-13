@@ -77,31 +77,41 @@ class MediaStorePhotoSourceTest {
   }
 
   @Test
-  fun api30UsesGenerationWhenVersionMatchesAndResetsOnVersionChange() {
+  fun api30UsesModifiedGenerationAndStartsFromZeroAfterVersionChange() {
     val backend =
       FakeBackend(
         version = "v2",
         generationValue = 44,
-        rows = listOf(photoRow(8, relativePath = "DCIM/8.jpg", generation = 42)),
+        rows = listOf(photoRow(8, relativePath = "DCIM/8.jpg", generationAdded = 41, generationModified = 42)),
       )
     val source = MediaStorePhotoSource(30, backend)
     val established = MediaStorePhotoCursor(mediaStoreVersion = "v2", generationCursor = 40)
 
     source.queryPage("external_primary", PhotoAccessState.FULL, established, null, 10_000, limit = 3)
     assertEquals(MediaStorePhotoQueryMode.GENERATION_CURSOR, backend.lastPlan!!.mode)
-    assertTrue(backend.lastPlan!!.selection.contains(MediaStore.MediaColumns.GENERATION_ADDED))
+    assertTrue(backend.lastPlan!!.selection.contains(MediaStore.MediaColumns.GENERATION_MODIFIED))
+    assertFalse(backend.lastPlan!!.selection.contains(MediaStore.MediaColumns.GENERATION_ADDED))
 
     val changed = established.copy(mediaStoreVersion = "v1", generationCursor = 99)
     val reset = source.queryPage("external_primary", PhotoAccessState.FULL, changed, null, 10_000, limit = 1)
-    assertEquals(MediaStorePhotoQueryMode.BASELINE_BY_DATE_ADDED, backend.lastPlan!!.mode)
-    assertFalse(backend.lastPlan!!.selection.contains(MediaStore.MediaColumns.GENERATION_ADDED))
-    assertTrue(backend.lastPlan!!.selection.contains(MediaStore.Images.Media.DATE_ADDED))
-    assertEquals(null, checkNotNull(reset.nextCursor).mediaStoreVersion)
-    assertEquals(20L, checkNotNull(reset.nextCursor).dateAddedCursorSeconds)
+    assertEquals(MediaStorePhotoQueryMode.GENERATION_CURSOR, backend.lastPlan!!.mode)
+    assertTrue(backend.lastPlan!!.selection.contains(MediaStore.MediaColumns.GENERATION_MODIFIED))
+    assertEquals("0", backend.lastPlan!!.selectionArgs[4])
+    assertEquals(42L, checkNotNull(reset.nextCursor).generationCursor)
+  }
 
-    source.queryPage("external_primary", PhotoAccessState.FULL, checkNotNull(reset.nextCursor), null, 10_000, limit = 1)
-    assertEquals(MediaStorePhotoQueryMode.BASELINE_BY_DATE_ADDED, backend.lastPlan!!.mode)
-    assertTrue(backend.lastPlan!!.selection.contains(MediaStore.Images.Media._ID))
+  @Test
+  fun firstFullScanUsesModifiedGenerationFromZeroAndHonorsOptInTime() {
+    val backend = FakeBackend(version = "v2", generationValue = 44)
+
+    val page = MediaStorePhotoSource(35, backend).queryPage("external_primary", PhotoAccessState.FULL, null, null, 10_000)
+
+    assertEquals(MediaStorePhotoQueryMode.GENERATION_CURSOR, backend.lastPlan!!.mode)
+    assertTrue(backend.lastPlan!!.selection.contains(MediaStore.MediaColumns.GENERATION_MODIFIED))
+    assertEquals("10", backend.lastPlan!!.selectionArgs[3])
+    assertEquals("0", backend.lastPlan!!.selectionArgs[4])
+    assertEquals("0", backend.lastPlan!!.selectionArgs[5])
+    assertEquals(44L, checkNotNull(page.nextCursor).generationCursor)
   }
 
   @Test
@@ -125,7 +135,7 @@ class MediaStorePhotoSourceTest {
       FakeBackend(
         version = "v1",
         generationValue = 20,
-        rows = listOf(photoRow(9, relativePath = "DCIM/9.jpg", generation = 18)),
+        rows = listOf(photoRow(9, relativePath = "DCIM/9.jpg", generationAdded = 16, generationModified = 18)),
       )
     val source = MediaStorePhotoSource(33, backend)
     val cursor = MediaStorePhotoCursor(mediaStoreVersion = "v1", generationCursor = 17)
@@ -135,6 +145,27 @@ class MediaStorePhotoSourceTest {
     assertEquals(MediaStorePhotoQueryMode.GENERATION_CURSOR, backend.lastPlan!!.mode)
     assertEquals(20L, checkNotNull(page.nextCursor).generationCursor)
     assertTrue(backend.lastPlan!!.selection.contains(MediaStore.MediaColumns.RELATIVE_PATH))
+    assertTrue(backend.lastPlan!!.selection.contains(MediaStore.MediaColumns.GENERATION_MODIFIED))
+  }
+
+  @Test
+  fun photoPublishedAfterItsAddedGenerationIsStillDiscoveredByModifiedGeneration() {
+    val backend =
+      FakeBackend(
+        version = "v1",
+        generationValue = 44,
+        rows = listOf(photoRow(8, relativePath = "DCIM/Camera/8.jpg", generationAdded = 10, generationModified = 43)),
+      )
+    val cursor = MediaStorePhotoCursor(mediaStoreVersion = "v1", generationCursor = 42, mediaStoreIdCursor = 99)
+
+    val page = MediaStorePhotoSource(35, backend).queryPage("external_primary", PhotoAccessState.FULL, cursor, null, 0)
+
+    assertEquals(listOf("external_primary:8"), page.photos.map(MediaStorePhotoCandidate::sourceId))
+    assertTrue(backend.lastPlan!!.selection.contains(MediaStore.MediaColumns.IS_PENDING))
+    assertTrue(backend.lastPlan!!.selection.contains(MediaStore.MediaColumns.GENERATION_MODIFIED))
+    assertFalse(backend.lastPlan!!.selection.contains("${MediaStore.MediaColumns.GENERATION_ADDED} > ?"))
+    assertEquals("42", backend.lastPlan!!.selectionArgs[4])
+    assertEquals(44L, checkNotNull(page.nextCursor).generationCursor)
   }
 
   @Test
@@ -281,7 +312,19 @@ class MediaStorePhotoSourceTest {
     ): List<MediaStorePhotoRow> {
       lastPlan = plan
       if (throwSecurityException) throw SecurityException("permission was revoked")
-      return rows.take(plan.limit)
+      val matchingRows =
+        if (plan.mode == MediaStorePhotoQueryMode.GENERATION_CURSOR) {
+          val generationCursor = plan.selectionArgs[plan.selectionArgs.lastIndex - 2].toLong()
+          val mediaIdCursor = plan.selectionArgs.last().toLong()
+          rows.filter { row ->
+            val modified = row.generationModified
+            modified != null &&
+              (modified > generationCursor || (modified == generationCursor && row.mediaStoreId > mediaIdCursor))
+          }
+        } else {
+          rows
+        }
+      return matchingRows.take(plan.limit)
     }
   }
 
@@ -293,7 +336,8 @@ class MediaStorePhotoSourceTest {
       dateTakenMs: Long? = 1_000,
       dateAddedSeconds: Long? = 20,
       mime: String? = "image/jpeg",
-      generation: Long? = 4,
+      generationAdded: Long? = 3,
+      generationModified: Long? = 4,
       pending: Boolean = false,
       trashed: Boolean = false,
     ) = MediaStorePhotoRow(
@@ -306,7 +350,8 @@ class MediaStorePhotoSourceTest {
       height = 80,
       relativePath = relativePath,
       legacyDataPath = legacyPath,
-      generationAdded = generation,
+      generationAdded = generationAdded,
+      generationModified = generationModified,
       isPending = pending,
       isTrashed = trashed,
     )

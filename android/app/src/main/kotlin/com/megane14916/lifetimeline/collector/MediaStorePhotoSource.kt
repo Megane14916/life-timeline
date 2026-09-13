@@ -68,16 +68,8 @@ object MediaStorePhotoQueryPolicy {
 
         PhotoAccessState.FULL -> {
           when {
-            generationSupported &&
-              mediaStoreVersion != null &&
-              cursor != null &&
-              cursor.mediaStoreVersion == mediaStoreVersion &&
-              cursor.generationCursor != null -> {
+            generationSupported && mediaStoreVersion != null -> {
               MediaStorePhotoQueryMode.GENERATION_CURSOR
-            }
-
-            generationSupported -> {
-              MediaStorePhotoQueryMode.BASELINE_BY_DATE_ADDED
             }
 
             apiLevel >= Build.VERSION_CODES.R &&
@@ -135,9 +127,18 @@ object MediaStorePhotoQueryPolicy {
 
     when (mode) {
       MediaStorePhotoQueryMode.GENERATION_CURSOR -> {
-        selectionParts += "${MediaStore.MediaColumns.GENERATION_ADDED} > ?"
-        args += checkNotNull(checkNotNull(cursor).generationCursor).toString()
-        sortOrder = "${MediaStore.MediaColumns.GENERATION_ADDED} ASC, ${MediaStore.Images.Media._ID} ASC"
+        val matchingCursor = cursor?.takeIf { it.mediaStoreVersion == mediaStoreVersion }
+        val generationCursor = matchingCursor?.generationCursor ?: 0L
+        val mediaIdCursor = matchingCursor?.mediaStoreIdCursor ?: 0L
+        selectionParts += "${MediaStore.Images.Media.DATE_ADDED} >= ?"
+        args += (collectionStartedAtMs / 1_000).toString()
+        selectionParts +=
+          "(${MediaStore.MediaColumns.GENERATION_MODIFIED} > ? OR " +
+          "(${MediaStore.MediaColumns.GENERATION_MODIFIED} = ? AND ${MediaStore.Images.Media._ID} > ?))"
+        args += generationCursor.toString()
+        args += generationCursor.toString()
+        args += mediaIdCursor.toString()
+        sortOrder = "${MediaStore.MediaColumns.GENERATION_MODIFIED} ASC, ${MediaStore.Images.Media._ID} ASC"
       }
 
       MediaStorePhotoQueryMode.DATE_ADDED_CURSOR -> {
@@ -218,6 +219,7 @@ data class MediaStorePhotoRow(
   val relativePath: String?,
   val legacyDataPath: String?,
   val generationAdded: Long?,
+  val generationModified: Long?,
   val isPending: Boolean,
   val isTrashed: Boolean,
 )
@@ -321,14 +323,38 @@ class MediaStorePhotoSource(
         }
 
         MediaStorePhotoQueryMode.GENERATION_CURSOR -> {
-          checkNotNull(cursor).copy(
-            generationCursor =
-              if (hasMore) {
-                lastRow?.generationAdded ?: cursor.generationCursor
-              } else {
-                generation ?: cursor.generationCursor
-              },
-          )
+          val currentCursor =
+            cursor
+              ?.takeIf { it.mediaStoreVersion == version && it.generationCursor != null }
+              ?: MediaStorePhotoCursor(mediaStoreVersion = version, generationCursor = 0, mediaStoreIdCursor = 0)
+          when {
+            hasMore -> {
+              currentCursor.copy(
+                generationCursor = lastRow?.generationModified ?: currentCursor.generationCursor,
+                mediaStoreIdCursor = lastRow?.mediaStoreId ?: currentCursor.mediaStoreIdCursor,
+              )
+            }
+
+            generation != null -> {
+              currentCursor.copy(
+                mediaStoreVersion = version,
+                generationCursor = maxOf(generation, currentCursor.generationCursor ?: 0),
+                mediaStoreIdCursor = Long.MAX_VALUE,
+              )
+            }
+
+            lastRow?.generationModified != null -> {
+              currentCursor.copy(
+                mediaStoreVersion = version,
+                generationCursor = lastRow.generationModified,
+                mediaStoreIdCursor = lastRow.mediaStoreId,
+              )
+            }
+
+            else -> {
+              currentCursor.copy(mediaStoreVersion = version)
+            }
+          }
         }
 
         MediaStorePhotoQueryMode.BASELINE_BY_DATE_ADDED -> {
@@ -492,6 +518,7 @@ class AndroidMediaStorePhotoBackend(
         if (apiLevel >= Build.VERSION_CODES.R) {
           add(MediaStore.MediaColumns.IS_TRASHED)
           add(MediaStore.MediaColumns.GENERATION_ADDED)
+          add(MediaStore.MediaColumns.GENERATION_MODIFIED)
         }
       }
     val queryArgs =
@@ -528,7 +555,8 @@ class AndroidMediaStorePhotoBackend(
     val legacyDataPath: Int?,
     val pending: Int?,
     val trashed: Int?,
-    val generation: Int?,
+    val generationAdded: Int?,
+    val generationModified: Int?,
   ) {
     constructor(cursor: Cursor, apiLevel: Int) :
       this(
@@ -543,7 +571,8 @@ class AndroidMediaStorePhotoBackend(
         legacyDataPath = optionalColumnIndex(cursor, apiLevel < Build.VERSION_CODES.Q, MediaStore.Images.Media.DATA),
         pending = optionalColumnIndex(cursor, apiLevel >= Build.VERSION_CODES.Q, MediaStore.MediaColumns.IS_PENDING),
         trashed = optionalColumnIndex(cursor, apiLevel >= Build.VERSION_CODES.R, MediaStore.MediaColumns.IS_TRASHED),
-        generation = optionalColumnIndex(cursor, apiLevel >= Build.VERSION_CODES.R, MediaStore.MediaColumns.GENERATION_ADDED),
+        generationAdded = optionalColumnIndex(cursor, apiLevel >= Build.VERSION_CODES.R, MediaStore.MediaColumns.GENERATION_ADDED),
+        generationModified = optionalColumnIndex(cursor, apiLevel >= Build.VERSION_CODES.R, MediaStore.MediaColumns.GENERATION_MODIFIED),
       )
   }
 
@@ -558,7 +587,8 @@ class AndroidMediaStorePhotoBackend(
       height = nullableInt(indexes.height),
       relativePath = indexes.relativePath?.let { getString(it) },
       legacyDataPath = indexes.legacyDataPath?.let { getString(it) },
-      generationAdded = indexes.generation?.let { getLong(it) },
+      generationAdded = indexes.generationAdded?.let { getLong(it) },
+      generationModified = indexes.generationModified?.let { getLong(it) },
       isPending = indexes.pending?.let { getInt(it) != 0 } ?: false,
       isTrashed = indexes.trashed?.let { getInt(it) != 0 } ?: false,
     )
