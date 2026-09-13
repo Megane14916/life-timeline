@@ -44,3 +44,5 @@
 - [Phase 3受け入れ記録](phase3-acceptance.md)
 - [P4-08の合成データ・CI](https://github.com/Megane14916/life-timeline/pull/86)
 - [MediaStore公開後の差分scan修正](https://github.com/Megane14916/life-timeline/pull/91)
+
+- [P4-10 文書整理・Phase 5引き継ぎ](https://github.com/Megane14916/life-timeline/issues/78)

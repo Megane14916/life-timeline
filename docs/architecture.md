@@ -16,13 +16,17 @@ flowchart LR
         LOC[Fused Location Provider]
         ROOM[(Room)]
         MSYNC[Manual / Diagnostic Sync]
-        WM[Automatic Workers]
+        WM[Usage Workers]
+        PHOTO[Photo collection worker]
+        PSYNC[Photo sync worker]
 
         US --> ROOM
-        MS --> ROOM
         LOC --> ROOM
+        MS --> PHOTO
+        PHOTO --> ROOM
         ROOM --> MSYNC
         ROOM -.-> WM
+        ROOM --> PSYNC
     end
 
     subgraph Network["Private Network"]
@@ -44,6 +48,7 @@ flowchart LR
 
     MSYNC -->|HTTPS| TS
     WM -.->|HTTPS| TS
+    PSYNC -.->|UNMETERED HTTPS| TS
     TS --> API
 ```
 
@@ -91,7 +96,7 @@ flowchart LR
 - MediaStore
 - Fused Location Provider
 
-Androidはライフログデータの収集、一時保存、PCへの同期に特化します。Roomのpending Sessionは、WorkManagerの定期収集・自動同期と、画面の「収集して同期」による診断・即時実行の両方から扱います。ACKを受け取ったものだけをsyncedへ更新し、network障害時は期限付きleaseとretryで再開します。
+Androidはライフログデータの収集、一時保存、PCへの同期に特化します。写真収集と写真同期はUsageStatsのworkerから独立し、写真専用のunique work nameとRoom leaseを使います。写真収集は15分周期 / 5分flexで、BatteryNotLow・StorageNotLowを要求します。写真同期はUNMETERED・BatteryNotLow・StorageNotLowを要求し、20件単位、最大8分または10 batchで処理します。ACKを受けた写真だけをsyncedへ更新し、network障害時はpendingを保ってretryします。
 
 ### 通信
 
@@ -170,7 +175,7 @@ life-timeline-data/
 
 画像はSQLiteのBLOBとして保存せず、ファイルシステムに保存します。
 
-PCへ送るのは原本ではなく、Android側で生成した軽量サムネイルのみです。
+PCへ送るのは原本ではなく、Android側で生成した最大辺512px・WebP lossy quality 65のthumbnailのみです。PC側のmetadataは`lifelog.db`、binaryはdata root直下の`thumbnails/`へ保存します。手動backup・restoreではFastAPIを停止し、この二つを含むdata root全体を一体として扱います。自動backup機能は現時点でありません。
 
 ## 4. 外部サービス
 
