@@ -54,11 +54,11 @@ class BackgroundWorkScheduler(
     )
   }
 
-  /** Adds one immediate photo scan while leaving the periodic schedule untouched. */
+  /** Queues an immediate photo scan after any already-requested scan without touching the periodic schedule. */
   fun enqueuePhotoCollectionNow() {
     workManager.enqueueUniqueWork(
       PhotoWorkPolicy.IMMEDIATE_COLLECTION_WORK_NAME,
-      ExistingWorkPolicy.KEEP,
+      ExistingWorkPolicy.APPEND_OR_REPLACE,
       immediatePhotoCollectionWorkRequest(),
     )
   }
