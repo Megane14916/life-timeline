@@ -3,7 +3,6 @@ package com.megane14916.lifetimeline.data.remote
 import com.megane14916.lifetimeline.domain.validateUlid
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlin.math.abs
 
 object LocationSyncPolicy {
   const val MAX_LOCATIONS_PER_BATCH = 200
