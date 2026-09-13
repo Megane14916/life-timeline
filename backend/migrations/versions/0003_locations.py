@@ -35,11 +35,17 @@ def upgrade() -> None:
             "longitude BETWEEN -180 AND 180", name=op.f("ck_location_points_longitude_range")
         ),
         sa.CheckConstraint(
-            "accuracy_m IS NULL OR accuracy_m >= 0",
+            "accuracy_m IS NULL OR (accuracy_m >= 0 AND accuracy_m <= 1.7976931348623157e308)",
             name=op.f("ck_location_points_nonnegative_accuracy"),
         ),
         sa.CheckConstraint(
-            "speed_mps IS NULL OR speed_mps >= 0", name=op.f("ck_location_points_nonnegative_speed")
+            "altitude_m IS NULL OR "
+            "altitude_m BETWEEN -1.7976931348623157e308 AND 1.7976931348623157e308",
+            name=op.f("ck_location_points_finite_altitude"),
+        ),
+        sa.CheckConstraint(
+            "speed_mps IS NULL OR (speed_mps >= 0 AND speed_mps <= 1.7976931348623157e308)",
+            name=op.f("ck_location_points_nonnegative_speed"),
         ),
         sa.CheckConstraint(
             "recorded_at_ms >= 0", name=op.f("ck_location_points_nonnegative_recorded_at")
@@ -87,7 +93,24 @@ def upgrade() -> None:
             "duration_ms = ended_at_ms - started_at_ms",
             name=op.f("ck_place_visits_duration_matches_range"),
         ),
-        sa.CheckConstraint("radius_m >= 0", name=op.f("ck_place_visits_nonnegative_radius")),
+        sa.CheckConstraint(
+            "started_at_ms >= 0", name=op.f("ck_place_visits_nonnegative_started_at")
+        ),
+        sa.CheckConstraint(
+            "created_at_ms >= 0", name=op.f("ck_place_visits_nonnegative_created_at")
+        ),
+        sa.CheckConstraint(
+            "center_latitude BETWEEN -90 AND 90",
+            name=op.f("ck_place_visits_center_latitude_range"),
+        ),
+        sa.CheckConstraint(
+            "center_longitude BETWEEN -180 AND 180",
+            name=op.f("ck_place_visits_center_longitude_range"),
+        ),
+        sa.CheckConstraint(
+            "radius_m BETWEEN 0 AND 1.7976931348623157e308",
+            name=op.f("ck_place_visits_nonnegative_radius"),
+        ),
         sa.CheckConstraint("point_count >= 3", name=op.f("ck_place_visits_minimum_point_count")),
         sa.CheckConstraint(
             "algorithm_version = 'stay_point_v1'", name=op.f("ck_place_visits_algorithm_version")

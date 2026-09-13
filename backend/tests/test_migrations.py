@@ -77,8 +77,7 @@ def test_media_migration_preserves_existing_rows_and_adds_constraints(
             assert (
                 connection.scalar(
                     text(
-                        "SELECT count(*) FROM alembic_version "
-                        "WHERE version_num = '0003_locations'"
+                        "SELECT count(*) FROM alembic_version WHERE version_num = '0003_locations'"
                     )
                 )
                 == 1

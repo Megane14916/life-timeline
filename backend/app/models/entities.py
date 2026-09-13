@@ -151,8 +151,19 @@ class LocationPoint(Base):
     __table_args__ = (
         CheckConstraint("latitude BETWEEN -90 AND 90", name="latitude_range"),
         CheckConstraint("longitude BETWEEN -180 AND 180", name="longitude_range"),
-        CheckConstraint("accuracy_m IS NULL OR accuracy_m >= 0", name="nonnegative_accuracy"),
-        CheckConstraint("speed_mps IS NULL OR speed_mps >= 0", name="nonnegative_speed"),
+        CheckConstraint(
+            "accuracy_m IS NULL OR (accuracy_m >= 0 AND accuracy_m <= 1.7976931348623157e308)",
+            name="nonnegative_accuracy",
+        ),
+        CheckConstraint(
+            "altitude_m IS NULL OR "
+            "altitude_m BETWEEN -1.7976931348623157e308 AND 1.7976931348623157e308",
+            name="finite_altitude",
+        ),
+        CheckConstraint(
+            "speed_mps IS NULL OR (speed_mps >= 0 AND speed_mps <= 1.7976931348623157e308)",
+            name="nonnegative_speed",
+        ),
         CheckConstraint("recorded_at_ms >= 0", name="nonnegative_recorded_at"),
         CheckConstraint("created_at_ms >= 0", name="nonnegative_created_at"),
         CheckConstraint("source = 'android_fused_location'", name="source"),
@@ -181,7 +192,11 @@ class PlaceVisit(Base):
     __table_args__ = (
         CheckConstraint("ended_at_ms > started_at_ms", name="ended_after_started"),
         CheckConstraint("duration_ms = ended_at_ms - started_at_ms", name="duration_matches_range"),
-        CheckConstraint("radius_m >= 0", name="nonnegative_radius"),
+        CheckConstraint("started_at_ms >= 0", name="nonnegative_started_at"),
+        CheckConstraint("created_at_ms >= 0", name="nonnegative_created_at"),
+        CheckConstraint("center_latitude BETWEEN -90 AND 90", name="center_latitude_range"),
+        CheckConstraint("center_longitude BETWEEN -180 AND 180", name="center_longitude_range"),
+        CheckConstraint("radius_m BETWEEN 0 AND 1.7976931348623157e308", name="nonnegative_radius"),
         CheckConstraint("point_count >= 3", name="minimum_point_count"),
         CheckConstraint("algorithm_version = 'stay_point_v1'", name="algorithm_version"),
         UniqueConstraint(

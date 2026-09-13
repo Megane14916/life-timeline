@@ -77,17 +77,33 @@ class LocationSyncLocation(LocationSyncModel):
     def validate_finite(cls, value: float | int | None, info: object) -> float | int | None:
         return _validate_finite(value, str(info))
 
-    @model_validator(mode="after")
-    def validate_location(self) -> LocationSyncLocation:
-        if not -90 <= self.latitude <= 90:
+    @field_validator("latitude")
+    @classmethod
+    def validate_latitude(cls, value: float | int) -> float | int:
+        if not -90 <= value <= 90:
             raise ValueError("latitude is out of range")
-        if not -180 <= self.longitude <= 180:
+        return value
+
+    @field_validator("longitude")
+    @classmethod
+    def validate_longitude(cls, value: float | int) -> float | int:
+        if not -180 <= value <= 180:
             raise ValueError("longitude is out of range")
-        if self.accuracy_m is not None and self.accuracy_m < 0:
+        return value
+
+    @field_validator("accuracy_m")
+    @classmethod
+    def validate_accuracy(cls, value: float | int | None) -> float | int | None:
+        if value is not None and value < 0:
             raise ValueError("accuracyM must be nonnegative")
-        if self.speed_mps is not None and self.speed_mps < 0:
+        return value
+
+    @field_validator("speed_mps")
+    @classmethod
+    def validate_speed(cls, value: float | int | None) -> float | int | None:
+        if value is not None and value < 0:
             raise ValueError("speedMps must be nonnegative")
-        return self
+        return value
 
 
 class LocationSyncRequest(LocationSyncModel):
