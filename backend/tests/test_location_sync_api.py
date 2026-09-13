@@ -58,7 +58,7 @@ def _payload(locations: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     request = copy.deepcopy(_fixture()["request"])
     if locations is not None:
         request["locations"] = locations
-    return request
+    return cast(dict[str, Any], request)
 
 
 def _counts(factory: sessionmaker[Session]) -> tuple[int, int]:
@@ -299,7 +299,7 @@ def test_database_constraints_reject_invalid_location_values(
             )
         )
 
-    invalid_values = [
+    invalid_values: list[dict[str, Any]] = [
         {"latitude": 90.1},
         {"longitude": -180.1},
         {"accuracy_m": -1.0},
