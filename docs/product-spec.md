@@ -183,78 +183,37 @@ ActivityWatchからPC利用履歴を取り込みます。
 
 # 5. Android Companion
 
-Androidアプリの主目的は収集と同期です。
+Androidアプリは収集、端末内pendingの保持、PCへの同期状態の表示を担当します。アプリ利用履歴と写真収集は個別に有効化・診断できます。
 
-メイン画面の想定:
-
-```text
-life-timeline
-
-PC
-Connected
-
-Last Sync
-18:32
-
-Pending
-App Usage      12
-Locations      84
-Photos          3
-
-[Sync now]
-```
-
-設定:
-
-- 必要な権限
-- 位置情報記録ON/OFF
-- 同期間隔
-- 写真同期ON/OFF
-- アプリ履歴ON/OFF
-- 同期状況
-- エラー確認
-
----
+写真設定は明示的なopt-in操作からpermissionを要求します。Android 14以降はfull / partial / deniedを区別し、partial時は選択写真の再選択入口を表示します。写真へのアクセスpermissionだけでは収集を開始しません。
 
 # 6. 写真仕様
 
-## 基本
+## 収集対象と許可
 
-写真原本はPCへ送信しません。
+写真収集は利用者が有効化した後に開始します。MediaStoreに登録され、公開済みの`DCIM/`配下の画像が対象です。`DCIM/`はCameraアプリを厳密に識別するものではなく、DCIM外のCamera画像は対象外になり、DCIM内の非Camera画像を含む場合があります。
 
-Android側でサムネイルを生成します。
+full accessでは有効化時にbaselineを取り、以後に追加された写真を収集します。過去のlibrary全体は自動importしません。Android 14以降のpartial accessでは利用者が選択した写真だけを取り込み、未選択写真の自動収集は保証しません。permission取消・OSによる権限reset後は再度許可が必要です。
 
-想定:
+## サムネイルと保存
 
-```text
-最大辺 512px
-WebP
-quality 60〜70
-```
+写真原本はPCへ送信せず、Androidで生成したpreviewだけを同期します。
 
-PCでは、
+- 最大辺512px、WebP lossy、quality 65、拡大なし
+- 端末内thumbnailは1件あたり最大1 MiB
+- 1回最大20件、HTTP request全体は最大20 MiB
+- PCはmetadataを`lifelog.db`、thumbnailを`thumbnails/`へ保存する
 
-- メタデータ → SQLite
-- サムネイル → filesystem
+撮影時刻、filename、dimensions、MIME type、取得できるEXIF緯度・経度を保存します。EXIF位置は必要なpermissionがある場合だけ読み取り、取得できない場合はnullにします。Android原本の削除はPCのrecordやthumbnailを削除しません。life-timelineは写真backupサービスではありません。
 
-へ保存します。
+## 自動処理と非保証
 
-## 原本
+- 収集は15分周期 / 5分flexのWorkManager periodic workで実行します。低battery / storage時は遅延します。
+- 同期はunmetered network、BatteryNotLow、StorageNotLowを満たす場合に実行します。metered networkではpendingを保持します。
+- 1回の同期は最大8分または10 batchで区切り、batchは20件です。通信・WorkManager処理はOSやPCの状態に左右され、指定時刻の実行を保証しません。
+- Androidアプリ内「写真を今すぐ確認」はone-time scanを要求します。
 
-原本の保管は以下に任せます。
 
-- Android端末
-- Google Photos等
-
-life-timelineは写真バックアップサービスではありません。
-
-## Google Photos
-
-MVPでは連携しません。
-
-将来的にGoogle Photos Pickerを利用し、ユーザーが選択した写真のインポートを検討します。
-
----
 
 # 7. 位置情報仕様
 
@@ -277,30 +236,9 @@ MVPでは連携しません。
 
 # 8. 同期仕様
 
-Androidで収集したデータは、一度Roomへ保存します。
+Androidで収集したデータはRoomへ保存し、PCのAPIからaccepted ACKを受けたrecordだけをsyncedにします。未ACKの写真は端末pendingに残して再送します。
 
-```text
-収集
-↓
-Room
-↓
-PCへ同期
-↓
-PC ACK
-↓
-同期済み
-```
-
-PCへ接続できない場合も記録を続行します。
-
-同期条件:
-
-- PCがオンライン
-- Tailscale経由でアクセス可能
-
-将来的にはWi-Fi接続時のみ写真同期するなどの設定を追加できます。
-
----
+写真のWorkManager同期は`UNMETERED`、`BatteryNotLow`、`StorageNotLow`を要求します。PC停止・Tailscale未接続・metered network中は送信を待ち、条件回復後に再開します。15分周期 / 5分flexはworkの実行期限ではありません。日々の運転条件と復旧手順は[READMEの写真運用](../README.md#写真の収集と同期)を参照してください。
 
 # 9. 削除仕様
 
@@ -383,7 +321,7 @@ PC上のローカルデータを正とします。
 
 クラウドアカウントを必須にしません。
 
-データのExport / Backupを提供します。
+現在はExport / Backup UIや自動backup機能を提供していません。手動backupではPCのdata rootにある`lifelog.db`と`thumbnails/`を一体でコピーし、手順は[README](../README.md#手動バックアップと復旧)に従います。Export / Backup UIはPhase 7の候補です。
 
 ---
 
