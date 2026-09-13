@@ -233,35 +233,38 @@ created_at_ms    INTEGER
 
 ## media_items
 
-写真と動画を共通して扱います。
+写真と動画の共通Factです。現Phase 4の同期APIが書き込むのは`type = photo`だけです。
 
 ```text
 media_items
 -------------------------
-id             TEXT PK
-device_id      TEXT FK
-type           TEXT
-source         TEXT
-source_id      TEXT
-filename       TEXT
-captured_at_ms INTEGER
-width          INTEGER NULL
-height         INTEGER NULL
-duration_ms    INTEGER NULL
-latitude       REAL NULL
-longitude      REAL NULL
-thumbnail_path TEXT NULL
-mime_type      TEXT NULL
-created_at_ms  INTEGER
+id                    TEXT PK
+device_id             TEXT FK
+type                  TEXT                    # photo / video
+source                TEXT                    # android_media_store
+source_id             TEXT
+filename              TEXT
+captured_at_ms        INTEGER
+width                 INTEGER NULL
+height                INTEGER NULL
+duration_ms           INTEGER NULL
+latitude              REAL NULL
+longitude             REAL NULL
+thumbnail_path        TEXT NULL
+thumbnail_mime_type   TEXT NULL               # image/webp
+thumbnail_width       INTEGER NULL
+thumbnail_height      INTEGER NULL
+thumbnail_size_bytes  INTEGER NULL
+thumbnail_sha256      TEXT NULL
+mime_type             TEXT
+created_at_ms         INTEGER
 ```
 
-`type`: `photo` / `video`
+一意性は`device_id + source + source_id`です。緯度・経度は両方nullか両方値を持ちます。Thumbnail一式はnullか、WebP path / dimension / byte size / SHA-256がすべて揃います。Phase 4ではedge最大512px、1MiB以下のWebPを保存し、原本画像は保存・送信しません。metadataはSQLite、thumbnailはPC data rootの`thumbnails/`配下に保存します。
 
-`source`初期値: `android_media_store`
+Full photo accessでは収集有効化時のbaselineより後に追加されたDCIM写真を対象とします。Android 14以降のpartial accessでは選択写真を明示的に扱います。Android MediaStore上の原本削除はこのrecordやthumbnailの削除を意味しません。
 
-将来: `google_photos_picker`, `import`
-
-原本ファイルは管理せず、サムネイルとメタデータのみを保存します。
+将来: `google_photos_picker`, `import`。動画記録、原本管理は別の実装判断とします。
 
 ## manual_records
 
@@ -400,7 +403,7 @@ pending
 synced
 ```
 
-AppSessionの同期状態は引き続き`pending`と`synced`だけを持ちます。送信中の表示は画面上の一時状態として扱い、Sessionを永続的な`syncing`へ一括変更しません。自動workerと手動診断は別々のRoom `background_work_state` leaseで直列化し、PC側Factには`synced`を持たせず、PCに保存された時点で同期済みとみなします。重複防止はAndroidで生成したIDとPC側の一意制約で行います。WorkManagerのunique work、CONNECTED / BatteryNotLow制約、指数backoff、Room v2 leaseはPhase 3で実装済みです。
+AppSessionの同期状態は引き続き`pending`と`synced`だけを持ちます。送信中の表示は画面上の一時状態として扱い、Sessionを永続的な`syncing`へ一括変更しません。自動workerと手動診断は別々のRoom `background_work_state` leaseで直列化し、PC側Factには`synced`を持たせず、PCに保存された時点で同期済みとみなします。重複防止はAndroidで生成したIDとPC側の一意制約で行います。WorkManagerのAppSession unique work、CONNECTED / BatteryNotLow制約、指数backoff、Room v2 leaseはPhase 3で実装済みです。写真用workerはwork nameとleaseを分離し、collectionはBatteryNotLow / StorageNotLow、uploadはUNMETERED / BatteryNotLow / StorageNotLowを要求します。Android Room version 4が写真entityとMediaStore cursorを保持し、PC側の写真schemaはAlembic `0002_media_items`です。v3→v4では既存写真recordを保持してgeneration cursorをresetします。
 
 ### Phase 3のbackground work state
 
@@ -464,6 +467,8 @@ ManualRecord  → JSON / CSV
 ```
 
 ---
+
+写真を含むPC data rootでは`lifelog.db`と`thumbnails/`が一つのbackup / restore単位です。完全な復旧では両方を同じsnapshotから戻します。手順と自動backup機能の現状は[README](../README.md#手動バックアップと復旧)を参照してください。
 
 # 15. 今後決める事項
 
