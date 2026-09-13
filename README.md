@@ -2,7 +2,7 @@
 
 Life Timelineは、PCとスマートフォンから収集した活動データをローカルで管理し、複数の形式で振り返るためのアプリケーションです。
 
-Phase 3まで実装済みです。SQLiteへ正規化データを保存し、AndroidのUsage Accessで収集したAppSessionをRoomへ退避します。WorkManagerが定期収集と自動同期を行い、Tailscale Serve経由でFastAPIへ送信したデータをTimelineとDashboardで表示できます。画面の「収集して同期」は診断・即時実行用に残しています。写真と位置情報は後続Phaseで追加します。
+Phase 4まで実装済みです。SQLiteへ正規化データを保存し、AndroidのUsage AccessとMediaStoreから収集したデータをRoomへ一時保存します。WorkManagerがアプリ利用履歴と写真を定期収集し、写真のサムネイルとメタデータをTailscale Serve経由でPCへ同期してTimeline / Photosに表示します。写真原本は保存・送信しません。位置情報の継続収集と地図表示はPhase 5で追加します。
 
 ## Repository構成
 
@@ -214,6 +214,40 @@ WorkManagerによる定期収集・自動同期、Room v2、期限付きlease、
 ## Phase 4受け入れ記録
 
 写真収集有効化後の新規撮影がPCへ同期される通常系と、任意の拡張実機シナリオは[Phase 4受け入れ記録](docs/development/phase4-acceptance.md)を参照してください。
+## 写真の収集と同期
+
+写真収集はAndroidアプリで明示的に有効化し、写真へのアクセスを許可して利用します。対象はMediaStoreに登録済みの`DCIM/`配下の画像です。full accessでは有効化後に追加された写真を対象にし、Android 14以降のpartial accessでは利用者が選んだ写真だけを扱います。DCIM外、未公開の撮影中ファイル、Secure Folderや別Androidユーザーの写真は対象外になり得ます。
+
+写真scanはWorkManagerで15分周期（5分flex）を目安に実行し、低battery / storage時は遅延します。写真同期はunmetered network、battery・storageが十分なときだけ実行します。これらはOSが開始時刻を決めるbest-effort処理です。条件が整わない間はpendingを保持し、通信復旧後に再送します。「写真を今すぐ確認」はone-time scanを要求します。PC画面には収集した撮影日を選択して表示してください。
+
+### 写真が表示されない場合
+
+1. Androidで写真収集が有効か、写真アクセスがfullか（partialの場合は対象写真が選択済みか）を確認します。
+2. 対象写真がMediaStore上の`DCIM/`配下にあるか、scanの時刻・結果と端末内thumbnail / pendingの表示を確認します。
+3. scanが成功してもpendingが残る場合、Wi-Fi等のunmetered network、PCのFastAPIとTailscale Serve、Androidのbattery / storage条件を確認して待ちます。必要なら「写真を今すぐ確認」を実行します。
+4. PCでAPIの`items`件数を確認できます（例は日付を置き換えます）。
+
+```powershell
+Invoke-RestMethod 'http://127.0.0.1:8000/api/v1/photos?date=2026-09-13&timezone=Asia%2FTokyo'
+```
+
+### 手動バックアップと復旧
+
+life-timelineには現時点で自動backup機能はありません。PCのmetadataは`$env:LIFE_TIMELINE_DATA_DIR\lifelog.db`、写真previewは同じdata rootの`thumbnails/`にあります。この二つを必ず一体として扱い、片方だけのbackupを完全なbackupとして使わないでください。
+
+整合したsnapshotを作るには、FastAPIを停止した後、data root全体を別の場所へコピーします。
+
+```powershell
+if (-not $env:LIFE_TIMELINE_DATA_DIR) { throw 'Set LIFE_TIMELINE_DATA_DIR to the data root first.' }
+$source = (Resolve-Path $env:LIFE_TIMELINE_DATA_DIR).Path
+$backupRoot = Join-Path $env:USERPROFILE 'Documents\life-timeline-backups'
+New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
+$backupPath = Join-Path $backupRoot ("life-timeline-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+Copy-Item -LiteralPath $source -Destination $backupPath -Recurse
+```
+
+復旧時もFastAPIを停止し、退避したdata root全体（`lifelog.db`と`thumbnails/`を含む）を現在の`LIFE_TIMELINE_DATA_DIR`へ置き換えてから起動します。片方だけを戻したり、別snapshotのDBとthumbnailを混ぜたりしないでください。
+
 ## よくある問題
 
 ### `uv sync --frozen`が失敗する
@@ -321,6 +355,7 @@ PC endpointには`https://`のTailscale Serve URLだけを設定します。ま�
 | [Phase 2 Tailscale手順](docs/development/phase2-tailscale.md) | Serve、ACL、障害復旧の手順 |
 | [Phase 2受け入れ記録](docs/development/phase2-acceptance.md)  | Android実機、同期、CIの検証結果 |
 | [Phase 3詳細計画](docs/detailed_plan/phase3-automatic-sync.md) | 自動収集・自動同期・retryの実装計画 |
+| [Phase 4詳細計画](docs/detailed_plan/phase4-photos.md) | 写真収集・同期・表示とPhase 5への引き継ぎ |
 | [Phase 3受け入れ記録](docs/development/phase3-acceptance.md) | WorkManager、障害復旧、実機確認の記録 |
 
 Androidの`applicationId`と`namespace`は`com.megane14916.lifetimeline`です。
