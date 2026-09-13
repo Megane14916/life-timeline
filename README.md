@@ -214,6 +214,7 @@ WorkManagerによる定期収集・自動同期、Room v2、期限付きlease、
 ## Phase 4受け入れ記録
 
 写真収集有効化後の新規撮影がPCへ同期される通常系と、任意の拡張実機シナリオは[Phase 4受け入れ記録](docs/development/phase4-acceptance.md)を参照してください。
+
 ## 写真の収集と同期
 
 写真収集はAndroidアプリで明示的に有効化し、写真へのアクセスを許可して利用します。対象はMediaStoreに登録済みの`DCIM/`配下の画像です。full accessでは有効化後に追加された写真を対象にし、Android 14以降のpartial accessでは利用者が選んだ写真だけを扱います。DCIM外、未公開の撮影中ファイル、Secure Folderや別Androidユーザーの写真は対象外になり得ます。
