@@ -1,5 +1,9 @@
 # Phase 4 詳細実装計画: Photos
 
+## 実装状況
+
+P4-01〜P4-09の実装と通常系の実機受け入れは完了しています。拡張実機シナリオは任意・未実施です。P4-10でこの文書、主要設計文書、運用手順、Phase 5への引き継ぎを更新します。結果は[Phase 4受け入れ記録](../development/phase4-acceptance.md)と[Issue #78](https://github.com/Megane14916/life-timeline/issues/78)を参照してください。
+
 - 作成日: 2026-09-12
 - 対象: Androidの写真検出、サムネイル生成・保管・自動同期、PCのTimeline / 写真一覧
 - 前提: Phase 3の正常系、自動収集・自動同期基盤、CI gate、Room / WorkManager統合テスト、受け入れ手順がmainへ反映済みであること
@@ -74,13 +78,13 @@ PC
 - `DCIM/`配下にあり、MediaStoreで公開完了した画像のmetadata取得。
 - 撮影時刻、source ID、ファイル名、original MIME、width / height、取得可能なEXIF緯度・経度。
 - 最大辺512px、WebP lossy quality 65、回転補正済みthumbnail。
-- Android app-private filesystemへのatomic保存とRoom version 3のpending / synced管理。
+- Android app-private filesystemへのatomic保存とRoom version 4のpending / synced管理。
 - 写真専用のperiodic collection、one-time collection、photo sync worker、stable unique name、lease、retry、run budget。
 - `POST /api/v1/sync/photos` version 1 multipart contractと共通contract fixture。
 - PCの`media_items` migration、thumbnail file store、hash / size / image validation、冪等な保存。
 - thumbnail配信API、日付別Photos API、Timelineへのphoto union追加。
 - Reactのphoto Timeline cardと、選択日のresponsive写真一覧。
-- Android / Backend / Frontend / E2E / 実機の大量写真・障害復旧試験。
+- Android / Backend / Frontend / E2Eの自動テストとrequired CI、通常系の実機受け入れ。拡張実機シナリオは任意とする。
 - README、上位設計、acceptance記録、backup対象説明の更新。
 
 ### 2.3 Phase 4に含めないもの
@@ -166,9 +170,9 @@ permission requestは「写真の原本は送らず、thumbnailとmetadataをPC�
 
 ## 4. Androidの保存・収集設計
 
-### 4.1 Room version 3
+### 4.1 Room version 4
 
-`LifeTimelineDatabase`をversion 2から3へ上げ、既存5 tableを保持したまま次を追加する。
+Room v3で既存5 tableを保持したまま写真entity / cursor tableを追加した。Room v4は写真recordを保持し、MediaStore generation cursorの意味を`GENERATION_ADDED`から`GENERATION_MODIFIED`へ切り替えるため、旧cursorとMediaStore IDをresetする。
 
 ```text
 android_media_items
@@ -220,7 +224,7 @@ updated_at_ms           INTEGER
 
 `content://` URIやabsolute original pathは永続化しない。必要時に`volume_name`と`media_store_id`からURIを再構成する。app-private thumbnail pathはDBに絶対パスを保存せず、固定rootからのrelative pathだけを保存する。
 
-`MIGRATION_2_3`とRoom schema JSONをcommitし、v1→v2→v3およびv2→v3の両方をinstrumentation testする。写真generation cursorの意味を`GENERATION_ADDED`から`GENERATION_MODIFIED`へ変更するv3→v4では、既存のgeneration cursorとMediaStore IDを0へ戻し、登録済みsource IDを保ったまま対象写真を再照合する。
+Room migrationとschema JSONはv1→v2→v3→v4およびv2→v3→v4の経路をinstrumentation testする。v3→v4では既存photo rowと登録済みsource IDを保ちながらgeneration cursorとMediaStore IDだけを0へ戻して対象写真を再照合する。
 
 ### 4.2 MediaStore差分走査
 
@@ -522,7 +526,7 @@ P4-01 Photo v1 contract・policy・合成fixture
   ├─→ P4-02 Backend media schema・thumbnail store・Sync API ──┐
   └─→ P4-03 Android permission・MediaStore adapter             │
                ↓                                               │
-        P4-04 Room v3・thumbnail生成・local file管理             │
+        P4-04 Room v4・thumbnail生成・local file管理             │
                ↓                                               │
         P4-05 photo collection / sync worker・UI診断             │
                └───────────────────────────────────────────────┤
@@ -533,7 +537,7 @@ P4-01 Photo v1 contract・policy・合成fixture
                                                                ↓
                             P4-08 統合test・CI gate
                                                                ↓
-                            P4-09 大量写真・障害復旧の実機受け入れ
+                            P4-09 通常系写真収集の実機受け入れ（拡張は任意）
                                                                ↓
                             P4-10 文書更新・Phase 5引き継ぎ
 ```
@@ -562,12 +566,12 @@ P4-01 Photo v1 contract・policy・合成fixture
 - **成果物:** `PhotoAccessChecker`、`MediaStorePhotoSource`、permission UIの最小入口。
 - **完了条件:** API 26 / 29 / 30 / 33 / 34 / 36の分岐をtestし、partialをfullと誤表示せず、初回fullで過去libraryをimportしない。
 
-### P4-04: Room v3とthumbnail pipelineを実装する
+### P4-04: Room photo storeとthumbnail pipelineを実装する
 
 - **目的:** 発見済み写真を個別に再開可能な状態へし、原本を残さず軽量previewを作る。
 - **依存:** P4-03。
 - **作業:** §4の2 entity / DAO、MIGRATION_2_3、scan transaction、bounded decode、orientation、WebP、EXIF location、hash、atomic local store、orphan temp cleanupを実装する。
-- **成果物:** Room version 3、PhotoCollectionRepository、PhotoThumbnailGenerator / Store。
+- **成果物:** Room photo entityとcursor table（初期追加v3、最終schema v4）、PhotoCollectionRepository、PhotoThumbnailGenerator / Store。
 - **完了条件:** 1画像の破損で後続cursorが止まらず、最大辺 / quality / path / hash規約を満たし、原本byteやabsolute pathを永続化しない。
 
 ### P4-05: 写真の自動収集・自動同期とAndroid UIを完成する
@@ -739,7 +743,7 @@ Phase 4は、自動化可能な契約テストとrequired CIが成功し、通�
 - MediaStoreの撮影時刻が欠損して`DATE_ADDED`へfallbackした写真は、実際の撮影日ではなく追加日に表示され得る。
 - 原本がthumbnail生成前に消えた場合、Phase 4は画像previewを復元できない。metadata-only記録を残す。
 - Android app data消去 / uninstall、permission取消中に見えなかったpartial写真、OSがMediaStore recordを失った期間は復元できない。
-- PC側のthumbnail削除・filesystem破損はAndroid synced rowから自動修復しない。Backup / repairはPhase 7で扱う。
+- PC側のthumbnail削除・filesystem破損はAndroid synced rowから自動修復しない。手動backupではDBとthumbnail directoryをdata rootごとコピーし、自動repairやbackup UIはPhase 7以降で扱う。
 - Phase 4のPhotos一覧は日単位でpaginationなしとし、極端な件数へのpaginationは計測後に追加する。
 
 ## 15. リスクと対策
