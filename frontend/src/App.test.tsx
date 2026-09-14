@@ -65,6 +65,29 @@ const photoItem = {
   thumbnailUrl: '/api/v1/media/01J00000000000000000001401/thumbnail',
 }
 
+const placeVisitItem = {
+  type: 'place_visit' as const,
+  id: '01J00000000000000000001501',
+  deviceId: '01J00000000000000000001001',
+  deviceName: 'Demo Android A',
+  startedAt: '2026-09-03T00:00:00.000Z',
+  endedAt: '2026-09-03T00:30:00.000Z',
+  durationMs: 1800000,
+  centerLatitude: 35.68124,
+  centerLongitude: 139.76712,
+  radiusM: 34.6,
+  pointCount: 7,
+  label: '滞在地点' as const,
+  display: {
+    startedAt: '2026-09-03T00:00:00.000Z',
+    endedAt: '2026-09-03T00:30:00.000Z',
+    durationMs: 1800000,
+    continuesFromPreviousDay: false,
+    continuesToNextDay: false,
+    endsAtDayBoundary: false,
+  },
+}
+
 const photosResponse = {
   date: '2026-09-03',
   timezone: 'Asia/Tokyo',
@@ -205,6 +228,36 @@ describe('App', () => {
         photoItem.filename,
       ),
     ).toBeNull()
+  })
+
+  it('renders a PlaceVisit card with timezone-aware time and derived details', async () => {
+    vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
+      const url = requestPath(input)
+      const body = url.includes('/stats/apps')
+        ? statisticsResponse
+        : url.includes('/api/v1/photos')
+          ? photosResponse
+          : { ...timelineResponse, items: [placeVisitItem] }
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+
+    render(<App />)
+
+    const item = await screen.findByTestId('timeline-place-visit-item')
+    expect(
+      within(item).getByRole('heading', { name: '滞在地点' }),
+    ).toBeInTheDocument()
+    expect(within(item).getByText('35.68124, 139.76712')).toBeInTheDocument()
+    expect(within(item).getByText('位置情報 7点')).toBeInTheDocument()
+    expect(within(item).getByText('半径 約35m')).toBeInTheDocument()
+    expect(
+      within(item).getByTestId('timeline-item-duration'),
+    ).toHaveTextContent('30分')
+    expect(within(item).getByText('09:00')).toBeInTheDocument()
+    expect(within(item).getByText('09:30')).toBeInTheDocument()
   })
 
   it('shows a Photos API error independently and retries that panel', async () => {

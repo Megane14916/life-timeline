@@ -41,7 +41,24 @@ export interface PhotoTimelineItem {
   thumbnailUrl: string | null
 }
 
-export type TimelineItem = AppSessionTimelineItem | PhotoTimelineItem
+export interface PlaceVisitTimelineItem {
+  type: 'place_visit'
+  id: string
+  deviceId: string
+  deviceName: string
+  startedAt: string
+  endedAt: string
+  durationMs: number
+  centerLatitude: number
+  centerLongitude: number
+  radiusM: number
+  pointCount: number
+  label: '滞在地点'
+  display: TimelineDisplay
+}
+
+export type TimelineItem =
+  AppSessionTimelineItem | PlaceVisitTimelineItem | PhotoTimelineItem
 
 export interface TimelineResponse {
   date: string

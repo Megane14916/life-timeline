@@ -216,20 +216,22 @@ LocationPointから生成した「ある場所に滞在していた」という�
 ```text
 place_visits
 -------------------------
-id               TEXT PK
-device_id        TEXT FK
-place_id         TEXT NULL FK
-started_at_ms    INTEGER
-ended_at_ms      INTEGER
-duration_ms      INTEGER
-center_latitude  REAL
-center_longitude REAL
-radius_m         REAL
-confidence       REAL NULL
-created_at_ms    INTEGER
+id                    TEXT PK
+device_id             TEXT NOT NULL FK devices
+started_at_ms         INTEGER NOT NULL
+ended_at_ms           INTEGER NOT NULL
+duration_ms           INTEGER NOT NULL
+center_latitude       REAL NOT NULL
+center_longitude      REAL NOT NULL
+radius_m              REAL NOT NULL
+point_count           INTEGER NOT NULL
+algorithm_version     TEXT NOT NULL
+source_first_point_id TEXT NOT NULL FK location_points
+source_last_point_id  TEXT NOT NULL FK location_points
+created_at_ms         INTEGER NOT NULL
 ```
 
-用途: 場所別滞在時間、訪問回数、外出時間、Timeline、Map。
+`stay_point_v1`から再生成できる派生Factです。IDは同じdevice・algorithm version・source point範囲に対し決定的です。用途: 場所別滞在時間、訪問回数、外出時間、Timeline、Map。
 
 ## media_items
 

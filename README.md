@@ -72,9 +72,11 @@ $env:LIFE_TIMELINE_DATA_DIR = Join-Path (Get-Location).Path '..\data\demo'
 New-Item -ItemType Directory -Force -Path $env:LIFE_TIMELINE_DATA_DIR | Out-Null
 uv run alembic upgrade head
 uv run python -m app.cli.seed --data-dir $env:LIFE_TIMELINE_DATA_DIR
+uv run python -m app.cli.rebuild_place_visits --data-dir $env:LIFE_TIMELINE_DATA_DIR --dry-run
 ```
 
 DBは`$env:LIFE_TIMELINE_DATA_DIR\lifelog.db`に作成されます。migration前のDBへseedを実行すると失敗するため、必ず同じ保存先へmigrationを適用してください。
+PlaceVisitを明示的に再生成する場合は、dry-runで件数を確認してから`--dry-run`を外します。CLIは座標や端末IDを出力しません。
 
 開発サーバーをloopbackで起動します。
 

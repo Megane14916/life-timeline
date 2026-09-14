@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import App, AppSession, Device, MediaItem
+from app.models import App, AppSession, Device, MediaItem, PlaceVisit
 from app.services.time_range import QueryRange
 
 
@@ -21,6 +21,12 @@ class SessionWithMasters:
 @dataclass(frozen=True, slots=True)
 class PhotoWithDevice:
     media_item: MediaItem
+    device: Device
+
+
+@dataclass(frozen=True, slots=True)
+class PlaceVisitWithDevice:
+    place_visit: PlaceVisit
     device: Device
 
 
@@ -61,4 +67,26 @@ def find_photos(session: Session, query_range: QueryRange) -> list[PhotoWithDevi
     return [
         PhotoWithDevice(media_item=media_item, device=device)
         for media_item, device in session.execute(statement).tuples()
+    ]
+
+
+def find_place_visits(session: Session, query_range: QueryRange) -> list[PlaceVisitWithDevice]:
+    """Find visits overlapping a timezone-aware half-open day range."""
+
+    statement = (
+        select(PlaceVisit, Device)
+        .join(Device, Device.id == PlaceVisit.device_id)
+        .where(
+            PlaceVisit.started_at_ms < query_range.end_ms,
+            PlaceVisit.ended_at_ms > query_range.start_ms,
+        )
+        .order_by(
+            PlaceVisit.started_at_ms.asc(),
+            PlaceVisit.device_id.asc(),
+            PlaceVisit.id.asc(),
+        )
+    )
+    return [
+        PlaceVisitWithDevice(place_visit=place_visit, device=device)
+        for place_visit, device in session.execute(statement).tuples()
     ]

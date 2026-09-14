@@ -1,6 +1,7 @@
 import type {
   AppSessionTimelineItem as AppSessionTimelineItemData,
   PhotoTimelineItem as PhotoTimelineItemData,
+  PlaceVisitTimelineItem as PlaceVisitTimelineItemData,
   TimelineItem as TimelineItemData,
 } from '../../api/types'
 import { formatDuration, formatPlatform, formatTime } from './format'
@@ -92,9 +93,70 @@ function PhotoItem({
   )
 }
 
+function PlaceVisitItem({
+  item,
+  timezone,
+}: {
+  item: PlaceVisitTimelineItemData
+  timezone: string
+}) {
+  const flags = [
+    item.display.continuesFromPreviousDay ? '前日から継続' : null,
+    item.display.continuesToNextDay ? '翌日に継続' : null,
+    item.display.endsAtDayBoundary ? '日末で終了' : null,
+  ].filter((flag): flag is string => flag !== null)
+
+  return (
+    <li
+      className="timeline-item place-visit-item"
+      data-testid="timeline-place-visit-item"
+    >
+      <div className="timeline-time" aria-label="滞在時間">
+        <time dateTime={item.display.startedAt}>
+          {formatTime(item.display.startedAt, timezone)}
+        </time>
+        <span aria-hidden="true">–</span>
+        <time dateTime={item.display.endedAt}>
+          {formatTime(item.display.endedAt, timezone)}
+        </time>
+      </div>
+      <div className="timeline-marker" aria-hidden="true" />
+      <article className="timeline-card">
+        <div className="timeline-card-heading">
+          <div>
+            <h3>{item.label}</h3>
+            <p className="place-visit-coordinates" aria-label="滞在地点の座標">
+              {item.centerLatitude.toFixed(5)},{' '}
+              {item.centerLongitude.toFixed(5)}
+            </p>
+          </div>
+          <strong data-testid="timeline-item-duration">
+            {formatDuration(item.display.durationMs)}
+          </strong>
+        </div>
+        <div className="timeline-details">
+          <span>{item.deviceName}</span>
+          <span>位置情報 {item.pointCount}点</span>
+          <span>半径 約{Math.round(item.radiusM)}m</span>
+        </div>
+        {flags.length > 0 && (
+          <div className="timeline-flags" aria-label="滞在時間の境界情報">
+            {flags.map((flag) => (
+              <span key={flag}>{flag}</span>
+            ))}
+          </div>
+        )}
+      </article>
+    </li>
+  )
+}
+
 export function TimelineItem({ item, timezone }: TimelineItemProps) {
   if (item.type === 'photo') {
     return <PhotoItem item={item} timezone={timezone} />
+  }
+  if (item.type === 'place_visit') {
+    return <PlaceVisitItem item={item} timezone={timezone} />
   }
   return <AppSessionItem item={item} timezone={timezone} />
 }
