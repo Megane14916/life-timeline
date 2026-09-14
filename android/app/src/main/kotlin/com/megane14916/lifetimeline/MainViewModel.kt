@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
+import com.megane14916.lifetimeline.collector.LocationAccessState
+import com.megane14916.lifetimeline.collector.LocationPermissionChecker
+import com.megane14916.lifetimeline.collector.LocationRegistrationClient
 import com.megane14916.lifetimeline.collector.PhotoAccessChecker
 import com.megane14916.lifetimeline.collector.PhotoAccessState
 import com.megane14916.lifetimeline.collector.UsageAccessChecker
@@ -46,6 +49,8 @@ enum class MainStatus {
 data class MainUiState(
   val usageAccessGranted: Boolean = false,
   val photoAccessState: PhotoAccessState = PhotoAccessState.DENIED,
+  val locationAccessState: LocationAccessState = LocationAccessState.DISABLED,
+  val locationCollectionEnabled: Boolean = false,
   val photoCollectionEnabled: Boolean = false,
   val pcBaseUrl: String? = null,
   val lastCollectionAtMs: Long? = null,
@@ -93,6 +98,8 @@ class MainViewModel(
   private val pendingPhotoCount: suspend () -> Int = { 0 },
   private val pendingPhotoThumbnailCount: suspend () -> Int = { 0 },
   private val localPhotoThumbnailBytes: suspend () -> Long = { 0L },
+  private val locationPermissionChecker: LocationPermissionChecker? = null,
+  private val locationRegistrationClient: LocationRegistrationClient? = null,
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(MainUiState())
   val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -107,11 +114,13 @@ class MainViewModel(
             lastSyncAtMs = settings.lastSyncAtMs,
             usageAccessGranted = usageAccessChecker.isUsageAccessGranted(),
             photoCollectionEnabled = settings.photoCollectionEnabled,
+            locationCollectionEnabled = settings.locationCollectionEnabled,
             pendingCount = pendingCount(),
           )
       }
     }
     refreshPhotoAccess()
+    refreshLocationAccess()
     refreshBackgroundState()
   }
 
@@ -159,6 +168,53 @@ class MainViewModel(
       backgroundWorkScheduler?.cancelPhotoCollection()
       _uiState.value = _uiState.value.copy(photoCollectionEnabled = false)
     }
+  }
+
+  fun enableLocationCollection(onRequestPermissions: () -> Unit) {
+    viewModelScope.launch {
+      preferences.enableLocationCollection(nowMs())
+      _uiState.value = _uiState.value.copy(locationCollectionEnabled = true)
+      onRequestPermissions()
+    }
+  }
+
+  fun disableLocationCollection() {
+    viewModelScope.launch {
+      preferences.disableLocationCollection()
+      backgroundWorkScheduler?.cancelLocationRegistration()
+      runCatching { locationRegistrationClient?.unregister() }
+      _uiState.value = _uiState.value.copy(locationCollectionEnabled = false)
+      refreshLocationAccessInternal()
+    }
+  }
+
+  /** Rechecks OS state on every app resume and lets registration work reconcile external changes. */
+  fun refreshLocationAccess() {
+    viewModelScope.launch {
+      refreshLocationAccessInternal()
+      if (_uiState.value.locationCollectionEnabled) {
+        backgroundWorkScheduler?.ensureLocationRegistrationScheduled()
+        backgroundWorkScheduler?.enqueueLocationRegistration()
+      } else {
+        backgroundWorkScheduler?.cancelLocationRegistration()
+      }
+    }
+  }
+
+  private suspend fun refreshLocationAccessInternal() {
+    val settings = preferences.settings.first()
+    val access =
+      locationPermissionChecker?.currentAccess(settings.locationCollectionEnabled)
+        ?: if (settings.locationCollectionEnabled) {
+          LocationAccessState.FOREGROUND_PERMISSION_REQUIRED
+        } else {
+          LocationAccessState.DISABLED
+        }
+    _uiState.value =
+      _uiState.value.copy(
+        locationCollectionEnabled = settings.locationCollectionEnabled,
+        locationAccessState = access,
+      )
   }
 
   /** Requests one bounded photo scan without replacing the periodic work request. */

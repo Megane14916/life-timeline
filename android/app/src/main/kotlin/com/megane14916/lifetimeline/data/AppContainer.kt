@@ -7,6 +7,8 @@ import androidx.work.WorkManager
 import com.megane14916.lifetimeline.collector.AndroidMediaStorePhotoBackend
 import com.megane14916.lifetimeline.collector.AndroidPackageLabelResolver
 import com.megane14916.lifetimeline.collector.AndroidUsageEventsSource
+import com.megane14916.lifetimeline.collector.LocationPermissionChecker
+import com.megane14916.lifetimeline.collector.LocationRequestController
 import com.megane14916.lifetimeline.collector.MediaStorePhotoSource
 import com.megane14916.lifetimeline.collector.PhotoAccessChecker
 import com.megane14916.lifetimeline.collector.PhotoThumbnailGenerator
@@ -28,6 +30,7 @@ import com.megane14916.lifetimeline.repository.CollectionRepository
 import com.megane14916.lifetimeline.repository.LocalDataRepository
 import com.megane14916.lifetimeline.repository.LocalThumbnailStore
 import com.megane14916.lifetimeline.repository.LocationCollectionRepository
+import com.megane14916.lifetimeline.repository.LocationUpdateProcessor
 import com.megane14916.lifetimeline.repository.PhotoCollectionRepository
 import com.megane14916.lifetimeline.repository.PhotoSyncRepository
 import com.megane14916.lifetimeline.repository.RoomLocationPointStore
@@ -55,6 +58,7 @@ interface AppContainer {
   val backgroundExecutionCoordinator: BackgroundExecutionCoordinator
   val photoCollectionRepository: PhotoCollectionRepository
   val locationCollectionRepository: LocationCollectionRepository
+  val locationUpdateProcessor: LocationUpdateProcessor
 
   fun createCollectionCoordinator(context: Context): CollectionCoordinator
 
@@ -114,6 +118,14 @@ class DefaultAppContainer(
   override val locationCollectionRepository: LocationCollectionRepository by lazy {
     LocationCollectionRepository(RoomLocationPointStore(database))
   }
+  override val locationUpdateProcessor: LocationUpdateProcessor by lazy {
+    LocationUpdateProcessor(
+      settingsProvider = { preferences.settings.first() },
+      permissionChecker = LocationPermissionChecker.from(context),
+      repository = locationCollectionRepository,
+      deviceIdProvider = preferences::ensureDeviceId,
+    )
+  }
   override val workerDependencies: WorkerDependencies by lazy {
     WorkerDependencies(
       collectionCoordinatorFactory = ::createCollectionCoordinator,
@@ -131,6 +143,11 @@ class DefaultAppContainer(
       photoSyncTrigger = { backgroundWorkScheduler.enqueuePhotoSync() },
       pendingPhotoSyncableCountProvider = { database.androidMediaItemDao().countPendingSyncable() },
       pendingPhotoThumbnailCountProvider = { database.androidMediaItemDao().countPendingThumbnails() },
+      locationPermissionCheckerFactory = { locationContext -> LocationPermissionChecker.from(locationContext) },
+      locationRegistrationClientFactory = { locationContext ->
+        LocationRequestController(locationContext, LocationPermissionChecker.from(locationContext))
+      },
+      locationCollectionEnabledProvider = { preferences.settings.first().locationCollectionEnabled },
     )
   }
   override val workerFactory: LifeTimelineWorkerFactory by lazy {
