@@ -7,6 +7,7 @@ import android.location.Location
 import com.google.android.gms.location.LocationResult
 import com.megane14916.lifetimeline.LifeTimelineApplication
 import com.megane14916.lifetimeline.repository.LocationFix
+import com.megane14916.lifetimeline.repository.LocationUpdateProcessor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,25 +21,18 @@ class LocationUpdatesReceiver : BroadcastReceiver() {
     intent: Intent?,
   ) {
     if (intent?.action != "${context.packageName}.LOCATION_UPDATES") return
-    val fixes =
-      LocationResult
-        .extractResult(intent)
-        ?.locations
-        .orEmpty()
-        .map(Location::toLocationFix)
-    if (fixes.isEmpty()) return
+    val appContainer = (context.applicationContext as? LifeTimelineApplication)?.appContainer
+    if (appContainer == null) return
 
     val pendingResult = goAsync()
-    val appContainer = (context.applicationContext as? LifeTimelineApplication)?.appContainer
-    if (appContainer == null) {
-      pendingResult.finish()
-      return
-    }
     CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
       try {
         withTimeout(RECEIVER_TIMEOUT_MS) {
-          val result = appContainer.locationUpdateProcessor.persistBatch(fixes)
-          if (result != null && result.insertedCount > 0) {
+          handleLocationUpdateIntent(
+            packageName = context.packageName,
+            intent = intent,
+            processor = appContainer.locationUpdateProcessor,
+          ) {
             appContainer.backgroundWorkScheduler.enqueueLocationSync()
           }
         }
@@ -53,6 +47,26 @@ class LocationUpdatesReceiver : BroadcastReceiver() {
   private companion object {
     const val RECEIVER_TIMEOUT_MS = 25_000L
   }
+}
+
+internal suspend fun handleLocationUpdateIntent(
+  packageName: String,
+  intent: Intent?,
+  processor: LocationUpdateProcessor,
+  enqueueLocationSync: () -> Unit,
+): Int {
+  if (intent?.action != "$packageName.LOCATION_UPDATES") return 0
+  val fixes =
+    LocationResult
+      .extractResult(intent)
+      ?.locations
+      .orEmpty()
+      .map(Location::toLocationFix)
+  if (fixes.isEmpty()) return 0
+
+  val insertedCount = processor.persistBatch(fixes)?.insertedCount ?: 0
+  if (insertedCount > 0) enqueueLocationSync()
+  return insertedCount
 }
 
 internal fun Location.toLocationFix(): LocationFix =
