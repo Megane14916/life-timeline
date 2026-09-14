@@ -265,41 +265,6 @@ private fun MainScreen(
         }
       }
 
-      Text(text = "位置情報の収集", style = MaterialTheme.typography.titleMedium)
-      Text(
-        text = "位置情報は明示的に有効化した場合のみ、端末内へ保存します。いつでも無効化でき、過去のpending記録は保持されます。",
-        style = MaterialTheme.typography.bodyMedium,
-      )
-      Text("位置情報: ${state.locationAccessState.toDisplayText()}")
-      when {
-        !state.locationCollectionEnabled -> {
-          Button(onClick = onEnableLocationCollection, enabled = !busy) {
-            Text("位置情報収集を有効にする")
-          }
-        }
-
-        state.locationAccessState == LocationAccessState.FOREGROUND_PERMISSION_REQUIRED -> {
-          Button(onClick = onRequestLocationPermission, enabled = !busy) {
-            Text("位置情報へのアクセスを許可")
-          }
-        }
-
-        state.locationAccessState == LocationAccessState.BACKGROUND_PERMISSION_REQUIRED -> {
-          Button(onClick = onRequestLocationPermission, enabled = !busy) {
-            Text("バックグラウンド位置情報を設定")
-          }
-        }
-
-        state.locationAccessState == LocationAccessState.LOCATION_SERVICES_OFF -> {
-          Text("端末の位置情報サービスをオンにすると収集を再開します。")
-        }
-      }
-      if (state.locationCollectionEnabled) {
-        Button(onClick = onDisableLocationCollection, enabled = !busy) {
-          Text("位置情報収集を無効にする")
-        }
-      }
-
       OutlinedTextField(
         value = endpoint,
         onValueChange = { endpoint = it },
@@ -375,6 +340,41 @@ private fun MainScreen(
         enabled = !busy && state.usageAccessGranted && endpoint.isNotBlank(),
       ) {
         Text(if (busy) "処理中..." else "収集して同期")
+      }
+
+      Text(text = "位置情報の収集", style = MaterialTheme.typography.titleMedium)
+      Text(
+        text = "位置情報は明示的に有効化した場合のみ、端末内へ保存します。いつでも無効化でき、過去のpending記録は保持されます。",
+        style = MaterialTheme.typography.bodyMedium,
+      )
+      Text("位置情報: ${state.locationAccessState.toDisplayText()}")
+      when {
+        !state.locationCollectionEnabled -> {
+          Button(onClick = onEnableLocationCollection, enabled = !busy) {
+            Text("位置情報収集を有効にする")
+          }
+        }
+
+        state.locationAccessState == LocationAccessState.FOREGROUND_PERMISSION_REQUIRED -> {
+          Button(onClick = onRequestLocationPermission, enabled = !busy) {
+            Text("位置情報へのアクセスを許可")
+          }
+        }
+
+        state.locationAccessState == LocationAccessState.BACKGROUND_PERMISSION_REQUIRED -> {
+          Button(onClick = onRequestLocationPermission, enabled = !busy) {
+            Text("バックグラウンド位置情報を設定")
+          }
+        }
+
+        state.locationAccessState == LocationAccessState.LOCATION_SERVICES_OFF -> {
+          Text("端末の位置情報サービスをオンにすると収集を再開します。")
+        }
+      }
+      if (state.locationCollectionEnabled) {
+        Button(onClick = onDisableLocationCollection, enabled = !busy) {
+          Text("位置情報収集を無効にする")
+        }
       }
     }
   }
