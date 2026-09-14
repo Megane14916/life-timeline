@@ -20,6 +20,7 @@ from app.api.errors import (
 )
 from app.api.location_limits import LocationRequestSizeLimitMiddleware
 from app.api.location_sync import router as location_sync_router
+from app.api.map import router as map_router
 from app.api.photo_limits import PhotoRequestSizeLimitMiddleware
 from app.api.photo_sync import router as photo_sync_router
 from app.api.photos import router as photos_router
@@ -129,6 +130,7 @@ def create_app(
     application.include_router(photo_sync_router)
     application.include_router(location_sync_router)
     application.include_router(photos_router)
+    application.include_router(map_router)
     application.add_middleware(PhotoRequestSizeLimitMiddleware)
     application.add_middleware(LocationRequestSizeLimitMiddleware)
 
