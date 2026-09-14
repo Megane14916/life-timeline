@@ -55,4 +55,29 @@ class AppPreferencesTest {
       assertTrue(preferences.settings.first().photoCollectionEnabled)
       assertEquals(1_800_000_020_000, preferences.settings.first().photoCollectionStartedAtMs)
     }
+
+  @Test
+  fun locationCollectionOptInStoresStartTimeAndDisablePreservesIt() =
+    runBlocking {
+      val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+      val preferences = AppPreferences.forTest(context, "location-preferences-test")
+
+      val initial = preferences.settings.first()
+      assertFalse(initial.locationCollectionEnabled)
+      assertNull(initial.locationCollectionStartedAtMs)
+
+      preferences.enableLocationCollection(1_800_000_000_000)
+      assertTrue(preferences.settings.first().locationCollectionEnabled)
+      assertEquals(1_800_000_000_000, preferences.settings.first().locationCollectionStartedAtMs)
+
+      preferences.enableLocationCollection(1_800_000_010_000)
+      assertEquals(1_800_000_000_000, preferences.settings.first().locationCollectionStartedAtMs)
+
+      preferences.disableLocationCollection()
+      assertFalse(preferences.settings.first().locationCollectionEnabled)
+      assertEquals(1_800_000_000_000, preferences.settings.first().locationCollectionStartedAtMs)
+      preferences.enableLocationCollection(1_800_000_020_000)
+      assertTrue(preferences.settings.first().locationCollectionEnabled)
+      assertEquals(1_800_000_020_000, preferences.settings.first().locationCollectionStartedAtMs)
+    }
 }

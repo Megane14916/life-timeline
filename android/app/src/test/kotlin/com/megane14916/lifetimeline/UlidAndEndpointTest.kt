@@ -1,6 +1,7 @@
 package com.megane14916.lifetimeline
 
 import com.megane14916.lifetimeline.data.preferences.AppPreferences
+import com.megane14916.lifetimeline.domain.generateDeterministicUlid
 import com.megane14916.lifetimeline.domain.generateUlid
 import com.megane14916.lifetimeline.domain.validateUlid
 import org.junit.Assert.assertEquals
@@ -25,6 +26,17 @@ class UlidAndEndpointTest {
     assertThrows(IllegalArgumentException::class.java) {
       validateUlid("81K4N6Q2N6N8YJ7W4M2D3A9B5C")
     }
+  }
+
+  @Test
+  fun deterministicUlidUsesStableTimestampAndEntropy() {
+    val entropy = ByteArray(32) { it.toByte() }
+    val first = generateDeterministicUlid(1_780_000_000_000, entropy)
+
+    assertEquals(first, generateDeterministicUlid(1_780_000_000_000, entropy.copyOf()))
+    assertEquals(first, validateUlid(first))
+    assertNotEquals(first, generateDeterministicUlid(1_780_000_000_001, entropy))
+    assertNotEquals(first, generateDeterministicUlid(1_780_000_000_000, entropy.copyOf().also { it[0] = 99 }))
   }
 
   @Test
