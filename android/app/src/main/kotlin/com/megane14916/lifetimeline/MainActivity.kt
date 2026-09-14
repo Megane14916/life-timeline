@@ -67,6 +67,8 @@ class MainActivity : ComponentActivity() {
     val scheduler = (application as LifeTimelineApplication).appContainer.backgroundWorkScheduler
     scheduler.photoCollectionWorkInfosLiveData().observe(this) { viewModel.refreshBackgroundState() }
     scheduler.photoSyncWorkInfosLiveData().observe(this) { viewModel.refreshBackgroundState() }
+    scheduler.locationRegistrationWorkInfosLiveData().observe(this) { viewModel.refreshBackgroundState() }
+    scheduler.locationSyncWorkInfosLiveData().observe(this) { viewModel.refreshBackgroundState() }
     setContent {
       LifeTimelineTheme {
         val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -96,6 +98,11 @@ class MainActivity : ComponentActivity() {
           },
           onDisableLocationCollection = viewModel::disableLocationCollection,
           onRequestLocationPermission = ::advanceLocationPermissionFlow,
+          onCheckLocationRegistration = viewModel::checkLocationRegistration,
+          onSyncLocationNow = viewModel::syncLocationNow,
+          onOpenLocationSettings = {
+            startActivity(Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+          },
         )
       }
     }
@@ -128,6 +135,8 @@ class MainActivity : ComponentActivity() {
       localPhotoThumbnailBytes = { container.database.androidMediaItemDao().totalStoredThumbnailBytes() },
       locationPermissionChecker = locationPermissionChecker,
       locationRegistrationClient = LocationRequestController(appContext, locationPermissionChecker),
+      pendingLocationCount = { container.locationCollectionRepository.countPending() },
+      latestLocationReceivedAt = { container.locationCollectionRepository.latestReceivedAt() },
     )
   }
 
@@ -192,6 +201,9 @@ private fun MainScreen(
   onEnableLocationCollection: () -> Unit,
   onDisableLocationCollection: () -> Unit,
   onRequestLocationPermission: () -> Unit,
+  onCheckLocationRegistration: () -> Unit,
+  onSyncLocationNow: () -> Unit,
+  onOpenLocationSettings: () -> Unit,
 ) {
   var endpoint by rememberSaveable(state.pcBaseUrl) { mutableStateOf(state.pcBaseUrl.orEmpty()) }
   val busy =
@@ -344,7 +356,7 @@ private fun MainScreen(
 
       Text(text = "位置情報の収集", style = MaterialTheme.typography.titleMedium)
       Text(
-        text = "位置情報は明示的に有効化した場合のみ、端末内へ保存します。いつでも無効化でき、過去のpending記録は保持されます。",
+        text = "位置情報は明示的に有効化した場合のみ端末内へ保存します。無効化しても過去のpending記録とPC側の履歴は削除されません。",
         style = MaterialTheme.typography.bodyMedium,
       )
       Text("位置情報: ${state.locationAccessState.toDisplayText()}")
@@ -369,12 +381,47 @@ private fun MainScreen(
 
         state.locationAccessState == LocationAccessState.LOCATION_SERVICES_OFF -> {
           Text("端末の位置情報サービスをオンにすると収集を再開します。")
+          Button(onClick = onOpenLocationSettings, enabled = !busy) {
+            Text("端末の位置設定を開く")
+          }
         }
       }
       if (state.locationCollectionEnabled) {
         Button(onClick = onDisableLocationCollection, enabled = !busy) {
           Text("位置情報収集を無効にする")
         }
+        Button(onClick = onCheckLocationRegistration, enabled = !busy) {
+          Text("登録状態を確認")
+        }
+      }
+      Text("位置情報の最終受信: ${formatDeviceTimestamp(state.latestLocationReceivedAtMs)}")
+      Text("位置情報pending: ${state.pendingLocationCount}")
+      Text(
+        "位置登録: ${state.locationRegistrationResult.toLocationRegistrationLabel()} " +
+          "(試行 ${formatDeviceTimestamp(state.locationRegistrationAttemptAtMs)} / " +
+          "成功 ${formatDeviceTimestamp(state.locationRegistrationSuccessAtMs)})",
+      )
+      Text("位置登録work: ${state.locationRegistrationWorkState?.name ?: "未登録"}")
+      Text(
+        "位置同期: ${state.locationSyncStatusToDisplay()} " +
+          "(試行 ${formatDeviceTimestamp(state.locationSyncAttemptAtMs)} / " +
+          "成功 ${formatDeviceTimestamp(state.locationSyncSuccessAtMs)})",
+      )
+      Text(
+        "位置同期work: ${state.locationSyncWorkState?.name ?: "未登録"}" +
+          if (state.locationSyncRunAttemptCount > 0) " (試行回数 ${state.locationSyncRunAttemptCount})" else "",
+      )
+      state.locationSyncErrorKind?.let { kind ->
+        Text("位置同期の直近エラー: ${kind.toLocationErrorLabel()}", color = MaterialTheme.colorScheme.error)
+      }
+      state.locationRegistrationErrorKind?.let { kind ->
+        Text("位置登録の直近エラー: ${kind.toLocationErrorLabel()}", color = MaterialTheme.colorScheme.error)
+      }
+      Button(
+        onClick = onSyncLocationNow,
+        enabled = state.pendingLocationCount > 0 && !state.pcBaseUrl.isNullOrBlank() && !busy,
+      ) {
+        Text("未同期の位置情報を送信")
       }
     }
   }
@@ -414,6 +461,9 @@ private fun MainScreenPreview() {
       onEnableLocationCollection = {},
       onDisableLocationCollection = {},
       onRequestLocationPermission = {},
+      onCheckLocationRegistration = {},
+      onSyncLocationNow = {},
+      onOpenLocationSettings = {},
     )
   }
 }
@@ -443,4 +493,41 @@ private fun MainUiState.photoSyncStatusToDisplay(): String =
     photoSyncWorkState == androidx.work.WorkInfo.State.ENQUEUED -> "制約条件待ち（UNMETERED / バッテリー / ストレージ）"
     photoRecentErrorKind != null -> "要確認（$photoRecentErrorKind）"
     else -> "待機中"
+  }
+
+private fun String?.toLocationRegistrationLabel(): String =
+  when (this) {
+    "registered" -> "登録済み"
+    "disabled" -> "無効"
+    "permission_required" -> "権限が必要"
+    "location_services_off" -> "位置サービスOFF"
+    "play_services_unavailable" -> "Play services利用不可"
+    "retry" -> "再試行待ち"
+    null -> "未実行"
+    else -> "要確認"
+  }
+
+private fun MainUiState.locationSyncStatusToDisplay(): String =
+  when {
+    pendingLocationCount > 0 && pcBaseUrl.isNullOrBlank() -> "PC URL設定後に同期"
+    locationSyncWorkState == androidx.work.WorkInfo.State.RUNNING -> "同期中"
+    locationSyncWorkState == androidx.work.WorkInfo.State.ENQUEUED && locationSyncRunAttemptCount > 0 -> "再試行待ち"
+    locationSyncWorkState == androidx.work.WorkInfo.State.ENQUEUED -> "ネットワーク / バッテリー待ち"
+    locationSyncResult == "success" -> "完了"
+    locationSyncResult == "no_pending" -> "未同期なし"
+    locationSyncResult == "configuration_required" -> "PC URL設定が必要"
+    locationSyncResult == "retry" -> "再試行待ち"
+    locationSyncResult == "failure" -> "要確認"
+    pendingLocationCount > 0 -> "送信待ち"
+    else -> "待機中"
+  }
+
+private fun String.toLocationErrorLabel(): String =
+  when (this) {
+    "network" -> "ネットワーク"
+    "server" -> "PCサーバー"
+    "protocol" -> "同期データ形式"
+    "budget" -> "実行上限"
+    "unexpected" -> "予期しないエラー"
+    else -> "同期処理"
   }

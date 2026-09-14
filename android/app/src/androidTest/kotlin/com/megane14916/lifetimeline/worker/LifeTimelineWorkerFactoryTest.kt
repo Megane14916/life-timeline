@@ -25,7 +25,7 @@ import retrofit2.Response
 @RunWith(AndroidJUnit4::class)
 class LifeTimelineWorkerFactoryTest {
   @Test
-  fun createsBothPhotoWorkerTypesFromTheirStableNames() {
+  fun createsPhotoAndLocationWorkerTypesFromTheirStableNames() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val dependencies =
       WorkerDependencies(
@@ -44,9 +44,15 @@ class LifeTimelineWorkerFactoryTest {
         .from(context, PhotoSyncWorker::class.java)
         .setWorkerFactory(factory)
         .build(PhotoSyncWorker::class.java)
+    val locationSync =
+      TestListenableWorkerBuilder
+        .from(context, LocationSyncWorker::class.java)
+        .setWorkerFactory(factory)
+        .build(LocationSyncWorker::class.java)
 
     assertEquals(PhotoCollectionWorker::class.java, collection.javaClass)
     assertEquals(PhotoSyncWorker::class.java, sync.javaClass)
+    assertEquals(LocationSyncWorker::class.java, locationSync.javaClass)
   }
 
   @Test

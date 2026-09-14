@@ -43,5 +43,9 @@ class MainActivityTest {
       .performScrollTo()
       .assertIsDisplayed()
     composeRule.onNodeWithText("収集して同期").performScrollTo().assertIsDisplayed()
+    composeRule.onNodeWithText("位置情報pending:", substring = true).performScrollTo().assertIsDisplayed()
+    composeRule.onNodeWithText("位置情報の最終受信:", substring = true).performScrollTo().assertIsDisplayed()
+    composeRule.onNodeWithText("位置同期:", substring = true).performScrollTo().assertIsDisplayed()
+    composeRule.onNodeWithText("未同期の位置情報を送信").performScrollTo().assertIsDisplayed()
   }
 }

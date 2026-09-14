@@ -4,10 +4,35 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.megane14916.lifetimeline.data.local.BackgroundWorkStateEntity
 
 @Dao
 interface BackgroundWorkStateDao {
+  @Transaction
+  suspend fun recordLocationReceivedAt(receivedAtMs: Long) {
+    insertIfAbsent(
+      BackgroundWorkStateEntity(
+        workKey = LOCATION_RECEIVE_WORK_KEY,
+        lastSuccessAtMs = receivedAtMs,
+        lastResult = "received",
+        updatedAtMs = receivedAtMs,
+      ),
+    )
+    updateLocationReceivedAt(receivedAtMs)
+  }
+
+  @Query(
+    """
+    UPDATE background_work_state
+    SET last_success_at_ms = MAX(COALESCE(last_success_at_ms, 0), :receivedAtMs),
+        last_result = 'received',
+        updated_at_ms = MAX(updated_at_ms, :receivedAtMs)
+    WHERE work_key = 'location_receive_v1'
+    """,
+  )
+  suspend fun updateLocationReceivedAt(receivedAtMs: Long)
+
   @Query("SELECT * FROM background_work_state WHERE work_key = :workKey LIMIT 1")
   suspend fun find(workKey: String): BackgroundWorkStateEntity?
 
@@ -106,4 +131,8 @@ interface BackgroundWorkStateDao {
     errorKind: String,
     atMs: Long,
   ): Int
+
+  private companion object {
+    const val LOCATION_RECEIVE_WORK_KEY = "location_receive_v1"
+  }
 }

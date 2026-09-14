@@ -39,6 +39,10 @@ class LifeTimelineWorkerFactory(
         WorkerCreator { appContext, workerParameters, workerDependencies ->
           LocationRegistrationWorker(appContext, workerParameters, workerDependencies)
         },
+      LocationSyncWorker::class.java.name to
+        WorkerCreator { appContext, workerParameters, workerDependencies ->
+          LocationSyncWorker(appContext, workerParameters, workerDependencies)
+        },
     ),
 ) : WorkerFactory() {
   override fun createWorker(

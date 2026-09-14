@@ -61,6 +61,7 @@ class LocationPointRoomStoreTest {
       assertEquals(1, ack.markedSyncedCount)
       assertEquals(1, ack.cleanedCount)
       assertEquals(2, repository.countPending())
+      assertEquals(5_000L, repository.latestReceivedAt())
       assertEquals(null, database.locationPointDao().findById(pending[1].id))
       assertNotNull(database.locationPointDao().findById(pending[0].id))
       assertNotNull(database.locationPointDao().findById(pending[2].id))

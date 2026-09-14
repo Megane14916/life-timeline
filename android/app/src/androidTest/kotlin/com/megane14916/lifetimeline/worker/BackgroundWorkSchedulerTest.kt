@@ -61,6 +61,22 @@ class BackgroundWorkSchedulerTest {
     assertEquals(TimeUnit.HOURS.toMillis(1), watchdog.flexDuration)
   }
 
+  @Test
+  fun locationSyncHasIndependentNameConnectedBatteryConstraintAndFifteenMinuteBackoff() {
+    val scheduler = scheduler()
+    val workSpec = scheduler.locationSyncWorkRequest().workSpec
+
+    assertEquals(LocationSyncWorker::class.java.name, workSpec.workerClassName)
+    assertEquals(LocationWorkPolicy.SYNC_WORK_NAME, "life_timeline_location_sync_v1")
+    assertEquals(NetworkType.CONNECTED, workSpec.constraints.requiredNetworkType)
+    assertTrue(workSpec.constraints.requiresBatteryNotLow())
+    assertEquals(BackoffPolicy.EXPONENTIAL, workSpec.backoffPolicy)
+    assertEquals(TimeUnit.MINUTES.toMillis(15), workSpec.backoffDelayDuration)
+    assertTrue(workSpec.input.keyValueMap.isEmpty())
+    assertTrue(LocationWorkPolicy.SYNC_WORK_NAME != AutomaticSyncPolicy.SYNC_WORK_NAME)
+    assertTrue(LocationWorkPolicy.SYNC_WORK_NAME != PhotoWorkPolicy.SYNC_WORK_NAME)
+  }
+
   private fun scheduler(): BackgroundWorkScheduler =
     BackgroundWorkScheduler(
       WorkManager.getInstance(ApplicationProvider.getApplicationContext<Context>()),

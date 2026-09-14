@@ -6,6 +6,7 @@ import com.megane14916.lifetimeline.collector.LocationRegistrationClient
 import com.megane14916.lifetimeline.collector.PhotoAccessChecker
 import com.megane14916.lifetimeline.repository.BackgroundExecutionCoordinator
 import com.megane14916.lifetimeline.repository.CollectionCoordinator
+import com.megane14916.lifetimeline.repository.LocationSyncRepository
 import com.megane14916.lifetimeline.repository.PhotoCollectionRepository
 import com.megane14916.lifetimeline.repository.PhotoSyncRepository
 import com.megane14916.lifetimeline.repository.SyncRepository
@@ -42,4 +43,7 @@ data class WorkerDependencies(
     error("LocationRegistrationClient factory is not configured.")
   },
   val locationCollectionEnabledProvider: suspend () -> Boolean = { false },
+  val locationSyncRepositoryFactory: suspend (Context, String) -> LocationSyncRepository = { _, _ ->
+    error("LocationSyncRepository factory is not configured.")
+  },
 )

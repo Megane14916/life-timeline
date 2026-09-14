@@ -26,10 +26,20 @@ class RoomLocationPointStore(
 
   override suspend fun countPending(): Int = database.locationPointDao().countPending()
 
+  override suspend fun latestReceivedAt(): Long? = database.backgroundWorkStateDao().find(LOCATION_RECEIVE_WORK_KEY)?.lastSuccessAtMs
+
+  override suspend fun recordLatestReceivedAt(receivedAtMs: Long) {
+    database.backgroundWorkStateDao().recordLocationReceivedAt(receivedAtMs)
+  }
+
   override suspend fun markPendingAsSynced(
     ids: List<String>,
     syncedAtMs: Long,
   ): Int = database.locationPointDao().markPendingAsSynced(ids, syncedAtMs)
 
   override suspend fun deleteSyncedBatch(limit: Int): Int = database.locationPointDao().deleteSyncedBatch(limit)
+
+  private companion object {
+    const val LOCATION_RECEIVE_WORK_KEY = "location_receive_v1"
+  }
 }
