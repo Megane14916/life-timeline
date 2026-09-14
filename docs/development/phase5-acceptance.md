@@ -62,7 +62,7 @@ adb install -r android\app\build\outputs\apk\debug\app-debug.apk
 3. `life-timeline`を開き、PC endpoint欄へ同じHTTPS URLを入力し、「PC URLを保存」を押す。
 4. 画面下部の「位置情報の収集」で「位置情報収集を有効にする」を押す。
 5. 位置権限は段階的に許可する。foregroundでは「正確な位置情報」を選び、その後「バックグラウンド位置情報を設定」からAndroid設定を開いてbackground利用を許可する。Androidのversionにより設定名が異なるため、screen off中も許可される選択肢を選ぶ。
-6. Androidの端末設定でも位置情報サービスがONであることを確認する。アプリに戻り、位置情報状態がpermission不足やサービスOFFではないこと、登録状態が成功相当であることを確認する。
+6. Androidの端末設定でも位置情報サービスがONであることを確認する。アプリに戻り、位置情報状態がpermission不足やサービスOFFではないこと、登録状態が成功相当であることを確認する。登録に失敗した場合は、アプリの「位置登録の直近エラー」に表示される段階名・例外型・Play services status codeだけを共有する。例外メッセージやlogcatには位置・端末等の情報が含まれる可能性があるため共有しない。
 7. 位置収集を有効にする前から存在する履歴を変更・消去しない。テスト用PC DBが空の専用DBであることを確認する。
 
 ## 4. 通常系の実機手順
