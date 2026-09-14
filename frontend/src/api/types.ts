@@ -76,6 +76,37 @@ export interface PhotosResponse {
   items: PhotoTimelineItem[]
 }
 
+export interface MapRoutePoint {
+  recordedAt: string
+  latitude: number
+  longitude: number
+  accuracyM: number
+}
+
+export interface MapRoute {
+  deviceId: string
+  deviceName: string
+  startedAt: string
+  endedAt: string
+  pointCount: number
+  points: MapRoutePoint[]
+}
+
+export interface MapPhotoItem extends PhotoTimelineItem {
+  latitude: number
+  longitude: number
+}
+
+export interface MapResponse {
+  date: string
+  timezone: string
+  rangeStart: string
+  rangeEnd: string
+  routes: MapRoute[]
+  placeVisits: PlaceVisitTimelineItem[]
+  photos: MapPhotoItem[]
+}
+
 export interface StatisticsTotals {
   usageMs: number
   sessionCount: number

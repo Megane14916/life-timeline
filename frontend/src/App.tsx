@@ -1,12 +1,17 @@
 import './app.css'
 
 import { TimelinePage } from './features/timeline/TimelinePage'
+import { MapPage } from './features/map/MapPage'
 
 export function App() {
   const path = window.location.pathname
 
   if (path === '/' || path === '/timeline') {
     return <TimelinePage />
+  }
+
+  if (path === '/map') {
+    return <MapPage />
   }
 
   return (

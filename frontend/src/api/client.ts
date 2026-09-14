@@ -1,5 +1,6 @@
 import type {
   ApiErrorBody,
+  MapResponse,
   PhotosResponse,
   StatisticsResponse,
   TimelineResponse,
@@ -73,6 +74,15 @@ export function getPhotos(
 ): Promise<PhotosResponse> {
   const params = new URLSearchParams({ date, timezone })
   return getJson<PhotosResponse>(`/api/v1/photos?${params.toString()}`, signal)
+}
+
+export function getMap(
+  date: string,
+  timezone: string,
+  signal?: AbortSignal,
+): Promise<MapResponse> {
+  const params = new URLSearchParams({ date, timezone })
+  return getJson<MapResponse>(`/api/v1/map?${params.toString()}`, signal)
 }
 
 export function getAppStatistics(

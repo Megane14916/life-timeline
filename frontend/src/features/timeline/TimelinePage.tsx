@@ -22,6 +22,8 @@ import { DateNavigator } from './DateNavigator'
 import { nextCalendarDate } from './date'
 import { TimelineItem } from './TimelineItem'
 import { PhotosSection } from './PhotosSection'
+import { PageNavigation } from '../PageNavigation'
+import { navigateToPage } from '../navigation'
 
 interface PanelState<T> {
   key: string
@@ -44,15 +46,6 @@ function errorMessage(error: unknown): string {
 
 function locationKey(location: TimelineLocation): string {
   return `${location.date}|${location.timezone}`
-}
-
-function navigateTo(location: TimelineLocation, date: string): void {
-  const params = new URLSearchParams({
-    date,
-    timezone: location.timezone,
-  })
-  window.history.pushState({}, '', `/timeline?${params.toString()}`)
-  window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
 export function TimelinePage() {
@@ -211,12 +204,12 @@ export function TimelinePage() {
           ? shiftCalendarDate(location.date, 1)
           : value
     if (date !== null && date !== location.date) {
-      navigateTo(location, date)
+      navigateToPage('/timeline', location, date)
     }
   }
 
   const goToToday = () => {
-    navigateTo(location, todayInTimezone(location.timezone))
+    navigateToPage('/timeline', location, todayInTimezone(location.timezone))
   }
 
   const retryTimeline = () => {
@@ -240,9 +233,12 @@ export function TimelinePage() {
             <h1>life-timeline</h1>
             <p className="page-description">記録された一日の流れと利用状況</p>
           </div>
-          <div className="date-context">
-            <span className="date-label">選択中のタイムゾーン</span>
-            <span className="timezone-label">{location.timezone}</span>
+          <div className="header-actions">
+            <PageNavigation location={location} currentPage="timeline" />
+            <div className="date-context">
+              <span className="date-label">選択中のタイムゾーン</span>
+              <span className="timezone-label">{location.timezone}</span>
+            </div>
           </div>
         </header>
 
@@ -310,6 +306,7 @@ export function TimelinePage() {
                     key={`${item.type}-${item.deviceId}-${item.id}`}
                     item={item}
                     timezone={timeline.timezone}
+                    date={timeline.date}
                   />
                 ))}
               </ol>
