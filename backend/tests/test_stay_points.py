@@ -115,7 +115,8 @@ def test_adjacent_candidates_merge_when_gap_and_center_are_within_limits() -> No
 def test_candidates_more_than_ten_minutes_apart_are_not_merged() -> None:
     offset_201m = math.degrees(201 / EARTH_RADIUS_M)
     offset_160m = math.degrees(160 / EARTH_RADIUS_M)
-    points = _stationary_points() + [
+    points = [
+        *_stationary_points(),
         _point(11, 26, longitude=offset_201m),
         _point(12, 31, longitude=offset_160m),
         _point(13, 36, longitude=offset_160m),
