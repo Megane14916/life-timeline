@@ -18,38 +18,51 @@ class LocationRegistrationWorker(
   override suspend fun doWork(): Result {
     val coordinator = dependencies.backgroundExecutionCoordinatorFactory(applicationContext)
     val lease = coordinator.acquire(LocationWorkPolicy.REGISTRATION_LEASE_KEY) ?: return Result.success()
+    var stage = "permission_check"
     try {
       val enabled = dependencies.locationCollectionEnabledProvider()
       val permissionChecker = dependencies.locationPermissionCheckerFactory(applicationContext)
       val access = permissionChecker.currentAccess(enabled)
       when (access) {
         LocationAccessState.DISABLED -> {
+          stage = "remove_registration"
           removeRegistrationBestEffort()
+          stage = "save_state"
           coordinator.recordSuccess(lease, "disabled")
         }
 
         LocationAccessState.FOREGROUND_PERMISSION_REQUIRED,
         LocationAccessState.BACKGROUND_PERMISSION_REQUIRED,
         -> {
+          stage = "remove_registration"
           removeRegistrationBestEffort()
+          stage = "save_state"
           coordinator.recordSuccess(lease, "permission_required")
         }
 
         LocationAccessState.LOCATION_SERVICES_OFF -> {
+          stage = "remove_registration"
           removeRegistrationBestEffort()
+          stage = "save_state"
           coordinator.recordSuccess(lease, "location_services_off")
         }
 
         LocationAccessState.APPROXIMATE,
         LocationAccessState.PRECISE,
         -> {
+          stage = "create_client"
           val registrationClient = dependencies.locationRegistrationClientFactory(applicationContext)
+          stage = "request_updates"
           registrationClient.register()
+          stage = "verify_permissions"
           val latestAccess = permissionChecker.currentAccess(dependencies.locationCollectionEnabledProvider())
           if (latestAccess == LocationAccessState.APPROXIMATE || latestAccess == LocationAccessState.PRECISE) {
+            stage = "save_state"
             coordinator.recordSuccess(lease, "registered")
           } else {
+            stage = "remove_registration"
             runCatching { registrationClient.unregister() }
+            stage = "save_state"
             coordinator.recordSuccess(lease, latestAccess.toResultCode())
           }
         }
@@ -61,8 +74,8 @@ class LocationRegistrationWorker(
       removeRegistrationBestEffort()
       coordinator.recordSuccess(lease, "permission_required")
       return Result.success()
-    } catch (_: Throwable) {
-      coordinator.recordFailure(lease, "retry", "location_registration")
+    } catch (error: Throwable) {
+      coordinator.recordFailure(lease, "retry", LocationRegistrationDiagnostics.errorKind(stage, error))
       return Result.retry()
     } finally {
       withContext(NonCancellable) { coordinator.release(lease) }

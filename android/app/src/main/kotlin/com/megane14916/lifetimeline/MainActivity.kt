@@ -37,6 +37,7 @@ import com.megane14916.lifetimeline.collector.LocationRequestController
 import com.megane14916.lifetimeline.collector.PhotoAccessChecker
 import com.megane14916.lifetimeline.collector.PhotoAccessState
 import com.megane14916.lifetimeline.collector.UsageAccessChecker
+import com.megane14916.lifetimeline.worker.LocationRegistrationDiagnostics
 
 class MainActivity : ComponentActivity() {
   private val viewModel: MainViewModel by viewModels { MainViewModel.Factory { createMainViewModel() } }
@@ -523,12 +524,12 @@ private fun MainUiState.locationSyncStatusToDisplay(): String =
   }
 
 private fun String.toLocationErrorLabel(): String =
-  when (this) {
-    "network" -> "ネットワーク"
-    "server" -> "PCサーバー"
-    "protocol" -> "同期データ形式"
-    "location_registration" -> "位置登録"
-    "budget" -> "実行上限"
-    "unexpected" -> "予期しないエラー"
-    else -> "同期処理"
-  }
+  LocationRegistrationDiagnostics.errorLabel(this)
+    ?: when (this) {
+      "network" -> "ネットワーク"
+      "server" -> "PCサーバー"
+      "protocol" -> "同期データ形式"
+      "budget" -> "実行上限"
+      "unexpected" -> "予期しないエラー"
+      else -> "同期処理"
+    }
