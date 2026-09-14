@@ -124,7 +124,7 @@ disable後に再度enableした場合は開始時刻を更新する。off期間�
 
 ### 3.2 取得方式とlifecycle
 
-- `FusedLocationProviderClient.requestLocationUpdates(LocationRequest, PendingIntent)`を使い、callbackをActivityやprocess lifecycleへ結び付けない。
+- `FusedLocationProviderClient.requestLocationUpdates(LocationRequest, PendingIntent)`を使い、callbackをActivityやprocess lifecycleへ結び付けない。Fused Locationが`LocationResult`をintent extrasへ追加できるよう、PendingIntentはAPI 31以降`FLAG_MUTABLE`とし、component/action/dataを明示して送信先を限定する。
 - `LocationUpdatesReceiver`は`LocationResult.extractResult(intent)`からbatchを取り出し、`goAsync()`の有限時間内でRoom transactionを完了する。重いnetwork同期は行わず、WorkManagerへ委譲する。
 - enable直後はunique one-time registration workをenqueueする。登録済みの同一PendingIntentは同じrequestへ更新されるため冪等である。
 - `BOOT_COMPLETED` / `MY_PACKAGE_REPLACED`では位置を直接取得せず、unique registration workだけをenqueueする。
