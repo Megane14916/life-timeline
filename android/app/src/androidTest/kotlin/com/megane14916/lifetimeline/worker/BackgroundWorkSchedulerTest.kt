@@ -47,6 +47,20 @@ class BackgroundWorkSchedulerTest {
     assertTrue(workSpec.input.keyValueMap.isEmpty())
   }
 
+  @Test
+  fun locationRegistrationIsUnconstrainedAndWatchdogUsesDocumentedCadence() {
+    val scheduler = scheduler()
+    val registration = scheduler.locationRegistrationWorkRequest().workSpec
+    val watchdog = scheduler.locationRegistrationWatchdogWorkRequest().workSpec
+
+    assertEquals(LocationRegistrationWorker::class.java.name, registration.workerClassName)
+    assertEquals(NetworkType.NOT_REQUIRED, registration.constraints.requiredNetworkType)
+    assertEquals(false, registration.constraints.requiresBatteryNotLow())
+    assertEquals(LocationRegistrationWorker::class.java.name, watchdog.workerClassName)
+    assertEquals(TimeUnit.HOURS.toMillis(12), watchdog.intervalDuration)
+    assertEquals(TimeUnit.HOURS.toMillis(1), watchdog.flexDuration)
+  }
+
   private fun scheduler(): BackgroundWorkScheduler =
     BackgroundWorkScheduler(
       WorkManager.getInstance(ApplicationProvider.getApplicationContext<Context>()),

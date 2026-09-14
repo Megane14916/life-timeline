@@ -1,6 +1,8 @@
 package com.megane14916.lifetimeline.data
 
 import android.content.Context
+import com.megane14916.lifetimeline.collector.LocationPermissionChecker
+import com.megane14916.lifetimeline.collector.LocationRegistrationClient
 import com.megane14916.lifetimeline.collector.PhotoAccessChecker
 import com.megane14916.lifetimeline.repository.BackgroundExecutionCoordinator
 import com.megane14916.lifetimeline.repository.CollectionCoordinator
@@ -33,4 +35,11 @@ data class WorkerDependencies(
   val photoSyncTrigger: () -> Unit = {},
   val pendingPhotoSyncableCountProvider: suspend () -> Int = { 0 },
   val pendingPhotoThumbnailCountProvider: suspend () -> Int = { 0 },
+  val locationPermissionCheckerFactory: (Context) -> LocationPermissionChecker = {
+    error("LocationPermissionChecker factory is not configured.")
+  },
+  val locationRegistrationClientFactory: (Context) -> LocationRegistrationClient = {
+    error("LocationRegistrationClient factory is not configured.")
+  },
+  val locationCollectionEnabledProvider: suspend () -> Boolean = { false },
 )

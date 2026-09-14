@@ -1,5 +1,8 @@
 package com.megane14916.lifetimeline
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -27,6 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.megane14916.lifetimeline.collector.LocationAccessState
+import com.megane14916.lifetimeline.collector.LocationPermissionChecker
+import com.megane14916.lifetimeline.collector.LocationRequestController
 import com.megane14916.lifetimeline.collector.PhotoAccessChecker
 import com.megane14916.lifetimeline.collector.PhotoAccessState
 import com.megane14916.lifetimeline.collector.UsageAccessChecker
@@ -34,13 +41,28 @@ import com.megane14916.lifetimeline.collector.UsageAccessChecker
 class MainActivity : ComponentActivity() {
   private val viewModel: MainViewModel by viewModels { MainViewModel.Factory { createMainViewModel() } }
   private val photoAccessChecker by lazy { PhotoAccessChecker.from(applicationContext) }
+  private val locationPermissionChecker by lazy { LocationPermissionChecker.from(applicationContext) }
   private lateinit var photoPermissionLauncher: ActivityResultLauncher<Array<String>>
+  private lateinit var foregroundLocationPermissionLauncher: ActivityResultLauncher<Array<String>>
+  private lateinit var backgroundLocationPermissionLauncher: ActivityResultLauncher<String>
+  private var showBackgroundLocationEducation by mutableStateOf(false)
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     photoPermissionLauncher =
       registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.refreshPhotoAccess()
+      }
+    foregroundLocationPermissionLauncher =
+      registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        viewModel.refreshLocationAccess()
+        if (locationPermissionChecker.hasForegroundPermission() && !locationPermissionChecker.hasBackgroundPermission()) {
+          showBackgroundLocationEducation = true
+        }
+      }
+    backgroundLocationPermissionLauncher =
+      registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        viewModel.refreshLocationAccess()
       }
     val scheduler = (application as LifeTimelineApplication).appContainer.backgroundWorkScheduler
     scheduler.photoCollectionWorkInfosLiveData().observe(this) { viewModel.refreshBackgroundState() }
@@ -50,6 +72,10 @@ class MainActivity : ComponentActivity() {
         val state by viewModel.uiState.collectAsStateWithLifecycle()
         MainScreen(
           state = state,
+          showBackgroundLocationEducation = showBackgroundLocationEducation,
+          backgroundPermissionOptionLabel = backgroundPermissionOptionLabel(),
+          onDismissBackgroundLocationEducation = { showBackgroundLocationEducation = false },
+          onContinueBackgroundLocationEducation = ::continueBackgroundLocationPermission,
           onOpenUsageAccessSettings = {
             startActivity(UsageAccessChecker.from(this).usageAccessSettingsIntent())
           },
@@ -65,6 +91,11 @@ class MainActivity : ComponentActivity() {
           onSaveEndpoint = viewModel::savePcBaseUrl,
           onCollectAndSync = viewModel::collectAndSync,
           onCollectPhotosNow = viewModel::collectPhotosNow,
+          onEnableLocationCollection = {
+            viewModel.enableLocationCollection(::advanceLocationPermissionFlow)
+          },
+          onDisableLocationCollection = viewModel::disableLocationCollection,
+          onRequestLocationPermission = ::advanceLocationPermissionFlow,
         )
       }
     }
@@ -74,6 +105,7 @@ class MainActivity : ComponentActivity() {
     super.onResume()
     viewModel.refreshUsageAccess()
     viewModel.refreshPhotoAccess()
+    viewModel.refreshLocationAccess()
     viewModel.refreshBackgroundState()
   }
 
@@ -94,8 +126,48 @@ class MainActivity : ComponentActivity() {
       pendingPhotoCount = { container.database.androidMediaItemDao().countPendingSync() },
       pendingPhotoThumbnailCount = { container.database.androidMediaItemDao().countPendingThumbnails() },
       localPhotoThumbnailBytes = { container.database.androidMediaItemDao().totalStoredThumbnailBytes() },
+      locationPermissionChecker = locationPermissionChecker,
+      locationRegistrationClient = LocationRequestController(appContext, locationPermissionChecker),
     )
   }
+
+  private fun advanceLocationPermissionFlow() {
+    when {
+      !locationPermissionChecker.hasForegroundPermission() -> {
+        foregroundLocationPermissionLauncher.launch(locationPermissionChecker.foregroundPermissions())
+      }
+
+      !locationPermissionChecker.hasBackgroundPermission() -> {
+        showBackgroundLocationEducation = true
+      }
+
+      else -> {
+        viewModel.refreshLocationAccess()
+      }
+    }
+  }
+
+  private fun continueBackgroundLocationPermission() {
+    showBackgroundLocationEducation = false
+    if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
+      backgroundLocationPermissionLauncher.launch(locationPermissionChecker.backgroundPermission())
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      startActivity(
+        Intent(
+          android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+          Uri.fromParts("package", packageName, null),
+        ),
+      )
+    }
+  }
+
+  @Suppress("NewApi")
+  private fun backgroundPermissionOptionLabel(): String =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      packageManager.getBackgroundPermissionOptionLabel().toString()
+    } else {
+      "常に許可"
+    }
 }
 
 @Composable
@@ -106,6 +178,10 @@ private fun LifeTimelineTheme(content: @Composable () -> Unit) {
 @Composable
 private fun MainScreen(
   state: MainUiState,
+  showBackgroundLocationEducation: Boolean,
+  backgroundPermissionOptionLabel: String,
+  onDismissBackgroundLocationEducation: () -> Unit,
+  onContinueBackgroundLocationEducation: () -> Unit,
   onOpenUsageAccessSettings: () -> Unit,
   onEnablePhotoCollection: () -> Unit,
   onDisablePhotoCollection: () -> Unit,
@@ -113,6 +189,9 @@ private fun MainScreen(
   onSaveEndpoint: (String) -> Unit,
   onCollectAndSync: () -> Unit,
   onCollectPhotosNow: () -> Unit,
+  onEnableLocationCollection: () -> Unit,
+  onDisableLocationCollection: () -> Unit,
+  onRequestLocationPermission: () -> Unit,
 ) {
   var endpoint by rememberSaveable(state.pcBaseUrl) { mutableStateOf(state.pcBaseUrl.orEmpty()) }
   val busy =
@@ -238,11 +317,64 @@ private fun MainScreen(
         Text(text = error, color = MaterialTheme.colorScheme.error)
       }
 
+      if (showBackgroundLocationEducation) {
+        AlertDialog(
+          onDismissRequest = onDismissBackgroundLocationEducation,
+          title = { Text("バックグラウンド位置情報") },
+          text = {
+            Text(
+              "画面を閉じている間も位置情報を記録するには、アプリの位置情報権限で「$backgroundPermissionOptionLabel」を選択してください。許可しない場合、バックグラウンド収集は行いません.",
+            )
+          },
+          confirmButton = {
+            Button(onClick = onContinueBackgroundLocationEducation) { Text("設定を続ける") }
+          },
+          dismissButton = {
+            Button(onClick = onDismissBackgroundLocationEducation) { Text("今はしない") }
+          },
+        )
+      }
+
       Button(
         onClick = onCollectAndSync,
         enabled = !busy && state.usageAccessGranted && endpoint.isNotBlank(),
       ) {
         Text(if (busy) "処理中..." else "収集して同期")
+      }
+
+      Text(text = "位置情報の収集", style = MaterialTheme.typography.titleMedium)
+      Text(
+        text = "位置情報は明示的に有効化した場合のみ、端末内へ保存します。いつでも無効化でき、過去のpending記録は保持されます。",
+        style = MaterialTheme.typography.bodyMedium,
+      )
+      Text("位置情報: ${state.locationAccessState.toDisplayText()}")
+      when {
+        !state.locationCollectionEnabled -> {
+          Button(onClick = onEnableLocationCollection, enabled = !busy) {
+            Text("位置情報収集を有効にする")
+          }
+        }
+
+        state.locationAccessState == LocationAccessState.FOREGROUND_PERMISSION_REQUIRED -> {
+          Button(onClick = onRequestLocationPermission, enabled = !busy) {
+            Text("位置情報へのアクセスを許可")
+          }
+        }
+
+        state.locationAccessState == LocationAccessState.BACKGROUND_PERMISSION_REQUIRED -> {
+          Button(onClick = onRequestLocationPermission, enabled = !busy) {
+            Text("バックグラウンド位置情報を設定")
+          }
+        }
+
+        state.locationAccessState == LocationAccessState.LOCATION_SERVICES_OFF -> {
+          Text("端末の位置情報サービスをオンにすると収集を再開します。")
+        }
+      }
+      if (state.locationCollectionEnabled) {
+        Button(onClick = onDisableLocationCollection, enabled = !busy) {
+          Text("位置情報収集を無効にする")
+        }
       }
     }
   }
@@ -268,6 +400,10 @@ private fun MainScreenPreview() {
   LifeTimelineTheme {
     MainScreen(
       state = MainUiState(usageAccessGranted = true, pcBaseUrl = "https://pc.example.ts.net/"),
+      showBackgroundLocationEducation = false,
+      backgroundPermissionOptionLabel = "常に許可",
+      onDismissBackgroundLocationEducation = {},
+      onContinueBackgroundLocationEducation = {},
       onOpenUsageAccessSettings = {},
       onEnablePhotoCollection = {},
       onDisablePhotoCollection = {},
@@ -275,6 +411,9 @@ private fun MainScreenPreview() {
       onSaveEndpoint = {},
       onCollectAndSync = {},
       onCollectPhotosNow = {},
+      onEnableLocationCollection = {},
+      onDisableLocationCollection = {},
+      onRequestLocationPermission = {},
     )
   }
 }
@@ -284,6 +423,16 @@ private fun PhotoAccessState.toDisplayText(): String =
     PhotoAccessState.FULL -> "有効（すべての写真）"
     PhotoAccessState.PARTIAL -> "制限付き（選択した写真のみ）"
     PhotoAccessState.DENIED -> "権限が必要"
+  }
+
+private fun LocationAccessState.toDisplayText(): String =
+  when (this) {
+    LocationAccessState.DISABLED -> "無効"
+    LocationAccessState.FOREGROUND_PERMISSION_REQUIRED -> "権限が必要"
+    LocationAccessState.BACKGROUND_PERMISSION_REQUIRED -> "バックグラウンド許可が必要"
+    LocationAccessState.LOCATION_SERVICES_OFF -> "端末設定でOFF"
+    LocationAccessState.APPROXIMATE -> "有効（概算）"
+    LocationAccessState.PRECISE -> "有効（正確）"
   }
 
 private fun MainUiState.photoSyncStatusToDisplay(): String =

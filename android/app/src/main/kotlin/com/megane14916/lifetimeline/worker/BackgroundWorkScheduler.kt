@@ -23,6 +23,7 @@ class BackgroundWorkScheduler(
   private val syncWorkerClass: Class<out ListenableWorker> = AppSessionSyncWorker::class.java,
   private val photoCollectionWorkerClass: Class<out ListenableWorker> = PhotoCollectionWorker::class.java,
   private val photoSyncWorkerClass: Class<out ListenableWorker> = PhotoSyncWorker::class.java,
+  private val locationRegistrationWorkerClass: Class<out ListenableWorker> = LocationRegistrationWorker::class.java,
 ) {
   /** Ensures the periodic collection and pending-session sync work both exist. */
   fun ensureScheduled() {
@@ -77,6 +78,28 @@ class BackgroundWorkScheduler(
     workManager.cancelUniqueWork(PhotoWorkPolicy.IMMEDIATE_COLLECTION_WORK_NAME)
   }
 
+  /** Enqueues one idempotent Location registration and maintains its periodic recovery watchdog. */
+  fun ensureLocationRegistrationScheduled() {
+    workManager.enqueueUniquePeriodicWork(
+      LocationWorkPolicy.WATCHDOG_WORK_NAME,
+      ExistingPeriodicWorkPolicy.UPDATE,
+      locationRegistrationWatchdogWorkRequest(),
+    )
+  }
+
+  fun enqueueLocationRegistration() {
+    workManager.enqueueUniqueWork(
+      LocationWorkPolicy.REGISTRATION_WORK_NAME,
+      ExistingWorkPolicy.KEEP,
+      locationRegistrationWorkRequest(),
+    )
+  }
+
+  fun cancelLocationRegistration() {
+    workManager.cancelUniqueWork(LocationWorkPolicy.REGISTRATION_WORK_NAME)
+    workManager.cancelUniqueWork(LocationWorkPolicy.WATCHDOG_WORK_NAME)
+  }
+
   /** Enqueues the photo-only uploader; its network and battery policy is independent. */
   fun enqueuePhotoSync() {
     workManager.enqueueUniqueWork(
@@ -102,6 +125,9 @@ class BackgroundWorkScheduler(
     workManager.getWorkInfosForUniqueWork(PhotoWorkPolicy.COLLECTION_WORK_NAME)
 
   fun photoSyncWorkInfos(): ListenableFuture<List<WorkInfo>> = workManager.getWorkInfosForUniqueWork(PhotoWorkPolicy.SYNC_WORK_NAME)
+
+  fun locationRegistrationWorkInfos(): ListenableFuture<List<WorkInfo>> =
+    workManager.getWorkInfosForUniqueWork(LocationWorkPolicy.REGISTRATION_WORK_NAME)
 
   fun photoCollectionWorkInfosLiveData(): LiveData<List<WorkInfo>> =
     workManager.getWorkInfosForUniqueWorkLiveData(PhotoWorkPolicy.COLLECTION_WORK_NAME)
@@ -179,6 +205,18 @@ class BackgroundWorkScheduler(
         BackoffPolicy.EXPONENTIAL,
         PhotoWorkPolicy.SYNC_BACKOFF_MINUTES,
         TimeUnit.MINUTES,
+      ).build()
+
+  internal fun locationRegistrationWorkRequest(): OneTimeWorkRequest = OneTimeWorkRequest.Builder(locationRegistrationWorkerClass).build()
+
+  internal fun locationRegistrationWatchdogWorkRequest(): PeriodicWorkRequest =
+    PeriodicWorkRequest
+      .Builder(
+        locationRegistrationWorkerClass,
+        LocationWorkPolicy.WATCHDOG_INTERVAL_HOURS,
+        TimeUnit.HOURS,
+        LocationWorkPolicy.WATCHDOG_FLEX_HOURS,
+        TimeUnit.HOURS,
       ).build()
 
   private fun photoCollectionConstraints(): Constraints =
