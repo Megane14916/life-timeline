@@ -9,6 +9,7 @@ import com.megane14916.lifetimeline.data.local.dao.AndroidAppSessionDao
 import com.megane14916.lifetimeline.data.local.dao.AndroidMediaItemDao
 import com.megane14916.lifetimeline.data.local.dao.BackgroundWorkStateDao
 import com.megane14916.lifetimeline.data.local.dao.CollectorStateDao
+import com.megane14916.lifetimeline.data.local.dao.LocationPointDao
 import com.megane14916.lifetimeline.data.local.dao.MediaCollectionStateDao
 import com.megane14916.lifetimeline.data.local.dao.OpenActivityDao
 
@@ -21,8 +22,9 @@ import com.megane14916.lifetimeline.data.local.dao.OpenActivityDao
     BackgroundWorkStateEntity::class,
     AndroidMediaItemEntity::class,
     MediaCollectionStateEntity::class,
+    LocationPointEntity::class,
   ],
-  version = 4,
+  version = 5,
   exportSchema = true,
 )
 abstract class LifeTimelineDatabase : RoomDatabase() {
@@ -40,11 +42,14 @@ abstract class LifeTimelineDatabase : RoomDatabase() {
 
   abstract fun mediaCollectionStateDao(): MediaCollectionStateDao
 
+  abstract fun locationPointDao(): LocationPointDao
+
   companion object {
     val PHOTO_INTEGRITY_CALLBACK =
       object : RoomDatabase.Callback() {
         override fun onCreate(db: SupportSQLiteDatabase) {
           PhotoIntegrityTriggers.install(db)
+          LocationPointIntegrityTriggers.install(db)
         }
       }
 
@@ -148,6 +153,49 @@ abstract class LifeTimelineDatabase : RoomDatabase() {
           db.execSQL(
             "UPDATE media_collection_state SET generation_cursor = 0, media_id_cursor = 0 WHERE generation_cursor IS NOT NULL",
           )
+        }
+      }
+
+    val MIGRATION_4_5 =
+      object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+          db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `android_location_points` (
+              `id` TEXT NOT NULL,
+              `source` TEXT NOT NULL,
+              `recorded_at_ms` INTEGER NOT NULL,
+              `latitude` REAL NOT NULL,
+              `longitude` REAL NOT NULL,
+              `accuracy_m` REAL,
+              `altitude_m` REAL,
+              `speed_mps` REAL,
+              `elapsed_realtime_nanos` INTEGER NOT NULL,
+              `source_fingerprint` TEXT NOT NULL,
+              `sync_status` TEXT NOT NULL,
+              `received_at_ms` INTEGER NOT NULL,
+              `synced_at_ms` INTEGER,
+              `last_error_kind` TEXT,
+              PRIMARY KEY(`id`),
+              CHECK (`source` = 'android_fused_location'),
+              CHECK (`recorded_at_ms` >= 0),
+              CHECK (`latitude` BETWEEN -90 AND 90),
+              CHECK (`longitude` BETWEEN -180 AND 180),
+              CHECK (`accuracy_m` IS NULL OR `accuracy_m` >= 0),
+              CHECK (`speed_mps` IS NULL OR `speed_mps` >= 0),
+              CHECK (`elapsed_realtime_nanos` >= 0),
+              CHECK (`received_at_ms` >= 0),
+              CHECK (`sync_status` IN ('pending', 'synced'))
+            )
+            """.trimIndent(),
+          )
+          db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_android_location_points_source_fingerprint` ON `android_location_points` (`source_fingerprint`)",
+          )
+          db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_android_location_points_sync_status_recorded_at_ms_id` ON `android_location_points` (`sync_status`, `recorded_at_ms`, `id`)",
+          )
+          LocationPointIntegrityTriggers.install(db)
         }
       }
   }

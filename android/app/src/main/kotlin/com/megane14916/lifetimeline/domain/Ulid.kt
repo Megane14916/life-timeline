@@ -13,11 +13,7 @@ fun generateUlid(
   require(nowMs in 0..MAX_ULID_TIMESTAMP) { "ULID timestamp must fit in 48 bits." }
 
   val result = CharArray(ULID_LENGTH)
-  var timestamp = nowMs
-  for (index in 9 downTo 0) {
-    result[index] = ULID_ALPHABET[(timestamp and 31L).toInt()]
-    timestamp = timestamp ushr 5
-  }
+  encodeTimestamp(nowMs, result)
 
   val randomBytes = ByteArray(10)
   random.nextBytes(randomBytes)
@@ -31,6 +27,39 @@ fun generateUlid(
     result[10 + symbolIndex] = ULID_ALPHABET[symbol]
   }
   return result.concatToString()
+}
+
+/** Builds a reproducible ULID from a timestamp and at least 80 bits of caller-derived entropy. */
+fun generateDeterministicUlid(
+  timestampMs: Long,
+  entropy: ByteArray,
+): String {
+  require(timestampMs in 0..MAX_ULID_TIMESTAMP) { "ULID timestamp must fit in 48 bits." }
+  require(entropy.size >= 10) { "Deterministic ULID entropy must contain at least 80 bits." }
+
+  val result = CharArray(ULID_LENGTH)
+  encodeTimestamp(timestampMs, result)
+  for (symbolIndex in 0 until 16) {
+    var symbol = 0
+    repeat(5) { bitOffset ->
+      val bitIndex = symbolIndex * 5 + bitOffset
+      val bit = (entropy[bitIndex / 8].toInt() ushr (7 - bitIndex % 8)) and 1
+      symbol = (symbol shl 1) or bit
+    }
+    result[10 + symbolIndex] = ULID_ALPHABET[symbol]
+  }
+  return result.concatToString()
+}
+
+private fun encodeTimestamp(
+  timestampMs: Long,
+  result: CharArray,
+) {
+  var timestamp = timestampMs
+  for (index in 9 downTo 0) {
+    result[index] = ULID_ALPHABET[(timestamp and 31L).toInt()]
+    timestamp = timestamp ushr 5
+  }
 }
 
 fun validateUlid(
