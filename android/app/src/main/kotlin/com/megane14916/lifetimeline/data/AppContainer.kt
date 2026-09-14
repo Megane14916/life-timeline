@@ -17,8 +17,11 @@ import com.megane14916.lifetimeline.collector.UsageEventMapper
 import com.megane14916.lifetimeline.collector.UsageEventsCollector
 import com.megane14916.lifetimeline.data.local.LifeTimelineDatabase
 import com.megane14916.lifetimeline.data.preferences.AppPreferences
+import com.megane14916.lifetimeline.data.remote.LocationSyncApiFactory
+import com.megane14916.lifetimeline.data.remote.LocationSyncDevice
 import com.megane14916.lifetimeline.data.remote.PhotoSyncApiFactory
 import com.megane14916.lifetimeline.data.remote.PhotoSyncDevice
+import com.megane14916.lifetimeline.data.remote.RetrofitLocationSyncUploader
 import com.megane14916.lifetimeline.data.remote.RetrofitPhotoSyncUploader
 import com.megane14916.lifetimeline.data.remote.SyncApiFactory
 import com.megane14916.lifetimeline.data.remote.SyncAppDto
@@ -30,6 +33,7 @@ import com.megane14916.lifetimeline.repository.CollectionRepository
 import com.megane14916.lifetimeline.repository.LocalDataRepository
 import com.megane14916.lifetimeline.repository.LocalThumbnailStore
 import com.megane14916.lifetimeline.repository.LocationCollectionRepository
+import com.megane14916.lifetimeline.repository.LocationSyncRepository
 import com.megane14916.lifetimeline.repository.LocationUpdateProcessor
 import com.megane14916.lifetimeline.repository.PhotoCollectionRepository
 import com.megane14916.lifetimeline.repository.PhotoSyncRepository
@@ -71,6 +75,11 @@ interface AppContainer {
     context: Context,
     endpoint: String,
   ): PhotoSyncRepository
+
+  suspend fun createLocationSyncRepository(
+    context: Context,
+    endpoint: String,
+  ): LocationSyncRepository
 }
 
 class DefaultAppContainer(
@@ -148,6 +157,7 @@ class DefaultAppContainer(
         LocationRequestController(locationContext, LocationPermissionChecker.from(locationContext))
       },
       locationCollectionEnabledProvider = { preferences.settings.first().locationCollectionEnabled },
+      locationSyncRepositoryFactory = ::createLocationSyncRepository,
     )
   }
   override val workerFactory: LifeTimelineWorkerFactory by lazy {
@@ -225,6 +235,27 @@ class DefaultAppContainer(
         ),
       device =
         PhotoSyncDevice(
+          id = preferences.ensureDeviceId(),
+          name = deviceName(context),
+          platform = "android",
+        ),
+    )
+
+  override suspend fun createLocationSyncRepository(
+    context: Context,
+    endpoint: String,
+  ): LocationSyncRepository =
+    LocationSyncRepository(
+      collectionRepository = locationCollectionRepository,
+      uploader =
+        RetrofitLocationSyncUploader(
+          LocationSyncApiFactory.create(
+            baseUrl = endpoint,
+            retrofitBuilder = Retrofit.Builder().client(httpClient),
+          ),
+        ),
+      device =
+        LocationSyncDevice(
           id = preferences.ensureDeviceId(),
           name = deviceName(context),
           platform = "android",

@@ -37,7 +37,10 @@ class LocationUpdatesReceiver : BroadcastReceiver() {
     CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
       try {
         withTimeout(RECEIVER_TIMEOUT_MS) {
-          appContainer.locationUpdateProcessor.persistBatch(fixes)
+          val result = appContainer.locationUpdateProcessor.persistBatch(fixes)
+          if (result != null && result.insertedCount > 0) {
+            appContainer.backgroundWorkScheduler.enqueueLocationSync()
+          }
         }
       } catch (_: Throwable) {
         // No coordinates or provider payload are logged. A later Fused batch can safely retry these fixes.

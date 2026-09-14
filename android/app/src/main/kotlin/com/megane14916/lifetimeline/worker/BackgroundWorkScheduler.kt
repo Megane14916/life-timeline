@@ -24,6 +24,7 @@ class BackgroundWorkScheduler(
   private val photoCollectionWorkerClass: Class<out ListenableWorker> = PhotoCollectionWorker::class.java,
   private val photoSyncWorkerClass: Class<out ListenableWorker> = PhotoSyncWorker::class.java,
   private val locationRegistrationWorkerClass: Class<out ListenableWorker> = LocationRegistrationWorker::class.java,
+  private val locationSyncWorkerClass: Class<out ListenableWorker> = LocationSyncWorker::class.java,
 ) {
   /** Ensures the periodic collection and pending-session sync work both exist. */
   fun ensureScheduled() {
@@ -109,9 +110,19 @@ class BackgroundWorkScheduler(
     )
   }
 
+  /** Enqueues Location JSON sync independently from AppSession and Photo work. */
+  fun enqueueLocationSync() {
+    workManager.enqueueUniqueWork(
+      LocationWorkPolicy.SYNC_WORK_NAME,
+      ExistingWorkPolicy.KEEP,
+      locationSyncWorkRequest(),
+    )
+  }
+
   fun enqueueAllSync() {
     enqueueSync()
     enqueuePhotoSync()
+    enqueueLocationSync()
   }
 
   /** Returns the WorkManager records for the unique periodic collection work. */
@@ -129,10 +140,18 @@ class BackgroundWorkScheduler(
   fun locationRegistrationWorkInfos(): ListenableFuture<List<WorkInfo>> =
     workManager.getWorkInfosForUniqueWork(LocationWorkPolicy.REGISTRATION_WORK_NAME)
 
+  fun locationSyncWorkInfos(): ListenableFuture<List<WorkInfo>> = workManager.getWorkInfosForUniqueWork(LocationWorkPolicy.SYNC_WORK_NAME)
+
   fun photoCollectionWorkInfosLiveData(): LiveData<List<WorkInfo>> =
     workManager.getWorkInfosForUniqueWorkLiveData(PhotoWorkPolicy.COLLECTION_WORK_NAME)
 
   fun photoSyncWorkInfosLiveData(): LiveData<List<WorkInfo>> = workManager.getWorkInfosForUniqueWorkLiveData(PhotoWorkPolicy.SYNC_WORK_NAME)
+
+  fun locationRegistrationWorkInfosLiveData(): LiveData<List<WorkInfo>> =
+    workManager.getWorkInfosForUniqueWorkLiveData(LocationWorkPolicy.REGISTRATION_WORK_NAME)
+
+  fun locationSyncWorkInfosLiveData(): LiveData<List<WorkInfo>> =
+    workManager.getWorkInfosForUniqueWorkLiveData(LocationWorkPolicy.SYNC_WORK_NAME)
 
   /** Reads the current periodic collection record without duplicating schedule state in Room. */
   suspend fun currentCollectionWorkInfo(): WorkInfo? = currentWorkInfo(collectionWorkInfos())
@@ -143,6 +162,10 @@ class BackgroundWorkScheduler(
   suspend fun currentPhotoCollectionWorkInfo(): WorkInfo? = currentWorkInfo(photoCollectionWorkInfos())
 
   suspend fun currentPhotoSyncWorkInfo(): WorkInfo? = currentWorkInfo(photoSyncWorkInfos())
+
+  suspend fun currentLocationRegistrationWorkInfo(): WorkInfo? = currentWorkInfo(locationRegistrationWorkInfos())
+
+  suspend fun currentLocationSyncWorkInfo(): WorkInfo? = currentWorkInfo(locationSyncWorkInfos())
 
   private suspend fun currentWorkInfo(future: ListenableFuture<List<WorkInfo>>): WorkInfo? =
     withContext(Dispatchers.IO) {
@@ -208,6 +231,21 @@ class BackgroundWorkScheduler(
       ).build()
 
   internal fun locationRegistrationWorkRequest(): OneTimeWorkRequest = OneTimeWorkRequest.Builder(locationRegistrationWorkerClass).build()
+
+  internal fun locationSyncWorkRequest(): OneTimeWorkRequest =
+    OneTimeWorkRequest
+      .Builder(locationSyncWorkerClass)
+      .setConstraints(
+        Constraints
+          .Builder()
+          .setRequiredNetworkType(NetworkType.CONNECTED)
+          .setRequiresBatteryNotLow(true)
+          .build(),
+      ).setBackoffCriteria(
+        BackoffPolicy.EXPONENTIAL,
+        LocationWorkPolicy.SYNC_BACKOFF_MINUTES,
+        TimeUnit.MINUTES,
+      ).build()
 
   internal fun locationRegistrationWatchdogWorkRequest(): PeriodicWorkRequest =
     PeriodicWorkRequest
