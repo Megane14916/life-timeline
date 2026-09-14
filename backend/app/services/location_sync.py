@@ -18,6 +18,7 @@ from app.repositories import (
     RepositoryError,
 )
 from app.schemas.location_sync import LocationSyncRequest, LocationSyncResponse
+from app.services.place_visits import rebuild_place_visits_for_points
 
 
 def _is_sqlite_busy(error: OperationalError) -> bool:
@@ -63,7 +64,8 @@ def _save_batch(session: Session, request: LocationSyncRequest, received_at_ms: 
         )
         # Acquire SQLite's writer lock before checking replay conflicts.
         session.flush()
-        LocationPointRepository(session).save_many(_records(request, received_at_ms))
+        points = LocationPointRepository(session).save_many(_records(request, received_at_ms))
+        rebuild_place_visits_for_points(session, points)
 
 
 def sync_locations(
