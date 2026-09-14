@@ -527,6 +527,7 @@ private fun String.toLocationErrorLabel(): String =
     "network" -> "ネットワーク"
     "server" -> "PCサーバー"
     "protocol" -> "同期データ形式"
+    "location_registration" -> "位置登録"
     "budget" -> "実行上限"
     "unexpected" -> "予期しないエラー"
     else -> "同期処理"
