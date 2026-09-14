@@ -27,8 +27,10 @@ import com.megane14916.lifetimeline.repository.CollectionCoordinator
 import com.megane14916.lifetimeline.repository.CollectionRepository
 import com.megane14916.lifetimeline.repository.LocalDataRepository
 import com.megane14916.lifetimeline.repository.LocalThumbnailStore
+import com.megane14916.lifetimeline.repository.LocationCollectionRepository
 import com.megane14916.lifetimeline.repository.PhotoCollectionRepository
 import com.megane14916.lifetimeline.repository.PhotoSyncRepository
+import com.megane14916.lifetimeline.repository.RoomLocationPointStore
 import com.megane14916.lifetimeline.repository.SyncRepository
 import com.megane14916.lifetimeline.worker.BackgroundWorkScheduler
 import com.megane14916.lifetimeline.worker.LifeTimelineWorkerFactory
@@ -52,6 +54,7 @@ interface AppContainer {
   val backgroundWorkScheduler: BackgroundWorkScheduler
   val backgroundExecutionCoordinator: BackgroundExecutionCoordinator
   val photoCollectionRepository: PhotoCollectionRepository
+  val locationCollectionRepository: LocationCollectionRepository
 
   fun createCollectionCoordinator(context: Context): CollectionCoordinator
 
@@ -91,6 +94,7 @@ class DefaultAppContainer(
         LifeTimelineDatabase.MIGRATION_1_2,
         LifeTimelineDatabase.MIGRATION_2_3,
         LifeTimelineDatabase.MIGRATION_3_4,
+        LifeTimelineDatabase.MIGRATION_4_5,
       ).addCallback(LifeTimelineDatabase.PHOTO_INTEGRITY_CALLBACK)
       .build()
   }
@@ -106,6 +110,9 @@ class DefaultAppContainer(
       thumbnailGenerator = PhotoThumbnailGenerator(context),
       thumbnailStore = LocalThumbnailStore(java.io.File(context.filesDir, PHOTO_THUMBNAIL_DIRECTORY)),
     )
+  }
+  override val locationCollectionRepository: LocationCollectionRepository by lazy {
+    LocationCollectionRepository(RoomLocationPointStore(database))
   }
   override val workerDependencies: WorkerDependencies by lazy {
     WorkerDependencies(

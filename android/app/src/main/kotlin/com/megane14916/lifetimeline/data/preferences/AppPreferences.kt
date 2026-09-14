@@ -24,6 +24,8 @@ data class AppSettings(
   val lastSyncAtMs: Long?,
   val photoCollectionEnabled: Boolean = false,
   val photoCollectionStartedAtMs: Long? = null,
+  val locationCollectionEnabled: Boolean = false,
+  val locationCollectionStartedAtMs: Long? = null,
 )
 
 private val Context.lifeTimelineDataStore: DataStore<Preferences> by preferencesDataStore(
@@ -42,6 +44,8 @@ class AppPreferences private constructor(
         lastSyncAtMs = preferences[LAST_SYNC_AT_KEY],
         photoCollectionEnabled = preferences[PHOTO_COLLECTION_ENABLED_KEY] ?: false,
         photoCollectionStartedAtMs = preferences[PHOTO_COLLECTION_STARTED_AT_KEY],
+        locationCollectionEnabled = preferences[LOCATION_COLLECTION_ENABLED_KEY] ?: false,
+        locationCollectionStartedAtMs = preferences[LOCATION_COLLECTION_STARTED_AT_KEY],
       )
     }
 
@@ -92,6 +96,23 @@ class AppPreferences private constructor(
     dataStore.edit { preferences -> preferences[PHOTO_COLLECTION_ENABLED_KEY] = false }
   }
 
+  /** Records explicit user opt-in before location permission requests begin. */
+  suspend fun enableLocationCollection(startedAtMs: Long) {
+    require(startedAtMs >= 0) { "Location collection timestamp must be non-negative." }
+    dataStore.edit { preferences ->
+      val wasEnabled = preferences[LOCATION_COLLECTION_ENABLED_KEY] == true
+      preferences[LOCATION_COLLECTION_ENABLED_KEY] = true
+      if (!wasEnabled || preferences[LOCATION_COLLECTION_STARTED_AT_KEY] == null) {
+        preferences[LOCATION_COLLECTION_STARTED_AT_KEY] = startedAtMs
+      }
+    }
+  }
+
+  /** Stops future location collection without deleting locally pending points. */
+  suspend fun disableLocationCollection() {
+    dataStore.edit { preferences -> preferences[LOCATION_COLLECTION_ENABLED_KEY] = false }
+  }
+
   companion object {
     private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
     private val PC_BASE_URL_KEY = stringPreferencesKey("pc_base_url")
@@ -99,6 +120,8 @@ class AppPreferences private constructor(
     private val LAST_SYNC_AT_KEY = longPreferencesKey("last_sync_at_ms")
     private val PHOTO_COLLECTION_ENABLED_KEY = booleanPreferencesKey("photo_collection_enabled")
     private val PHOTO_COLLECTION_STARTED_AT_KEY = longPreferencesKey("photo_collection_started_at_ms")
+    private val LOCATION_COLLECTION_ENABLED_KEY = booleanPreferencesKey("location_collection_enabled")
+    private val LOCATION_COLLECTION_STARTED_AT_KEY = longPreferencesKey("location_collection_started_at_ms")
 
     fun create(context: Context): AppPreferences = AppPreferences(context.lifeTimelineDataStore)
 
