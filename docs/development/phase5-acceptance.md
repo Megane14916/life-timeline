@@ -33,7 +33,7 @@ P5-10はAndroid実機での通常系受け入れであり、GitHub Actionsやこ
 
 ### 3.1 PCの専用試験環境
 
-Phase 3と同じ隔離方法を使う。詳細な依存関係導入、health確認、Frontend起動、Tailscale Serve設定は[Phase 3受け入れ記録 §3](phase3-acceptance.md#3-専用環境の準備)を参照する。ここでは特に、データパスをP5専用の新しい名前にして、通常利用DBを指定しないこと。
+Phase 3と同じ隔離方法を使う。詳細な依存関係導入、health確認、Frontend起動、Tailscale Serve設定は[Phase 3受け入れ記録](phase3-acceptance.md)を参照する。ここでは特に、データパスをP5専用の新しい名前にして、通常利用DBを指定しないこと。
 
 Backend用PowerShellで、repository rootから実行する。`<unique>`は一意な文字列に置き換え、実際に作ったパスはIssue / PRやこの記録へ貼り付けない。
 
@@ -65,3 +65,86 @@ adb install -r android\app\build\outputs\apk\debug\app-debug.apk
 6. Androidの端末設定でも位置情報サービスがONであることを確認する。アプリに戻り、位置情報状態がpermission不足やサービスOFFではないこと、登録状態が成功相当であることを確認する。
 7. 位置収集を有効にする前から存在する履歴を変更・消去しない。テスト用PC DBが空の専用DBであることを確認する。
 
+## 4. 通常系の実機手順
+
+テストは位置履歴をPCの専用DBへ同期するため、実際の位置がMapに表示される。自宅・職場などを含むルートを避けるか、検証用端末・Androidユーザーを使い、位置収集を有効にすること自体に同意できる範囲で実施する。
+
+1. PCのBackend、Frontend、Tailscale Serveが起動し、専用DBのhealthが正常であることを確認する。Mapの背景地図を有効にする操作はしない。
+2. Androidアプリで、位置収集が有効、正確なforeground位置権限とbackground位置権限が許可済み、PC endpointが設定済みであることを確認する。必要なら「登録状態を確認」を押す。
+3. 画面OFFを含む移動と、動かずに15分以上過ごす時間を同じテスト日に含める。滞在の前後に無理のない移動を挟む。一定周期の点取得やrouteの完全性は要求しない。
+4. PCを停止する。簡易な停止試験では、Backendのuvicornを実行しているPowerShellで`Ctrl+C`を押す。PC自体をシャットダウンする場合も、同じ専用データディレクトリを使って後で起動する。Frontend / Tailscale Serveが残っていてもBackend停止中は同期先へ届かない。
+5. PC停止中にscreen offを含む移動と15分以上の滞在を行う。端末の電池を安全に保ち、不要に長時間位置収集を続けない。
+6. 端末を起こしてアプリを開き、「位置情報の最終受信」と「位置情報pending」を確認する。値や時刻を撮影・転記せず、「screen off中の受信を確認できたか」「pendingが保持されたか」だけを記録する。Androidのbackground配信は遅延・batch化し得るため、決まった分数内に届くことを合格条件にしない。
+7. Backendを同じ専用データディレクトリで再起動し、healthとTailscale経路を確認する。Androidではまず自動同期の状態を観察する。一定時間後もpendingが残る場合に限り、アプリを開いてから「未同期の位置情報を送信」を一度押してよい。自動復旧か手動操作後の復旧かを区別して記録する。
+8. pendingが解消したら、PCのFrontendでテスト日と端末のtimezoneに対応する日次TimelineとMapを確認する。Mapではroute / visit layerを表示し、背景tileはOFFのままにする。screen off中の複数pointによるrouteと、15分以上の滞在に対応するPlaceVisitが少なくとも1つ表示されることを確認する。
+9. 同じ日付のTimelineにPlaceVisitが表示されること、通常の再表示・reloadでpoint / visit / timeline itemが増殖して見えないことを確認する。実機UIにはACK済みbatchを強制再送する機能がないため、既に同期済みの座標をDB操作で再送しない。厳密な同一payload再送の冪等性は合成データによる自動テストで確認する。
+10. 確認後、アプリの「位置情報収集を無効にする」を押す。無効化しても端末内pendingやPC履歴は削除されない。pendingが残った状態でテストを終える場合はそのまま保持し、アプリデータ消去で解決しない。
+
+テストをlocal midnightを跨がずに行うと、日付境界の切り分けが簡単になる。跨いだ場合はroute / visitが記録時刻とtimezoneに対応する日へ表示されることを確認するが、実際の日付や時刻の列はここへ記録しない。
+
+### 4.1 結果の読み方
+
+- `PASS`: その項目を画面上で確認した。
+- `FAIL`: 前提を満たして実施したが、期待する状態にならなかった。個人位置情報を含まない症状カテゴリだけを記録する。
+- `BLOCKED`: permission、端末設定、ネットワークなどの前提を満たせず実施できなかった。
+- `NOT TESTED`: まだ試していない。未実施をPASSへ変えない。
+- 画面OFF後にpointの到着が遅れた場合、配信間隔が固定でないことだけからFAILと断定しない。一方、確認を終えても収集が確認できなければ未達として記録し、追加で常時追跡を続けない。
+- PlaceVisitが表示されない場合も、訪問先の詳細や座標を記録しない。permission精度、pending同期完了、Map / Timelineの日付とtimezone、tile OFFを確認し、再現を安全に説明できる場合は別Issueで追跡する。
+
+## 5. 任意の拡張実機シナリオ
+
+通常系受け入れの完了条件には含めない。試す場合も専用端末・専用PC DBを使い、意図的な過放電、個人DBの破壊、長時間の無監視収集はしない。
+
+- approximate locationでの表示品質とPlaceVisit非生成の挙動。
+- permission取消 / auto-reset、位置サービスOFFからの回復。
+- 端末再起動、app update、process kill、force-stop後のregistration。
+- Doze、OEM battery optimization、24時間 / 7日運転。
+- Wi-Fi / mobile / Tailscale切替、PC長時間停止、200件超backlog。
+- 地下、屋内、高層階、高速移動、timezone / DST / 日付境界。
+- battery、pending解消時間、accuracy分布などのprivacy-safeなaggregate計測。
+
+拡張項目は実施したものだけを記録し、未実施は`NOT TESTED`とする。座標を含むスクリーンショット・ログ、端末識別子、hostname、DBやbackupは添付しない。
+
+## 6. 実施結果
+
+この表は実機操作後に利用者が更新する。現在のcheckoutでは実施していないため、結果欄はすべて未実施のままにしている。
+
+| 項目 | 結果 | 記録してよい補足 |
+| --- | --- | --- |
+| 正確なforeground + background権限と位置収集opt-in | NOT TESTED | permission導線が完了したかだけ |
+| screen off中に複数pointを端末で受信 | NOT TESTED | はい / いいえ。時刻・座標は不可 |
+| PC停止中の端末pending保持 | NOT TESTED | 保持されたかだけ |
+| PC復旧後の同期とpending解消 | NOT TESTED | 自動 / 手動 / 未復旧の区別 |
+| Mapの日次route表示 | NOT TESTED | 表示あり / なし |
+| PlaceVisitが1件以上表示 | NOT TESTED | 表示あり / なし |
+| Timelineに同じPlaceVisitが表示 | NOT TESTED | 表示あり / なし |
+| 通常の再表示後に明らかな重複がない | NOT TESTED | はい / いいえ。画面画像は不可 |
+| online basemap / tileがOFF | NOT TESTED | OFF確認のみ |
+| 実機での厳密な同一batch再送 | NOT TESTED | UIから実行しない。冪等性はCIで確認 |
+
+実施時に追記してよい環境情報は、Android OS major version、アプリversionまたはcommit短縮SHA、screen off / PC停止 / 移動 / 15分滞在を行ったかだけとする。実施日を記録する場合は年月までにし、位置履歴の時刻を残さない。
+
+```text
+Android OS major version: 未記録
+App version / commit: 未記録
+screen off: NOT TESTED
+PC停止: NOT TESTED
+移動: NOT TESTED
+15分以上の滞在: NOT TESTED
+実施年月（任意）: 未記録
+実機操作担当: 利用者
+```
+
+### 6.1 後片付けと失敗時
+
+- テスト終了後、位置収集をOFFにし、Backend / Frontendを停止する。Backendの専用DBを再起動する場合はデータディレクトリを取り違えない。
+- 専用DBを消去する必要がある場合、本手順は自動削除を行わない。関連プロセス停止後に、利用者が実際の専用絶対パスと中身を確認し、他のデータが含まれないと確かめた場合だけ、手動で後片付けする。
+- 失敗時は、permission未完了、OS配信なし、pending保持不可、同期不可、Map / Timeline表示なし、visitなし、tile設定など、症状カテゴリだけを記録する。正確な場所・時刻やraw logがなければ原因を絞れない場合でも、それらを共有せず、privacy-safeな再現条件へ置き換える。
+- backend / Androidのログは位置情報や識別情報を含む可能性がある。Issue / PRへ貼らず、必要な場合は値を一切含めずに再現できる形を開発者と相談する。
+
+## 7. 参照
+
+- [P5-10 Issue #103](https://github.com/Megane14916/life-timeline/issues/103)
+- [Phase 5詳細計画 §12 / P5-10](../detailed_plan/phase5-location.md)
+- [Phase 3受け入れ記録](phase3-acceptance.md)
+- [Phase 2 Tailscale Serve手順](phase2-tailscale.md)
