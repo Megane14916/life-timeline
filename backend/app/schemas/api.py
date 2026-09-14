@@ -123,3 +123,34 @@ class StatisticsResponse(ApiModel):
     range_end: str = Field(alias="rangeEnd")
     totals: StatisticsTotals
     items: list[StatisticsAppItem]
+
+
+class MapRoutePoint(ApiModel):
+    recorded_at: str = Field(alias="recordedAt")
+    latitude: float
+    longitude: float
+    accuracy_m: float = Field(alias="accuracyM")
+
+
+class MapRoute(ApiModel):
+    device_id: str = Field(alias="deviceId")
+    device_name: str = Field(alias="deviceName")
+    started_at: str = Field(alias="startedAt")
+    ended_at: str = Field(alias="endedAt")
+    point_count: int = Field(alias="pointCount")
+    points: list[MapRoutePoint]
+
+
+class MapPhotoItem(PhotoTimelineItem):
+    latitude: float
+    longitude: float
+
+
+class MapResponse(ApiModel):
+    date: str
+    timezone: str
+    range_start: str = Field(alias="rangeStart")
+    range_end: str = Field(alias="rangeEnd")
+    routes: list[MapRoute]
+    place_visits: list[PlaceVisitTimelineItem] = Field(alias="placeVisits")
+    photos: list[MapPhotoItem]
