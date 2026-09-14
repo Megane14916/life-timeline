@@ -1,7 +1,11 @@
 package com.megane14916.lifetimeline.worker
 
 import android.content.Context
+import android.content.Intent
+import android.location.Location
+import android.os.Build
 import android.util.Log
+import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Constraints
@@ -13,7 +17,24 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestDriver
 import androidx.work.testing.WorkManagerTestInitHelper
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.megane14916.lifetimeline.collector.FusedLocationUpdatesAdapter
+import com.megane14916.lifetimeline.collector.LocationPermissionChecker
+import com.megane14916.lifetimeline.collector.LocationPermissionStateProvider
+import com.megane14916.lifetimeline.collector.LocationRequestController
+import com.megane14916.lifetimeline.collector.locationPendingIntent
+import com.megane14916.lifetimeline.collector.locationUpdatesReceiverIntent
+import com.megane14916.lifetimeline.data.local.LifeTimelineDatabase
+import com.megane14916.lifetimeline.data.preferences.AppSettings
+import com.megane14916.lifetimeline.location.handleLocationUpdateIntent
+import com.megane14916.lifetimeline.repository.LocationCollectionRepository
+import com.megane14916.lifetimeline.repository.LocationUpdateProcessor
+import com.megane14916.lifetimeline.repository.RoomLocationPointStore
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
@@ -178,6 +199,132 @@ class BackgroundWorkManagerIntegrationTest {
   }
 
   @Test
+  fun fakeFusedBatchFlowsThroughReceiverIntoRoomAndUniqueLocationSyncWork() =
+    runBlocking {
+      val context = ApplicationProvider.getApplicationContext<Context>()
+      val adapter = RecordingFusedLocationUpdatesAdapter()
+      val permissionChecker = grantedLocationPermissionChecker()
+      val controller = LocationRequestController(context, permissionChecker, adapter)
+
+      controller.register()
+      controller.register()
+
+      assertEquals(2, adapter.requests.size)
+      assertEquals(adapter.pendingIntents[0], adapter.pendingIntents[1])
+      assertEquals(0, adapter.removedPendingIntents.size)
+      val receiverIntent = locationUpdatesReceiverIntent(context)
+      assertEquals(locationPendingIntent(context), adapter.pendingIntents[0])
+      assertEquals(
+        "com.megane14916.lifetimeline.location.LocationUpdatesReceiver",
+        receiverIntent.component?.className,
+      )
+      assertEquals("${context.packageName}.LOCATION_UPDATES", receiverIntent.action)
+      assertEquals("lifetimeline://${context.packageName}/location-updates/v1", receiverIntent.data.toString())
+
+      controller.unregister()
+      assertEquals(listOf(adapter.pendingIntents[0]), adapter.removedPendingIntents)
+
+      val startedAtMs = 1_800_000_000_000L
+      val syntheticLocation =
+        Location("synthetic-fused")
+          .apply {
+            time = startedAtMs + 5_000
+            latitude = 35.0
+            longitude = 139.0
+            accuracy = 12.0f
+            elapsedRealtimeNanos = 123_456_789L
+          }
+      val receivedIntent =
+        receiverIntent.putExtra(
+          EXTRA_LOCATION_RESULT,
+          LocationResult.create(listOf(syntheticLocation)),
+        )
+      assertTrue(LocationResult.hasResult(receivedIntent))
+      assertNotNull(LocationResult.extractResult(receivedIntent))
+
+      val database =
+        Room
+          .inMemoryDatabaseBuilder(context, LifeTimelineDatabase::class.java)
+          .allowMainThreadQueries()
+          .addCallback(LifeTimelineDatabase.PHOTO_INTEGRITY_CALLBACK)
+          .build()
+      try {
+        val processor =
+          LocationUpdateProcessor(
+            settingsProvider = {
+              AppSettings(
+                deviceId = DEVICE_ID,
+                pcBaseUrl = null,
+                lastCollectionAtMs = null,
+                lastSyncAtMs = null,
+                locationCollectionEnabled = true,
+                locationCollectionStartedAtMs = startedAtMs,
+              )
+            },
+            permissionChecker = permissionChecker,
+            repository = LocationCollectionRepository(RoomLocationPointStore(database)),
+            deviceIdProvider = { DEVICE_ID },
+            nowMs = { startedAtMs + 10_000 },
+          )
+        val scheduler = BackgroundWorkScheduler(workManager)
+
+        assertEquals(
+          0,
+          handleLocationUpdateIntent(
+            packageName = context.packageName,
+            intent = Intent(receivedIntent).setAction("unexpected-action"),
+            processor = processor,
+            enqueueLocationSync = scheduler::enqueueLocationSync,
+          ),
+        )
+        assertEquals(0, database.locationPointDao().countPending())
+
+        assertEquals(
+          1,
+          handleLocationUpdateIntent(
+            packageName = context.packageName,
+            intent = receivedIntent,
+            processor = processor,
+            enqueueLocationSync = scheduler::enqueueLocationSync,
+          ),
+        )
+        val stored = database.locationPointDao().getPendingBatch(10)
+        assertEquals(1, stored.size)
+        assertEquals(startedAtMs + 5_000, stored.single().recordedAtMs)
+        assertEquals(1, scheduler.locationSyncWorkInfos().get().size)
+        assertEquals(0, scheduler.syncWorkInfos().get().size)
+        assertEquals(0, scheduler.photoSyncWorkInfos().get().size)
+
+        val locationSyncWorkId =
+          scheduler
+            .locationSyncWorkInfos()
+            .get()
+            .single()
+            .id
+        assertEquals(
+          0,
+          handleLocationUpdateIntent(
+            packageName = context.packageName,
+            intent = receivedIntent,
+            processor = processor,
+            enqueueLocationSync = scheduler::enqueueLocationSync,
+          ),
+        )
+        assertEquals(
+          locationSyncWorkId,
+          scheduler
+            .locationSyncWorkInfos()
+            .get()
+            .single()
+            .id,
+        )
+        assertEquals(1, database.locationPointDao().countPending())
+      } finally {
+        database.close()
+      }
+    }
+
+  @Test
   fun immediatePhotoScanQueuesFollowUpWithoutReplacingThePeriodicPhotoSchedule() {
     val scheduler = scheduler()
     scheduler.ensurePhotoCollectionScheduled()
@@ -206,6 +353,13 @@ class BackgroundWorkManagerIntegrationTest {
 
   private fun scheduler(): BackgroundWorkScheduler = BackgroundWorkScheduler(workManager)
 
+  private fun grantedLocationPermissionChecker() =
+    LocationPermissionChecker(
+      apiLevel = Build.VERSION.SDK_INT,
+      permissionStateProvider = LocationPermissionStateProvider { true },
+      locationServicesEnabledProvider = { true },
+    )
+
   private fun logWorkInfo(
     label: String,
     info: WorkInfo?,
@@ -227,8 +381,28 @@ class BackgroundWorkManagerIntegrationTest {
     override fun doWork(): Result = Result.retry()
   }
 
+  private class RecordingFusedLocationUpdatesAdapter : FusedLocationUpdatesAdapter {
+    val requests = mutableListOf<LocationRequest>()
+    val pendingIntents = mutableListOf<android.app.PendingIntent>()
+    val removedPendingIntents = mutableListOf<android.app.PendingIntent>()
+
+    override suspend fun requestLocationUpdates(
+      request: LocationRequest,
+      pendingIntent: android.app.PendingIntent,
+    ) {
+      requests += request
+      pendingIntents += pendingIntent
+    }
+
+    override suspend fun removeLocationUpdates(pendingIntent: android.app.PendingIntent) {
+      removedPendingIntents += pendingIntent
+    }
+  }
+
   private companion object {
     const val DIAGNOSTIC_TAG = "LifeTimelineWorkInfo"
+    const val DEVICE_ID = "01K00000000000000000000001"
+    const val EXTRA_LOCATION_RESULT = "com.google.android.gms.location.EXTRA_LOCATION_RESULT"
 
     lateinit var workManager: WorkManager
     lateinit var testDriver: TestDriver

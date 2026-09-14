@@ -20,11 +20,15 @@ interface LocationRegistrationClient {
   suspend fun unregister()
 }
 
-class LocationRequestController(
+class LocationRequestController internal constructor(
   private val context: Context,
-  private val permissionChecker: LocationPermissionChecker = LocationPermissionChecker.from(context),
+  private val permissionChecker: LocationPermissionChecker,
+  private val fusedLocationUpdatesAdapter: FusedLocationUpdatesAdapter,
 ) : LocationRegistrationClient {
-  private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
+  constructor(
+    context: Context,
+    permissionChecker: LocationPermissionChecker = LocationPermissionChecker.from(context),
+  ) : this(context, permissionChecker, PlayServicesFusedLocationUpdatesAdapter(context))
 
   @SuppressLint("MissingPermission")
   override suspend fun register() {
@@ -32,13 +36,11 @@ class LocationRequestController(
     check(access == LocationAccessState.APPROXIMATE || access == LocationAccessState.PRECISE) {
       "Location registration is not allowed in state $access."
     }
-    fusedLocationClient
-      .requestLocationUpdates(locationRequest(), locationPendingIntent(context))
-      .awaitCompletion()
+    fusedLocationUpdatesAdapter.requestLocationUpdates(locationRequest(), locationPendingIntent(context))
   }
 
   override suspend fun unregister() {
-    fusedLocationClient.removeLocationUpdates(locationPendingIntent(context)).awaitCompletion()
+    fusedLocationUpdatesAdapter.removeLocationUpdates(locationPendingIntent(context))
   }
 
   internal fun locationRequest(): LocationRequest =
@@ -56,20 +58,47 @@ class LocationRequestController(
   }
 }
 
+internal interface FusedLocationUpdatesAdapter {
+  suspend fun requestLocationUpdates(
+    request: LocationRequest,
+    pendingIntent: PendingIntent,
+  )
+
+  suspend fun removeLocationUpdates(pendingIntent: PendingIntent)
+}
+
+private class PlayServicesFusedLocationUpdatesAdapter(
+  context: Context,
+) : FusedLocationUpdatesAdapter {
+  private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
+
+  @SuppressLint("MissingPermission")
+  override suspend fun requestLocationUpdates(
+    request: LocationRequest,
+    pendingIntent: PendingIntent,
+  ) {
+    fusedLocationClient.requestLocationUpdates(request, pendingIntent).awaitCompletion()
+  }
+
+  override suspend fun removeLocationUpdates(pendingIntent: PendingIntent) {
+    fusedLocationClient.removeLocationUpdates(pendingIntent).awaitCompletion()
+  }
+}
+
 private const val LOCATION_PENDING_INTENT_REQUEST_CODE = 504
 
-internal fun locationPendingIntent(context: Context): PendingIntent {
-  val intent =
-    Intent(context, LocationUpdatesReceiver::class.java)
-      .setAction("${context.packageName}.LOCATION_UPDATES")
-      .setData("lifetimeline://${context.packageName}/location-updates/v1".toUri())
-  return PendingIntent.getBroadcast(
+internal fun locationPendingIntent(context: Context): PendingIntent =
+  PendingIntent.getBroadcast(
     context,
     LOCATION_PENDING_INTENT_REQUEST_CODE,
-    intent,
+    locationUpdatesReceiverIntent(context),
     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
   )
-}
+
+internal fun locationUpdatesReceiverIntent(context: Context): Intent =
+  Intent(context, LocationUpdatesReceiver::class.java)
+    .setAction("${context.packageName}.LOCATION_UPDATES")
+    .setData("lifetimeline://${context.packageName}/location-updates/v1".toUri())
 
 private suspend fun com.google.android.gms.tasks.Task<Void>.awaitCompletion() =
   suspendCancellableCoroutine { continuation ->
