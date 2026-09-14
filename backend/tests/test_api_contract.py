@@ -17,7 +17,7 @@ from app.cli.seed import main as seed_main
 from app.config import Settings
 from app.db import create_engine_for_settings, create_session_factory
 from app.main import create_app
-from app.models import AppSession, MediaItem
+from app.models import AppSession, LocationPoint, MediaItem, PlaceVisit
 from app.services.time_range import build_day_range
 
 
@@ -88,6 +88,45 @@ def test_timeline_merges_photo_and_app_session_items_in_stable_order(
     try:
         day_start = build_day_range("2026-09-03", "Asia/Tokyo")[1].start_ms
         with factory.begin() as session:
+            point_ids = [
+                "01J00000000000000000001601",
+                "01J00000000000000000001602",
+                "01J00000000000000000001603",
+            ]
+            for index, point_id in enumerate(point_ids):
+                session.add(
+                    LocationPoint(
+                        id=point_id,
+                        device_id="01J00000000000000000001001",
+                        recorded_at_ms=day_start + 9 * 60 * 60 * 1000 + index * 5 * 60_000,
+                        latitude=35.0,
+                        longitude=139.0,
+                        accuracy_m=10.0,
+                        altitude_m=None,
+                        speed_mps=None,
+                        source="android_fused_location",
+                        created_at_ms=day_start,
+                    )
+                )
+            session.flush()
+            visit_start = day_start + 9 * 60 * 60 * 1000
+            session.add(
+                PlaceVisit(
+                    id="01J00000000000000000001501",
+                    device_id="01J00000000000000000001001",
+                    started_at_ms=visit_start,
+                    ended_at_ms=visit_start + 15 * 60_000,
+                    duration_ms=15 * 60_000,
+                    center_latitude=35.0,
+                    center_longitude=139.0,
+                    radius_m=0,
+                    point_count=3,
+                    algorithm_version="stay_point_v1",
+                    source_first_point_id=point_ids[0],
+                    source_last_point_id=point_ids[-1],
+                    created_at_ms=day_start,
+                )
+            )
             session.add(
                 MediaItem(
                     id="01J00000000000000000001401",
@@ -129,12 +168,102 @@ def test_timeline_merges_photo_and_app_session_items_in_stable_order(
         assert [item["type"] for item in at_nine_am] == [
             "app_session",
             "app_session",
+            "place_visit",
             "photo",
         ]
+        visit = at_nine_am[2]
+        assert visit["label"] == "滞在地点"
+        assert visit["deviceName"] == "Demo Android A"
+        assert visit["pointCount"] == 3
         photo = at_nine_am[-1]
         assert photo["id"] == "01J00000000000000000001401"
         assert photo["takenAt"] == "2026-09-03T00:00:00.000Z"
         assert photo["thumbnailUrl"] is None
+    finally:
+        engine.dispose()
+
+
+def test_place_visit_overlapping_timezone_day_is_clipped_without_changing_raw_duration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine, factory = _migrated_seeded_database(tmp_path, monkeypatch)
+    try:
+        day_start = build_day_range("2026-09-03", "Asia/Tokyo")[1].start_ms
+        started_at = day_start - 10 * 60_000
+        ended_at = day_start + 10 * 60_000
+        point_ids = [
+            "01J00000000000000000001701",
+            "01J00000000000000000001702",
+            "01J00000000000000000001703",
+        ]
+        with factory.begin() as session:
+            for index, point_id in enumerate(point_ids):
+                session.add(
+                    LocationPoint(
+                        id=point_id,
+                        device_id="01J00000000000000000001001",
+                        recorded_at_ms=started_at + index * 10 * 60_000,
+                        latitude=0.0,
+                        longitude=0.0,
+                        accuracy_m=10.0,
+                        altitude_m=None,
+                        speed_mps=None,
+                        source="android_fused_location",
+                        created_at_ms=started_at,
+                    )
+                )
+            session.flush()
+            session.add(
+                PlaceVisit(
+                    id="01J00000000000000000001502",
+                    device_id="01J00000000000000000001001",
+                    started_at_ms=started_at,
+                    ended_at_ms=ended_at,
+                    duration_ms=ended_at - started_at,
+                    center_latitude=0.0,
+                    center_longitude=0.0,
+                    radius_m=0.0,
+                    point_count=3,
+                    algorithm_version="stay_point_v1",
+                    source_first_point_id=point_ids[0],
+                    source_last_point_id=point_ids[-1],
+                    created_at_ms=started_at,
+                )
+            )
+
+        application = create_app(factory)
+        current_day = _get(
+            application,
+            "/api/v1/timeline",
+            date="2026-09-03",
+            timezone="Asia/Tokyo",
+        )
+        previous_day = _get(
+            application,
+            "/api/v1/timeline",
+            date="2026-09-02",
+            timezone="Asia/Tokyo",
+        )
+        assert current_day.status_code == previous_day.status_code == 200
+        current_visit = next(
+            item for item in current_day.json()["items"] if item["type"] == "place_visit"
+        )
+        previous_visit = next(
+            item for item in previous_day.json()["items"] if item["type"] == "place_visit"
+        )
+        assert current_visit["startedAt"] == "2026-09-02T14:50:00.000Z"
+        assert current_visit["endedAt"] == "2026-09-02T15:10:00.000Z"
+        assert current_visit["durationMs"] == 1_200_000
+        assert current_visit["display"] == {
+            "startedAt": "2026-09-02T15:00:00.000Z",
+            "endedAt": "2026-09-02T15:10:00.000Z",
+            "durationMs": 600_000,
+            "continuesFromPreviousDay": True,
+            "continuesToNextDay": False,
+            "endsAtDayBoundary": False,
+        }
+        assert previous_visit["display"]["continuesToNextDay"] is True
+        assert previous_visit["display"]["endsAtDayBoundary"] is True
     finally:
         engine.dispose()
 

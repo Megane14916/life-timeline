@@ -420,6 +420,13 @@ td {
   color: #254c40;
 }
 
+.place-visit-coordinates {
+  margin: 0;
+  color: #597a6e;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
 .timeline-card-heading strong {
   flex: 0 0 auto;
   color: #1b7057;
@@ -521,6 +528,11 @@ td {
 .photo-timeline-item .timeline-marker::before {
   background: #477dba;
   box-shadow: 0 0 0 1px #35649b;
+}
+
+.place-visit-item .timeline-marker::before {
+  background: #d18b42;
+  box-shadow: 0 0 0 1px #a86728;
 }
 
 .photo-timeline-card {

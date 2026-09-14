@@ -46,6 +46,22 @@ class AppSessionTimelineItem(ApiModel):
     display: TimelineDisplay
 
 
+class PlaceVisitTimelineItem(ApiModel):
+    type: Literal["place_visit"]
+    id: str
+    device_id: str = Field(alias="deviceId")
+    device_name: str = Field(alias="deviceName")
+    started_at: str = Field(alias="startedAt")
+    ended_at: str = Field(alias="endedAt")
+    duration_ms: int = Field(alias="durationMs")
+    center_latitude: float = Field(alias="centerLatitude")
+    center_longitude: float = Field(alias="centerLongitude")
+    radius_m: float = Field(alias="radiusM")
+    point_count: int = Field(alias="pointCount")
+    label: Literal["滞在地点"]
+    display: TimelineDisplay
+
+
 class PhotoTimelineItem(ApiModel):
     type: Literal["photo"]
     id: str
@@ -63,7 +79,7 @@ class PhotoTimelineItem(ApiModel):
 
 
 TimelineItem = Annotated[
-    AppSessionTimelineItem | PhotoTimelineItem,
+    AppSessionTimelineItem | PlaceVisitTimelineItem | PhotoTimelineItem,
     Field(discriminator="type"),
 ]
 

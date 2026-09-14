@@ -186,7 +186,7 @@ class LocationPoint(Base):
 
 
 class PlaceVisit(Base):
-    """Derived location fact; population is added by the PlaceVisit phase."""
+    """Deterministic, rebuildable stay-point fact derived from LocationPoints."""
 
     __tablename__ = "place_visits"
     __table_args__ = (

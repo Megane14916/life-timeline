@@ -22,7 +22,7 @@ from app.config import Settings
 from app.db import create_engine_for_settings, create_session_factory
 from app.ids import new_ulid
 from app.main import create_app
-from app.models import Device, LocationPoint
+from app.models import Device, LocationPoint, PlaceVisit
 from app.repositories.locations import LocationPointRepository
 
 CONTRACT_PATH = Path(__file__).parents[2] / "contracts" / "sync" / "locations-v1.json"
@@ -109,6 +109,74 @@ def test_empty_batch_returns_empty_ack_without_creating_device(
         assert response.status_code == 200
         assert response.json() == {"schemaVersion": 1, "accepted": []}
         assert _counts(factory) == (0, 0)
+    finally:
+        engine.dispose()
+
+
+def test_location_sync_rebuilds_stable_place_visit_inside_batch_transaction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine, factory, application = _database(tmp_path, monkeypatch)
+    request = _payload()
+    template = request["locations"][0]
+    request["locations"] = [
+        {
+            **template,
+            "id": new_ulid(),
+            "recordedAtMs": 1_780_000_000_000 + index * 5 * 60_000,
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "accuracyM": 10.0,
+        }
+        for index in range(4)
+    ]
+    try:
+        first = _post(application, request)
+        with factory() as session:
+            visit = session.scalar(select(PlaceVisit))
+            assert visit is not None
+            first_content = (
+                visit.id,
+                visit.started_at_ms,
+                visit.ended_at_ms,
+                visit.duration_ms,
+                visit.point_count,
+                visit.created_at_ms,
+            )
+        replay = _post(application, request)
+        with factory() as session:
+            visits = list(session.scalars(select(PlaceVisit)))
+            assert len(visits) == 1
+            replay_content = (
+                visits[0].id,
+                visits[0].started_at_ms,
+                visits[0].ended_at_ms,
+                visits[0].duration_ms,
+                visits[0].point_count,
+                visits[0].created_at_ms,
+            )
+        assert first.status_code == replay.status_code == 200
+        assert first_content == replay_content
+        assert first_content[4] == 4
+    finally:
+        engine.dispose()
+
+
+def test_place_visit_rebuild_failure_rolls_back_raw_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine, factory, application = _database(tmp_path, monkeypatch)
+
+    def fail_rebuild(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError("synthetic rebuild failure")
+
+    monkeypatch.setattr("app.services.location_sync.rebuild_place_visits_for_points", fail_rebuild)
+    try:
+        response = _post(application, _fixture()["request"])
+        assert response.status_code == 500
+        assert _counts(factory) == (0, 0)
+        with factory() as session:
+            assert session.scalar(select(func.count()).select_from(PlaceVisit)) == 0
     finally:
         engine.dispose()
 

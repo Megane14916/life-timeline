@@ -6,9 +6,10 @@ from typing import Literal, cast
 
 from sqlalchemy.orm import Session
 
-from app.repositories.queries import find_photos, find_sessions
+from app.repositories.queries import find_photos, find_place_visits, find_sessions
 from app.schemas import (
     AppSessionTimelineItem,
+    PlaceVisitTimelineItem,
     TimelineDisplay,
     TimelineItem,
     TimelineResponse,
@@ -21,7 +22,7 @@ def get_timeline(
     session: Session, date_value: str | None, timezone_name: str | None
 ) -> TimelineResponse:
     date_string, query_range = build_day_range(date_value, timezone_name)
-    ordered_items: list[tuple[int, str, str, TimelineItem]] = []
+    ordered_items: list[tuple[int, int, str, TimelineItem]] = []
     for session_row in find_sessions(session, query_range):
         app_session = session_row.app_session
         display = clip_interval(app_session.started_at_ms, app_session.ended_at_ms, query_range)
@@ -47,13 +48,39 @@ def get_timeline(
                 endsAtDayBoundary=display.ends_at_day_boundary,
             ),
         )
-        ordered_items.append((display.start_ms, "app_session", app_session.id, item))
+        ordered_items.append((display.start_ms, 0, app_session.id, item))
+    for visit_row in find_place_visits(session, query_range):
+        visit = visit_row.place_visit
+        display = clip_interval(visit.started_at_ms, visit.ended_at_ms, query_range)
+        visit_item = PlaceVisitTimelineItem(
+            type="place_visit",
+            id=visit.id,
+            deviceId=visit.device_id,
+            deviceName=visit_row.device.name,
+            startedAt=format_epoch_ms(visit.started_at_ms),
+            endedAt=format_epoch_ms(visit.ended_at_ms),
+            durationMs=visit.duration_ms,
+            centerLatitude=visit.center_latitude,
+            centerLongitude=visit.center_longitude,
+            radiusM=visit.radius_m,
+            pointCount=visit.point_count,
+            label="滞在地点",
+            display=TimelineDisplay(
+                startedAt=format_epoch_ms(display.start_ms),
+                endedAt=format_epoch_ms(display.end_ms),
+                durationMs=display.duration_ms,
+                continuesFromPreviousDay=display.continues_from_previous_day,
+                continuesToNextDay=display.continues_to_next_day,
+                endsAtDayBoundary=display.ends_at_day_boundary,
+            ),
+        )
+        ordered_items.append((display.start_ms, 1, visit.id, visit_item))
     for photo_row in find_photos(session, query_range):
         photo = photo_row.media_item
         ordered_items.append(
             (
                 photo.captured_at_ms,
-                "photo",
+                2,
                 photo.id,
                 to_photo_timeline_item(photo_row),
             )
