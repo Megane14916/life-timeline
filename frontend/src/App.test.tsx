@@ -258,6 +258,12 @@ describe('App', () => {
     ).toHaveTextContent('30分')
     expect(within(item).getByText('09:00')).toBeInTheDocument()
     expect(within(item).getByText('09:30')).toBeInTheDocument()
+    expect(
+      within(item).getByRole('link', { name: '地図で表示' }),
+    ).toHaveAttribute(
+      'href',
+      `/map?date=2026-09-03&timezone=Asia%2FTokyo&visit=${placeVisitItem.id}`,
+    )
   })
 
   it('shows a Photos API error independently and retries that panel', async () => {

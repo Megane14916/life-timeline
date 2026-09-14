@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, unlinkSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -7,11 +7,16 @@ import { spawn, spawnSync } from 'node:child_process'
 const frontendDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repositoryDirectory = resolve(frontendDirectory, '..')
 const backendDirectory = join(repositoryDirectory, 'backend')
+const frontendPort = process.env.LIFE_TIMELINE_E2E_FRONTEND_PORT ?? '5173'
+const backendPort = process.env.LIFE_TIMELINE_E2E_BACKEND_PORT ?? '8000'
 const configuredDataDirectory = process.env.LIFE_TIMELINE_E2E_DATA_DIR
-const ownsDataDirectory = configuredDataDirectory === undefined
-const dataDirectory = ownsDataDirectory
-  ? mkdtempSync(join(tmpdir(), 'life-timeline-e2e-'))
-  : resolve(configuredDataDirectory)
+const stopFile = process.env.LIFE_TIMELINE_E2E_STOP_FILE
+const ownsDataDirectory =
+  process.env.LIFE_TIMELINE_E2E_OWNS_DATA_DIR === 'true' ||
+  configuredDataDirectory === undefined
+const dataDirectory = configuredDataDirectory
+  ? resolve(configuredDataDirectory)
+  : mkdtempSync(join(tmpdir(), 'life-timeline-e2e-'))
 
 if (ownsDataDirectory) {
   process.env.LIFE_TIMELINE_E2E_DATA_DIR = dataDirectory
@@ -74,12 +79,12 @@ let frontend
 process.once('exit', () => {
   stopProcess(frontend)
   stopProcess(backend)
-  if (ownsDataDirectory) rmSync(dataDirectory, { recursive: true, force: true })
+  if (stopFile && existsSync(stopFile)) unlinkSync(stopFile)
 })
 
 backend = startProcess(
   pythonExecutable(),
-  ['scripts/e2e_server.py', '--data-dir', dataDirectory],
+  ['scripts/e2e_server.py', '--data-dir', dataDirectory, '--port', backendPort],
   backendDirectory,
   {
     LIFE_TIMELINE_DATA_DIR: dataDirectory,
@@ -88,7 +93,7 @@ backend = startProcess(
 )
 
 try {
-  await waitForUrl('http://127.0.0.1:8000/api/v1/health', backend)
+  await waitForUrl(`http://127.0.0.1:${backendPort}/api/v1/health`, backend)
   frontend = startProcess(
     process.execPath,
     [
@@ -96,7 +101,7 @@ try {
       '--host',
       '127.0.0.1',
       '--port',
-      '5173',
+      frontendPort,
     ],
     frontendDirectory,
   )
@@ -115,6 +120,10 @@ try {
 
   if (parentProcessId > 1) {
     parentWatch = setInterval(() => {
+      if (stopFile && existsSync(stopFile)) {
+        stop()
+        return
+      }
       try {
         process.kill(parentProcessId, 0)
       } catch {

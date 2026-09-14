@@ -14,6 +14,11 @@ const syncedSessionId = '01K4N70E3Q6N9D6E6G0C8M2H1P'
 const syncedStartedAtMs = Date.UTC(2026, 8, 5, 1, 0)
 const photoId = '01K4N70E3Q6N9D6E6G0C8M2H1Q'
 const photoCapturedAtMs = Date.UTC(2026, 8, 5, 23, 30)
+const mapDate = '2026-09-10'
+const mapDeviceId = '00000000000000000000000001'
+const mapPhotoId = '00000000000000000000000007'
+const mapDeviceName = 'P5-08 Synthetic Android'
+const mapStartAtMs = Date.UTC(2026, 8, 10, 0, 0)
 const repositoryDirectory = resolve(
   dirname(fileURLToPath(import.meta.url)),
   '../..',
@@ -388,5 +393,121 @@ test.describe('PC core real database flow', () => {
     ).toBeVisible()
     await expect(page.getByTestId('timeline-photo-item')).toHaveCount(1)
     await expect(page.getByTestId('photo-grid-card')).toHaveCount(1)
+  })
+
+  test('opens a synthetic visit on the Map and requests OSM tiles only after opt-in', async ({
+    page,
+  }) => {
+    const offsets = [0, 5, 10, 20, 60].map((minute) => minute * 60_000)
+    const locationPayload = {
+      schemaVersion: 1,
+      device: {
+        id: mapDeviceId,
+        name: mapDeviceName,
+        platform: 'android',
+      },
+      locations: offsets.map((offset, index) => ({
+        id: String(index + 2).padStart(26, '0'),
+        recordedAtMs: mapStartAtMs + offset,
+        latitude: 35.68124 + index * 0.00001,
+        longitude: 139.76712 + index * 0.00001,
+        accuracyM: 25,
+        altitudeM: null,
+        speedMps: null,
+        source: 'android_fused_location',
+      })),
+    }
+    const locationSync = await page.request.post('/api/v1/sync/locations', {
+      data: locationPayload,
+    })
+    expect(locationSync.status()).toBe(200)
+    await expect(locationSync.json()).resolves.toMatchObject({
+      schemaVersion: 1,
+      accepted: locationPayload.locations.map((point) => point.id),
+    })
+
+    const photoPayloadForMap = {
+      schemaVersion: 1,
+      device: {
+        id: mapDeviceId,
+        name: mapDeviceName,
+        platform: 'android',
+      },
+      photos: [
+        {
+          id: mapPhotoId,
+          source: 'android_media_store',
+          sourceId: 'fixture-volume:p5-08-map-photo',
+          filename: 'map-synthetic-photo.jpg',
+          capturedAtMs: mapStartAtMs + 25 * 60_000,
+          width: 640,
+          height: 480,
+          mimeType: 'image/jpeg',
+          latitude: 35.6818,
+          longitude: 139.768,
+          thumbnail: null,
+        },
+      ],
+    }
+    const boundary = 'life-timeline-p5-08-map-photo'
+    const photoBody = Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="metadata"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(photoPayloadForMap)}\r\n--${boundary}--\r\n`,
+    )
+    const photoSync = await page.request.post('/api/v1/sync/photos', {
+      data: photoBody,
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+    })
+    expect(photoSync.status()).toBe(200)
+
+    let tileRequestCount = 0
+    page.on('request', (request) => {
+      if (request.url().startsWith('https://tile.openstreetmap.org/')) {
+        tileRequestCount += 1
+      }
+    })
+    await page.route('https://tile.openstreetmap.org/**', (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'image/png',
+        body: '',
+      }),
+    )
+    const pageErrors: string[] = []
+    page.on('pageerror', (error) => pageErrors.push(error.message))
+
+    await page.goto(timelineUrl(mapDate))
+    const visitCard = page.getByTestId('timeline-place-visit-item')
+    await expect(visitCard).toBeVisible()
+    const mapResponsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/v1/map?'),
+    )
+    await visitCard.getByRole('link', { name: '地図で表示' }).click()
+    await expect(page).toHaveURL(/\/map\?.*visit=/)
+    const mapResponse = await mapResponsePromise
+    expect(mapResponse.status()).toBe(200)
+    const mapData = await mapResponse.json()
+    expect(mapData.routes).toHaveLength(2)
+    expect(mapData.placeVisits).toHaveLength(1)
+    expect(mapData.photos).toHaveLength(1)
+    await expect(page.getByTestId('leaflet-map')).toBeVisible()
+    await expect(page.getByTestId('map-summary')).toBeVisible()
+    expect(pageErrors).toEqual([])
+    await expect(page.getByTestId('map-summary')).toContainText(mapDeviceName)
+    await expect(page.getByTestId('map-summary')).toContainText(
+      'map-synthetic-photo.jpg',
+    )
+    await expect(
+      page.getByRole('button', { name: '地図で表示' }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByLabel('移動経路（2）')).toBeChecked()
+    expect(tileRequestCount).toBe(0)
+
+    await page.getByRole('button', { name: 'オンライン背景地図を表示' }).click()
+    await expect.poll(() => tileRequestCount).toBeGreaterThan(0)
+    await expect(page.getByRole('alert')).toContainText(
+      '背景地図を読み込めませんでした',
+    )
+    await expect(page.getByTestId('map-summary')).toBeVisible()
+    await expect(page.getByTestId('leaflet-map')).toBeVisible()
   })
 })
