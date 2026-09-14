@@ -217,6 +217,10 @@ WorkManagerによる定期収集・自動同期、Room v2、期限付きlease、
 
 写真収集有効化後の新規撮影がPCへ同期される通常系と、任意の拡張実機シナリオは[Phase 4受け入れ記録](docs/development/phase4-acceptance.md)を参照してください。
 
+## Phase 5受け入れ記録
+
+位置情報の通常系実機確認は[Phase 5実機受け入れ手順・記録](docs/development/phase5-acceptance.md)を参照してください。実機確認は未実施項目を含むため、利用者が手順を実施してから結果を記録します。
+
 ## 写真の収集と同期
 
 写真収集はAndroidアプリで明示的に有効化し、写真へのアクセスを許可して利用します。対象はMediaStoreに登録済みの`DCIM/`配下の画像です。full accessでは有効化後に追加された写真を対象にし、Android 14以降のpartial accessでは利用者が選んだ写真だけを扱います。DCIM外、未公開の撮影中ファイル、Secure Folderや別Androidユーザーの写真は対象外になり得ます。
@@ -360,5 +364,7 @@ PC endpointには`https://`のTailscale Serve URLだけを設定します。ま�
 | [Phase 3詳細計画](docs/detailed_plan/phase3-automatic-sync.md) | 自動収集・自動同期・retryの実装計画 |
 | [Phase 4詳細計画](docs/detailed_plan/phase4-photos.md) | 写真収集・同期・表示とPhase 5への引き継ぎ |
 | [Phase 3受け入れ記録](docs/development/phase3-acceptance.md) | WorkManager、障害復旧、実機確認の記録 |
+| [Phase 5詳細計画](docs/detailed_plan/phase5-location.md) | Android background location、同期、Map / PlaceVisit |
+| [Phase 5実機受け入れ手順・記録](docs/development/phase5-acceptance.md) | 通常系の実機テストとprivacy-safeな結果記録 |
 
 Androidの`applicationId`と`namespace`は`com.megane14916.lifetimeline`です。
