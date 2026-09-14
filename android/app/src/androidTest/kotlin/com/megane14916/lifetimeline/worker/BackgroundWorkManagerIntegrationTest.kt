@@ -213,7 +213,7 @@ class BackgroundWorkManagerIntegrationTest {
       assertEquals(adapter.pendingIntents[0], adapter.pendingIntents[1])
       assertEquals(0, adapter.removedPendingIntents.size)
       val receiverIntent = locationUpdatesReceiverIntent(context)
-      assertEquals(locationPendingIntent(context), adapter.pendingIntents.single())
+      assertEquals(locationPendingIntent(context), adapter.pendingIntents[0])
       assertEquals(
         "com.megane14916.lifetimeline.location.LocationUpdatesReceiver",
         receiverIntent.component?.className,
