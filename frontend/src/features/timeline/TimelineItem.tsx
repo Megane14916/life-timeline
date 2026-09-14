@@ -6,10 +6,12 @@ import type {
 } from '../../api/types'
 import { formatDuration, formatPlatform, formatTime } from './format'
 import { PhotoTimelineCard } from './PhotoTimelineCard'
+import { pageHref } from '../navigation'
 
 interface TimelineItemProps {
   item: TimelineItemData
   timezone: string
+  date: string
 }
 
 function AppSessionItem({
@@ -96,9 +98,11 @@ function PhotoItem({
 function PlaceVisitItem({
   item,
   timezone,
+  date,
 }: {
   item: PlaceVisitTimelineItemData
   timezone: string
+  date: string
 }) {
   const flags = [
     item.display.continuesFromPreviousDay ? '前日から継続' : null,
@@ -146,17 +150,23 @@ function PlaceVisitItem({
             ))}
           </div>
         )}
+        <a
+          className="map-deep-link"
+          href={pageHref('/map', date, timezone, item.id)}
+        >
+          地図で表示
+        </a>
       </article>
     </li>
   )
 }
 
-export function TimelineItem({ item, timezone }: TimelineItemProps) {
+export function TimelineItem({ item, timezone, date }: TimelineItemProps) {
   if (item.type === 'photo') {
     return <PhotoItem item={item} timezone={timezone} />
   }
   if (item.type === 'place_visit') {
-    return <PlaceVisitItem item={item} timezone={timezone} />
+    return <PlaceVisitItem item={item} timezone={timezone} date={date} />
   }
   return <AppSessionItem item={item} timezone={timezone} />
 }
