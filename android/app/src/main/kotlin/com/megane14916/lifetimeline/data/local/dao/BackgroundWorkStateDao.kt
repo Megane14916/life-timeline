@@ -8,6 +8,18 @@ import com.megane14916.lifetimeline.data.local.BackgroundWorkStateEntity
 
 @Dao
 interface BackgroundWorkStateDao {
+  @Query(
+    """
+    INSERT INTO background_work_state(work_key, last_success_at_ms, last_result, updated_at_ms)
+    VALUES('location_receive_v1', :receivedAtMs, 'received', :receivedAtMs)
+    ON CONFLICT(work_key) DO UPDATE SET
+      last_success_at_ms = MAX(COALESCE(last_success_at_ms, 0), :receivedAtMs),
+      last_result = 'received',
+      updated_at_ms = MAX(updated_at_ms, :receivedAtMs)
+    """,
+  )
+  suspend fun recordLocationReceivedAt(receivedAtMs: Long)
+
   @Query("SELECT * FROM background_work_state WHERE work_key = :workKey LIMIT 1")
   suspend fun find(workKey: String): BackgroundWorkStateEntity?
 

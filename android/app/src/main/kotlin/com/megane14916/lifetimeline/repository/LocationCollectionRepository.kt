@@ -31,6 +31,10 @@ interface LocationPointStore {
 
   suspend fun countPending(): Int
 
+  suspend fun latestReceivedAt(): Long? = null
+
+  suspend fun recordLatestReceivedAt(receivedAtMs: Long) {}
+
   suspend fun markPendingAsSynced(
     ids: List<String>,
     syncedAtMs: Long,
@@ -98,6 +102,7 @@ class LocationCollectionRepository(
         }
       }
     }
+    if (normalized.isNotEmpty()) store.recordLatestReceivedAt(nowMs)
     return LocationCollectionResult(inserted, duplicates, invalid, conflicts)
   }
 
@@ -107,6 +112,8 @@ class LocationCollectionRepository(
   }
 
   suspend fun countPending(): Int = store.countPending()
+
+  suspend fun latestReceivedAt(): Long? = store.latestReceivedAt()
 
   /** Validates ACK scope before any mutation, then marks only pending sent IDs and cleans boundedly. */
   suspend fun acknowledge(

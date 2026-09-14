@@ -22,6 +22,7 @@ import com.megane14916.lifetimeline.repository.SyncResult
 import com.megane14916.lifetimeline.repository.SyncRunStatus
 import com.megane14916.lifetimeline.worker.AutomaticSyncPolicy
 import com.megane14916.lifetimeline.worker.BackgroundWorkScheduler
+import com.megane14916.lifetimeline.worker.LocationWorkPolicy
 import com.megane14916.lifetimeline.worker.PhotoWorkPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -51,6 +52,19 @@ data class MainUiState(
   val photoAccessState: PhotoAccessState = PhotoAccessState.DENIED,
   val locationAccessState: LocationAccessState = LocationAccessState.DISABLED,
   val locationCollectionEnabled: Boolean = false,
+  val latestLocationReceivedAtMs: Long? = null,
+  val pendingLocationCount: Int = 0,
+  val locationRegistrationAttemptAtMs: Long? = null,
+  val locationRegistrationSuccessAtMs: Long? = null,
+  val locationRegistrationResult: String? = null,
+  val locationRegistrationErrorKind: String? = null,
+  val locationRegistrationWorkState: WorkInfo.State? = null,
+  val locationSyncAttemptAtMs: Long? = null,
+  val locationSyncSuccessAtMs: Long? = null,
+  val locationSyncResult: String? = null,
+  val locationSyncErrorKind: String? = null,
+  val locationSyncWorkState: WorkInfo.State? = null,
+  val locationSyncRunAttemptCount: Int = 0,
   val photoCollectionEnabled: Boolean = false,
   val pcBaseUrl: String? = null,
   val lastCollectionAtMs: Long? = null,
@@ -100,6 +114,8 @@ class MainViewModel(
   private val localPhotoThumbnailBytes: suspend () -> Long = { 0L },
   private val locationPermissionChecker: LocationPermissionChecker? = null,
   private val locationRegistrationClient: LocationRegistrationClient? = null,
+  private val pendingLocationCount: suspend () -> Int = { 0 },
+  private val latestLocationReceivedAt: suspend () -> Long? = { null },
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(MainUiState())
   val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -198,6 +214,11 @@ class MainViewModel(
       } else {
         backgroundWorkScheduler?.cancelLocationRegistration()
       }
+      val settings = preferences.settings.first()
+      if (pendingLocationCount() > 0 && !settings.pcBaseUrl.isNullOrBlank()) {
+        backgroundWorkScheduler?.enqueueLocationSync()
+      }
+      refreshBackgroundStateInternal()
     }
   }
 
@@ -221,6 +242,24 @@ class MainViewModel(
   fun collectPhotosNow() {
     if (!_uiState.value.photoCollectionEnabled || _uiState.value.photoAccessState == PhotoAccessState.DENIED) return
     backgroundWorkScheduler?.enqueuePhotoCollectionNow()
+    refreshBackgroundState()
+  }
+
+  /** Explicitly reruns Location registration without changing opt-in or permissions. */
+  fun checkLocationRegistration() {
+    viewModelScope.launch {
+      if (!_uiState.value.locationCollectionEnabled) return@launch
+      backgroundWorkScheduler?.ensureLocationRegistrationScheduled()
+      backgroundWorkScheduler?.enqueueLocationRegistration()
+      refreshBackgroundStateInternal()
+    }
+  }
+
+  /** Requests the independent Location uploader for locally pending points. */
+  fun syncLocationNow() {
+    val current = _uiState.value
+    if (current.pcBaseUrl.isNullOrBlank() || current.pendingLocationCount <= 0) return
+    backgroundWorkScheduler?.enqueueLocationSync()
     refreshBackgroundState()
   }
 
@@ -422,13 +461,19 @@ class MainViewModel(
     val syncState = coordinator?.findState(AutomaticSyncPolicy.SYNC_LEASE_KEY)
     val photoCollectionState = coordinator?.findState(PhotoWorkPolicy.COLLECTION_LEASE_KEY)
     val photoSyncState = coordinator?.findState(PhotoWorkPolicy.SYNC_LEASE_KEY)
+    val locationRegistrationState = coordinator?.findState(LocationWorkPolicy.REGISTRATION_LEASE_KEY)
+    val locationSyncState = coordinator?.findState(LocationWorkPolicy.SYNC_LEASE_KEY)
     val collectionWorkInfo = backgroundWorkScheduler?.currentCollectionWorkInfo()
     val syncWorkInfo = backgroundWorkScheduler?.currentSyncWorkInfo()
     val photoCollectionWorkInfo = backgroundWorkScheduler?.currentPhotoCollectionWorkInfo()
     val photoSyncWorkInfo = backgroundWorkScheduler?.currentPhotoSyncWorkInfo()
+    val locationRegistrationWorkInfo = backgroundWorkScheduler?.currentLocationRegistrationWorkInfo()
+    val locationSyncWorkInfo = backgroundWorkScheduler?.currentLocationSyncWorkInfo()
     val pendingPhotos = pendingPhotoCount()
     val pendingThumbnails = pendingPhotoThumbnailCount()
     val thumbnailBytes = localPhotoThumbnailBytes()
+    val pendingLocations = pendingLocationCount()
+    val latestLocationReceived = latestLocationReceivedAt()
     val now = nowMs()
     val leaseBusy =
       listOf(collectionState, syncState).any { state ->
@@ -470,6 +515,19 @@ class MainViewModel(
         localPhotoThumbnailBytes = thumbnailBytes,
         photoSyncWorkState = photoSyncWorkInfo?.state,
         photoSyncRunAttemptCount = photoSyncWorkInfo?.runAttemptCount ?: 0,
+        latestLocationReceivedAtMs = latestLocationReceived,
+        pendingLocationCount = pendingLocations,
+        locationRegistrationAttemptAtMs = locationRegistrationState?.lastAttemptAtMs,
+        locationRegistrationSuccessAtMs = locationRegistrationState?.lastSuccessAtMs,
+        locationRegistrationResult = locationRegistrationState?.lastResult,
+        locationRegistrationErrorKind = locationRegistrationState?.lastErrorKind,
+        locationRegistrationWorkState = locationRegistrationWorkInfo?.state,
+        locationSyncAttemptAtMs = locationSyncState?.lastAttemptAtMs,
+        locationSyncSuccessAtMs = locationSyncState?.lastSuccessAtMs,
+        locationSyncResult = locationSyncState?.lastResult,
+        locationSyncErrorKind = locationSyncState?.lastErrorKind,
+        locationSyncWorkState = locationSyncWorkInfo?.state,
+        locationSyncRunAttemptCount = locationSyncWorkInfo?.runAttemptCount ?: 0,
         status = status,
         errorMessage = if (status == MainStatus.READY) null else _uiState.value.errorMessage,
         backgroundBusy = backgroundBusy,
