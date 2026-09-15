@@ -81,6 +81,21 @@ Google Play services Locationは[公式セットアップ手順](https://develop
 
 位置情報の実機運用では、5分を配信周期やdeadlineとして扱わない。AndroidのDoze、OEM battery optimization、permission、位置情報サービス、Google Play services、電波により遅延・欠測が起こる。位置情報を有効化する前に専用DBを用意し、PC停止中のpending保持と復旧後のaccepted ACKを確認する。位置情報は正確な生活圏を含むため、`lifelog.db`をbackupから除外せず、実座標・地名・tile URL・endpointをログ、Issue、PRへ記録しない。日常運用の切り分けは[Phase 5位置情報の運用手順](phase5-location-operations.md)を参照する。
 
+### Phase 6 ActivityWatch依存とsource contract
+
+P6-01では、ActivityWatchのWindows stable releaseと、loopback REST Adapterのruntime HTTP clientを固定した。確認日は2026年9月15日である。ActivityWatch `v0.14.0b5`以下のpre-release系列は採用せず、stableとして公開されている`v0.13.2`を基準にする。ActivityWatch本体はlife-timelineへ同梱せず、利用者が公式手順でインストールする。
+
+| 対象 | 確認したversion | 初めて固定する場所 | 用途 |
+| --- | --- | --- | --- |
+| ActivityWatch Windows suite | `v0.13.2` | `contracts/activitywatch-v1.json`、本表 | `/api/0/info`、bucket metadata、window / AFK / Web event shapeのsource contract |
+| HTTPX | `0.28.1` | `backend/pyproject.toml`、`backend/uv.lock` | ActivityWatch loopback REST AdapterのHTTP transport。runtime dependencyとしてexact pin |
+
+ActivityWatchはPython packageとして実行せず、Windowsで動作する外部serverへHTTP接続する。そのためPython `3.13.15`との互換性は、Backendのcontract fixture / HTTP transportとActivityWatch `v0.13.2`のREST shapeを分離して確認する。ActivityWatchのinternal DB・設定file・write APIには依存しない。HTTPXは既存lockに記録済みの`0.28.1`をruntimeへ移し、test専用の範囲指定依存を残さない。
+
+source contractの正本は[`contracts/activitywatch-v1.json`](../../contracts/activitywatch-v1.json)、保存前のdata minimizationとfixtureレビューは[Phase 6 ActivityWatch privacy review](phase6-activitywatch-privacy.md)に記録する。ActivityWatchのversion更新、browser mapping追加、privacy policy変更は、contract fixture・policy test・この表を同じPull Requestで更新する。
+
+一次資料: [ActivityWatch REST API](https://docs.activitywatch.net/en/latest/api/rest.html)、[ActivityWatch releases](https://github.com/ActivityWatch/activitywatch/releases)、[HTTPX on PyPI](https://pypi.org/project/httpx/)。
+
 ## 3. Androidアプリの識別子
 
 Androidプロジェクトでは次の値を使う。

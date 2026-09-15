@@ -147,5 +147,68 @@
       "data.title: optional string",
       "data.incognito: boolean when the event is used for detail"
     ]
+  },
+  "privacyPolicy": {
+    "titlePolicyVersion": "activitywatch_title_v1",
+    "urlPolicyVersion": "activitywatch_url_v1",
+    "modes": {
+      "app_only": {
+        "nonBrowserWindowTitle": false,
+        "browserWindowTitle": false,
+        "browserTitle": false,
+        "url": false
+      },
+      "titles": {
+        "nonBrowserWindowTitle": true,
+        "browserWindowTitle": false,
+        "browserTitle": false,
+        "url": false
+      },
+      "web": {
+        "nonBrowserWindowTitle": true,
+        "browserWindowTitle": false,
+        "browserTitle": true,
+        "url": true,
+        "requiresActiveBrowser": true,
+        "requiresNonIncognito": true
+      }
+    },
+    "titleMaxUnicodeCharacters": 500,
+    "urlMaxCharacters": 2048,
+    "allowedUrlSchemes": [
+      "http",
+      "https"
+    ],
+    "removedUrlComponents": [
+      "userinfo",
+      "query",
+      "fragment",
+      "default_port"
+    ],
+    "rejectedUrlSchemes": [
+      "file",
+      "data",
+      "javascript",
+      "browser_extension",
+      "browser_internal"
+    ],
+    "incognitoDetail": "null"
+  },
+  "fixedValues": {
+    "enabledDefault": false,
+    "detailModeDefault": "app_only",
+    "scheduleInitialDelaySeconds": 30,
+    "scheduleIntervalSeconds": 900,
+    "settlementLagSeconds": 120,
+    "initialLookbackUtcDays": 7,
+    "rollingRefreshUtcDays": 2,
+    "queryContextSeconds": 300,
+    "eventLimitPerRequest": 10000,
+    "minimumSplitSeconds": 300,
+    "runBudgetUtcDays": 8,
+    "runBudgetSeconds": 480,
+    "leaseTtlSeconds": 900,
+    "httpConnectTimeoutSeconds": 2,
+    "httpReadTimeoutSeconds": 60
   }
 }
