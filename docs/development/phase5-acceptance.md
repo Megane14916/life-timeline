@@ -166,5 +166,6 @@ PC停止: NOT TESTED
 
 - [P5-10 Issue #103](https://github.com/Megane14916/life-timeline/issues/103)
 - [Phase 5詳細計画 §12 / P5-10](../detailed_plan/phase5-location.md)
+- [Phase 5位置情報の運用手順](phase5-location-operations.md)
 - [Phase 3受け入れ記録](phase3-acceptance.md)
 - [Phase 2 Tailscale Serve手順](phase2-tailscale.md)

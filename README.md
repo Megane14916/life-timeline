@@ -2,7 +2,7 @@
 
 Life Timelineは、PCとスマートフォンから収集した活動データをローカルで管理し、複数の形式で振り返るためのアプリケーションです。
 
-Phase 4まで実装済みです。SQLiteへ正規化データを保存し、AndroidのUsage AccessとMediaStoreから収集したデータをRoomへ一時保存します。WorkManagerがアプリ利用履歴と写真を定期収集し、写真のサムネイルとメタデータをTailscale Serve経由でPCへ同期してTimeline / Photosに表示します。写真原本は保存・送信しません。位置情報の継続収集と地図表示はPhase 5で追加します。
+Phase 5の実装と自動検証まで完了しています。SQLiteへ正規化データを保存し、AndroidのUsage Access、MediaStore、Fused Location Providerから収集したデータをRoomへ一時保存します。WorkManagerが各データ種別を独立して収集・同期し、写真のサムネイルと位置情報をTailscale Serve経由でPCへ送信してTimeline / Photos / Mapに表示します。写真原本は保存・送信しません。screen offを含むbackground locationの通常系は、[Phase 5実機受け入れ手順](docs/development/phase5-acceptance.md)に従って利用者が確認します。
 
 ## Repository構成
 
@@ -219,7 +219,13 @@ WorkManagerによる定期収集・自動同期、Room v2、期限付きlease、
 
 ## Phase 5受け入れ記録
 
-位置情報の通常系実機確認は[Phase 5実機受け入れ手順・記録](docs/development/phase5-acceptance.md)を参照してください。実機確認は未実施項目を含むため、利用者が手順を実施してから結果を記録します。
+位置情報の自動検証、通常系実機確認の手順、既知の非保証は[Phase 5実機受け入れ手順・記録](docs/development/phase5-acceptance.md)を参照してください。実機確認はOS・端末依存のため、未実施項目をPASSとは扱いません。日常運用と障害切り分けは[Phase 5位置情報の運用手順](docs/development/phase5-location-operations.md)にまとめています。
+
+## 位置情報の収集と同期
+
+位置収集はアプリのopt-in、foreground / background権限、端末の位置情報サービス、Google Play servicesが利用可能なことを前提にします。Fused Location Providerへbalanced powerの5分要求と15分の最大batch遅延を設定しますが、これは到着期限ではありません。AndroidのDoze、OEM最適化、権限状態、電波、端末の判断により遅延・欠測が起こります。foreground serviceやreverse geocodingは使用しません。
+
+受信したraw `LocationPoint`はAndroidのRoomでpendingとして保持し、PC APIが返したaccepted IDだけをsyncedにします。位置同期は最大200件のbatch、1回最大20 batchまたは8分で区切り、PC側では`location_points`を正本として`stay_point_v1`のPlaceVisitを再生成します。位置情報は機微データなので、`$env:LIFE_TIMELINE_DATA_DIR\lifelog.db`を写真の`thumbnails/`と同じsnapshotへ含めてbackupしてください。raw pointの自動間引き・削除、地名への変換、道路への補正は行いません。
 
 ## 写真の収集と同期
 
@@ -366,5 +372,6 @@ PC endpointには`https://`のTailscale Serve URLだけを設定します。ま�
 | [Phase 3受け入れ記録](docs/development/phase3-acceptance.md) | WorkManager、障害復旧、実機確認の記録 |
 | [Phase 5詳細計画](docs/detailed_plan/phase5-location.md) | Android background location、同期、Map / PlaceVisit |
 | [Phase 5実機受け入れ手順・記録](docs/development/phase5-acceptance.md) | 通常系の実機テストとprivacy-safeな結果記録 |
+| [Phase 5位置情報の運用手順](docs/development/phase5-location-operations.md) | permission、同期、battery、tile privacyの運用と障害切り分け |
 
 Androidの`applicationId`と`namespace`は`com.megane14916.lifetimeline`です。

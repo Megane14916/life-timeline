@@ -39,7 +39,6 @@ erDiagram
     APP_SESSIONS ||--o| DESKTOP_SESSION_DETAILS : has
     DEVICES ||--o{ LOCATION_POINTS : records
     DEVICES ||--o{ PLACE_VISITS : records
-    PLACES ||--o{ PLACE_VISITS : visited_as
     DEVICES ||--o{ MEDIA_ITEMS : captures
     DEVICES ||--o{ MANUAL_RECORDS : creates
 ```
@@ -50,7 +49,7 @@ erDiagram
 
 ### ID
 
-UUID v7またはULIDを採用し、可能な限りデータ発生元で生成します。Androidで生成したIDをRoomとPCの両方で使うことで、再送時の重複登録を防ぎます。
+ULIDを採用し、可能な限りデータ発生元で生成します。Androidで生成したIDをRoomとPCの両方で使うことで、再送時の重複登録を防ぎます。LocationPointのIDは同じfixの再配信で安定するdeterministic ULIDです。
 
 ### 時刻
 
@@ -132,7 +131,7 @@ Android: com.google.android.youtube
 Windows: Code.exe
 ```
 
-## places
+## places（将来の命名 master）
 
 ```text
 places
@@ -146,7 +145,7 @@ category      TEXT NULL
 created_at_ms INTEGER
 ```
 
-自宅、大学、駅など継続的に参照する場所を表します。
+将来、ユーザーが自宅・大学・駅などを命名して継続参照するための候補です。現行Phaseではこのtable、`place_id`、命名UIを作成せず、`PlaceVisit`のcenterと`algorithm_version`だけを保存します。
 
 ---
 
@@ -207,7 +206,7 @@ source         TEXT
 created_at_ms  INTEGER
 ```
 
-用途: 移動経路、移動距離、PlaceVisit生成、写真位置の補完。
+`source`は現行実装で`android_fused_location`に固定します。PC側では`id`の一意性と同期APIのUPSERTで再送を冪等に処理します。Android Roomでは`source_fingerprint`をuniqueに保持し、`pending` / `synced`、`received_at_ms`、`synced_at_ms`、`last_error_kind`を管理します。PC側のraw pointは削除・間引き・補正を行わず、移動経路、移動距離、PlaceVisit生成、将来のexportのSource of Truthとして扱います。
 
 ## place_visits
 
@@ -446,7 +445,7 @@ ON media_items(captured_at_ms);
 
 # 13. データ量
 
-最も増えやすいのは`location_points`です。5分ごとの取得なら約288件/日、約10.5万件/年で、SQLiteでも十分扱える規模です。
+最も増えやすいのは`location_points`です。5分要求で常に到着する保証はありませんが、上限目安として約288件/日、約10.5万件/年を想定します。SQLiteでも十分扱える規模ですが、raw pointは生活圏を直接含むため、写真thumbnailと同じPC data rootのsnapshotへ含めてbackupします。
 
 将来的には必要に応じて、古いLocationPointの間引き、PlaceVisit生成後の圧縮、Index最適化などを検討します。
 
@@ -470,16 +469,17 @@ ManualRecord  → JSON / CSV
 
 ---
 
-写真を含むPC data rootでは`lifelog.db`と`thumbnails/`が一つのbackup / restore単位です。完全な復旧では両方を同じsnapshotから戻します。手順と自動backup機能の現状は[README](../README.md#手動バックアップと復旧)を参照してください。
+PC data rootでは`lifelog.db`と`thumbnails/`が一つのbackup / restore単位です。位置情報は`lifelog.db`の`location_points`に含まれるため、DBを個別に除外したbackupは完全なライフログbackupではありません。完全な復旧では両方を同じsnapshotから戻します。手順と自動backup機能の現状は[README](../README.md#手動バックアップと復旧)を参照してください。
 
-# 15. 今後決める事項
+# 15. Phase 6以降に検討する事項
 
-- UUID v7 / ULIDのどちらを採用するか
-- SQLAlchemy / SQLModelの選択
+- 命名済みplaces masterを導入する時期と、PlaceVisit centerからの手動関連付け
+- ActivityWatchの詳細な保存・query規則
+- SQLAlchemy以外のrepository実装を追加する必要性
 - Categoryの初期値
 - AppSession生成ルール
 - ActivityWatchイベントの統合ルール
-- PlaceVisit判定アルゴリズム
+- PlaceVisitの次期algorithm version（現行は`stay_point_v1`で固定）
 - timezone履歴の保存方法
 - Aggregate導入タイミング
-- LocationPointの保持・間引き方針
+- LocationPointの保持・間引き方針（現行Phaseではraw保持、間引き・明示削除は未提供）

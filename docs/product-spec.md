@@ -225,20 +225,26 @@ full accessでは有効化時にbaselineを取り、以後に追加された写�
 
 そのため位置取得頻度はバッテリー消費とのバランスを優先します。
 
-初期案:
+実装値:
 
-- 約5分周期
-- または一定距離移動時
+- Fused Location Providerの`PRIORITY_BALANCED_POWER_ACCURACY`
+- 要求間隔・最小間隔は5分、batchの最大遅延は15分
+- Androidのforeground / background location permissionと位置情報サービスを段階的に確認する
+- foreground service、reverse geocoding、road snapping、cloud分析は使用しない
 
-生位置情報からPC側でPlaceVisitを生成します。
+5分は要求間隔であり、実行・配信期限ではありません。Doze、OEM battery optimization、端末の位置判定、Google Play services、権限、電波の影響で遅延・欠測が起こります。生位置情報はPC側の`location_points`へ正本として保存し、`stay_point_v1`のPlaceVisitを派生させます。過去の移動は、位置収集を有効にした後に受信・同期済みのraw pointだけが対象で、端末やGoogle Play servicesから有効化前の履歴を取得する機能はありません。
+
+Mapは正確なaccuracyがある1,000m以下のpointを表示候補にし、30分超の欠測区間は線を分割します。200m / 15分 / 3 pointのPlaceVisit heuristicは滞在の推定であり、地名・実際の入退場時刻・すべてのGPS fixの正しさを保証しません。raw pointは自動削除・補正せず、PCの`lifelog.db`を重要な個人データとしてbackupします。
 
 ---
 
 # 8. 同期仕様
 
-Androidで収集したデータはRoomへ保存し、PCのAPIからaccepted ACKを受けたrecordだけをsyncedにします。未ACKの写真は端末pendingに残して再送します。
+Androidで収集したデータはRoomへ保存し、PCのAPIからaccepted ACKを受けたrecordだけをsyncedにします。未ACKのAppSession、LocationPoint、写真はデータ種別ごとのpendingに残して再送します。LocationPointの同期は最大200件のbatch、最大20 batchまたは8分のrun budgetで処理し、PC側の`location_points`を正本として保持します。
 
 写真のWorkManager同期は`UNMETERED`、`BatteryNotLow`、`StorageNotLow`を要求します。PC停止・Tailscale未接続・metered network中は送信を待ち、条件回復後に再開します。15分周期 / 5分flexはworkの実行期限ではありません。日々の運転条件と復旧手順は[READMEの写真運用](../README.md#写真の収集と同期)を参照してください。
+
+位置同期はPC停止、Tailscale未接続、network障害でpendingを保持します。位置情報は正確な生活圏を含むため、PCの`lifelog.db`をthumbnailと同じdata rootのbackup対象にします。permission、battery、tile privacy、障害切り分けは[Phase 5位置情報の運用手順](development/phase5-location-operations.md)を参照してください。
 
 # 9. 削除仕様
 
