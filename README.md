@@ -241,6 +241,16 @@ uv run python -m app.cli.import_activitywatch --from 2026-09-01 --to 2026-09-08 
 
 `--to`はexclusiveです。`--from` / `--to`のrangeは最大31 local日で、内部では重なるUTC日chunkへ変換されます。通常runは初回7 UTC日、以後はclosed day cursorと現在日・前日rolling refreshを使います。1 runは最大8 UTC日または8分で終了し、残りは次回runへ残します。`--dry-run`はDB、cursor、leaseを変更しません。
 
+Backend lifespanからの自動importを使う場合は、次の環境変数を明示的に設定します。未設定時は無効で、ActivityWatchへの接続を行いません。
+
+```powershell
+$env:LIFE_TIMELINE_ACTIVITYWATCH_ENABLED = 'true'
+$env:LIFE_TIMELINE_ACTIVITYWATCH_PRIVACY_MODE = 'app_only'
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+状態確認は`GET /api/v1/activitywatch/status`、手動importの要求はbodyなしの`POST /api/v1/activitywatch/import`です。手動要求が受理されると`202`、無効化中または別run実行中は`409`を返します。自動importは起動後30秒待ってから開始し、通常は15分間隔、通信の一時エラー時は1〜15分のbackoffで再試行します。status responseには安全なresult codeと時刻だけを含め、hostname、bucket、アプリ名、title、URL、例外本文は返しません。
+
 ## 写真の収集と同期
 
 写真収集はAndroidアプリで明示的に有効化し、写真へのアクセスを許可して利用します。対象はMediaStoreに登録済みの`DCIM/`配下の画像です。full accessでは有効化後に追加された写真を対象にし、Android 14以降のpartial accessでは利用者が選んだ写真だけを扱います。DCIM外、未公開の撮影中ファイル、Secure Folderや別Androidユーザーの写真は対象外になり得ます。
