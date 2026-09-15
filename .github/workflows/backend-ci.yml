@@ -48,6 +48,9 @@ jobs:
       - name: Test
         run: uv run pytest --junitxml "$RUNNER_TEMP/backend-tests-raw.xml"
 
+      - name: Measure ActivityWatch performance
+        run: uv run python scripts/benchmark_activitywatch.py --output "$RUNNER_TEMP/activitywatch-performance.json"
+
       - name: Sanitize test diagnostics and enforce test gate
         if: always()
         run: >-
@@ -65,6 +68,7 @@ jobs:
           path: |
             ${{ runner.temp }}/backend-ci-safe/backend-junit.xml
             ${{ runner.temp }}/backend-ci-safe/summary.json
+            ${{ runner.temp }}/activitywatch-performance.json
 
       - name: Check migration heads
         run: uv run alembic heads
@@ -114,6 +118,9 @@ jobs:
       - name: Test
         run: uv run pytest --junitxml "$env:RUNNER_TEMP\backend-tests-raw.xml"
 
+      - name: Measure ActivityWatch performance
+        run: uv run python scripts/benchmark_activitywatch.py --output "$env:RUNNER_TEMP\activitywatch-performance.json"
+
       - name: Sanitize test diagnostics and enforce test gate
         if: always()
         run: >-
@@ -131,6 +138,7 @@ jobs:
           path: |
             ${{ runner.temp }}/backend-ci-safe/backend-junit.xml
             ${{ runner.temp }}/backend-ci-safe/summary.json
+            ${{ runner.temp }}/activitywatch-performance.json
 
       - name: Check migration heads
         run: uv run alembic heads

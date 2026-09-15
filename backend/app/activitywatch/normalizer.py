@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import heapq
 import json
 import unicodedata
+from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from itertools import pairwise
@@ -215,16 +217,23 @@ def _select_windows(windows: list[_Window]) -> tuple[_Window, ...]:
     boundaries = sorted(
         {point for window in windows for point in (window.period.start_ms, window.period.end_ms)}
     )
+    ordered = sorted(enumerate(windows), key=lambda item: item[1].period.start_ms)
+    active: list[tuple[tuple[int, str, str], int, int, _Window]] = []
+    next_window = 0
     selected: list[_Window] = []
     for start_ms, end_ms in pairwise(boundaries):
-        covering = [
-            window
-            for window in windows
-            if window.period.start_ms < end_ms and window.period.end_ms > start_ms
-        ]
-        if not covering:
+        while next_window < len(ordered) and ordered[next_window][1].period.start_ms < end_ms:
+            original_index, window = ordered[next_window]
+            heapq.heappush(
+                active,
+                (_window_priority(window), original_index, window.period.end_ms, window),
+            )
+            next_window += 1
+        while active and active[0][2] <= start_ms:
+            heapq.heappop(active)
+        if not active:
             continue
-        winner = sorted(covering, key=_window_priority)[0]
+        winner = active[0][3]
         period = Period(start_ms, end_ms)
         if (
             selected
@@ -253,10 +262,19 @@ def _select_windows(windows: list[_Window]) -> tuple[_Window, ...]:
     return tuple(selected)
 
 
-def _matching_web(fragment: Period, web: list[_Web]) -> tuple[_Web, ...]:
+def _matching_web(
+    fragment: Period,
+    web: list[_Web],
+    web_starts: tuple[int, ...],
+    web_prefix_max_ends: tuple[int, ...],
+) -> tuple[_Web, ...]:
+    if not web:
+        return ()
+    first = bisect_right(web_prefix_max_ends, fragment.start_ms)
+    last = bisect_left(web_starts, fragment.end_ms)
     matching = [
         item
-        for item in web
+        for item in web[first:last]
         if item.period.start_ms < fragment.end_ms and item.period.end_ms > fragment.start_ms
     ]
     return tuple(
@@ -326,6 +344,14 @@ def normalize_activitywatch(
                 diagnostics.redacted_detail_count,
                 diagnostics.truncated_title_count,
             )
+    web.sort(key=lambda item: (item.period.start_ms, item.period.end_ms))
+    web_starts = tuple(item.period.start_ms for item in web)
+    web_prefix_max_ends: list[int] = []
+    for item in web:
+        web_prefix_max_ends.append(
+            max(item.period.end_ms, web_prefix_max_ends[-1] if web_prefix_max_ends else 0)
+        )
+    web_prefix_max_ends_tuple = tuple(web_prefix_max_ends)
     windows = list(_select_windows(windows))
     active_union = union_periods(active)
     fragments: list[_Fragment] = []
@@ -366,7 +392,12 @@ def normalize_activitywatch(
                 if privacy_mode != "app_only" and not browser:
                     title = window.window_title
                 if privacy_mode == "web" and browser:
-                    matched = _matching_web(piece, web)
+                    matched = _matching_web(
+                        piece,
+                        web,
+                        web_starts,
+                        web_prefix_max_ends_tuple,
+                    )
                     if matched:
                         selected_web = matched[0]
                         sources.append(_event_fingerprint(selected_web.source))
