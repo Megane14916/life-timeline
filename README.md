@@ -227,6 +227,20 @@ WorkManagerによる定期収集・自動同期、Room v2、期限付きlease、
 
 受信したraw `LocationPoint`はAndroidのRoomでpendingとして保持し、PC APIが返したaccepted IDだけをsyncedにします。位置同期は最大200件のbatch、1回最大20 batchまたは8分で区切り、PC側では`location_points`を正本として`stay_point_v1`のPlaceVisitを再生成します。位置情報は機微データなので、`$env:LIFE_TIMELINE_DATA_DIR\lifelog.db`を写真の`thumbnails/`と同じsnapshotへ含めてbackupしてください。raw pointの自動間引き・削除、地名への変換、道路への補正は行いません。
 
+## ActivityWatchのimportとbackfill
+
+ActivityWatch連携は既定で無効です。利用者が明示的に有効化した環境で、Backendのdata rootへmigrationを適用してからimport CLIを実行します。CLIはActivityWatchから取得した件数・duration・安全な診断集計だけを表示し、hostname、bucket ID、アプリ名、window title、URLを出力しません。
+
+```powershell
+cd backend
+uv run alembic upgrade head
+uv run python -m app.cli.import_activitywatch --dry-run
+uv run python -m app.cli.import_activitywatch --from 2026-09-01 --to 2026-09-08 --timezone UTC --dry-run
+uv run python -m app.cli.import_activitywatch --from 2026-09-01 --to 2026-09-08 --timezone UTC
+```
+
+`--to`はexclusiveです。`--from` / `--to`のrangeは最大31 local日で、内部では重なるUTC日chunkへ変換されます。通常runは初回7 UTC日、以後はclosed day cursorと現在日・前日rolling refreshを使います。1 runは最大8 UTC日または8分で終了し、残りは次回runへ残します。`--dry-run`はDB、cursor、leaseを変更しません。
+
 ## 写真の収集と同期
 
 写真収集はAndroidアプリで明示的に有効化し、写真へのアクセスを許可して利用します。対象はMediaStoreに登録済みの`DCIM/`配下の画像です。full accessでは有効化後に追加された写真を対象にし、Android 14以降のpartial accessでは利用者が選んだ写真だけを扱います。DCIM外、未公開の撮影中ファイル、Secure Folderや別Androidユーザーの写真は対象外になり得ます。
