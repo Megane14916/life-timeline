@@ -2,16 +2,20 @@ import { useEffect, useState } from 'react'
 
 import {
   ApiClientError,
+  getActivityWatchStatus,
   getAppStatistics,
   getPhotos,
   getTimeline,
+  triggerActivityWatchImport,
 } from '../../api/client'
 import type {
+  ActivityWatchStatusResponse,
   PhotosResponse,
   StatisticsResponse,
   TimelineResponse,
 } from '../../api/types'
 import { Dashboard } from './Dashboard'
+import { ActivityWatchStatus } from './ActivityWatchStatus'
 import {
   readTimelineLocation,
   shiftCalendarDate,
@@ -58,13 +62,18 @@ export function TimelinePage() {
     useState<PanelState<StatisticsResponse>>(initialPanelState)
   const [photosState, setPhotosState] =
     useState<PanelState<PhotosResponse>>(initialPanelState)
+  const [activityWatchState, setActivityWatchState] =
+    useState<PanelState<ActivityWatchStatusResponse>>(initialPanelState)
   const [timelineRetry, setTimelineRetry] = useState(0)
   const [statisticsRetry, setStatisticsRetry] = useState(0)
   const [photosRetry, setPhotosRetry] = useState(0)
+  const [activityWatchRetry, setActivityWatchRetry] = useState(0)
+  const [activityWatchImporting, setActivityWatchImporting] = useState(false)
   const currentKey = locationKey(location)
   const timelineRequestKey = `${currentKey}|${timelineRetry}`
   const statisticsRequestKey = `${currentKey}|${statisticsRetry}`
   const photosRequestKey = `${currentKey}|${photosRetry}`
+  const activityWatchRequestKey = `activitywatch|${activityWatchRetry}`
   const nextDate = nextCalendarDate(location.date)
   const locationIsValid = location.isValid
 
@@ -181,20 +190,88 @@ export function TimelinePage() {
     return () => controller.abort()
   }, [location.date, location.timezone, locationIsValid, photosRequestKey])
 
+  useEffect(() => {
+    if (!locationIsValid) return
+
+    const controller = new AbortController()
+    void getActivityWatchStatus(controller.signal)
+      .then((response) => {
+        if (controller.signal.aborted) return
+        setActivityWatchState({
+          key: activityWatchRequestKey,
+          data: response,
+          error: null,
+        })
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        setActivityWatchState({
+          key: activityWatchRequestKey,
+          data: null,
+          error: errorMessage(error),
+        })
+      })
+
+    return () => controller.abort()
+  }, [activityWatchRequestKey, locationIsValid])
+
+  useEffect(() => {
+    if (!activityWatchImporting) return
+
+    const controller = new AbortController()
+    const poll = () => {
+      void getActivityWatchStatus(controller.signal)
+        .then((response) => {
+          if (controller.signal.aborted) return
+          setActivityWatchState({
+            key: activityWatchRequestKey,
+            data: response,
+            error: null,
+          })
+          if (response.state !== 'queued' && response.state !== 'running') {
+            setActivityWatchImporting(false)
+          }
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return
+          setActivityWatchState({
+            key: activityWatchRequestKey,
+            data: null,
+            error: errorMessage(error),
+          })
+          setActivityWatchImporting(false)
+        })
+    }
+
+    poll()
+    const interval = window.setInterval(poll, 1000)
+    return () => {
+      controller.abort()
+      window.clearInterval(interval)
+    }
+  }, [activityWatchImporting, activityWatchRequestKey])
+
   const timelineMatches =
     locationIsValid && timelineState.key === timelineRequestKey
   const statisticsMatches =
     locationIsValid && statisticsState.key === statisticsRequestKey
   const photosMatches = locationIsValid && photosState.key === photosRequestKey
+  const activityWatchMatches =
+    locationIsValid && activityWatchState.key === activityWatchRequestKey
   const timeline = timelineMatches ? timelineState.data : null
   const statistics = statisticsMatches ? statisticsState.data : null
   const photos = photosMatches ? photosState.data : null
+  const activityWatch = activityWatchMatches ? activityWatchState.data : null
   const timelineError = timelineMatches ? timelineState.error : null
   const statisticsError = statisticsMatches ? statisticsState.error : null
   const photosError = photosMatches ? photosState.error : null
+  const activityWatchError = activityWatchMatches
+    ? activityWatchState.error
+    : null
   const timelineLoading = locationIsValid && !timelineMatches
   const statisticsLoading = locationIsValid && !statisticsMatches
   const photosLoading = locationIsValid && !photosMatches
+  const activityWatchLoading = locationIsValid && !activityWatchMatches
 
   const changeDate = (value: string) => {
     const date =
@@ -222,6 +299,26 @@ export function TimelinePage() {
 
   const retryPhotos = () => {
     setPhotosRetry((value) => value + 1)
+  }
+
+  const retryActivityWatch = () => {
+    setActivityWatchRetry((value) => value + 1)
+  }
+
+  const importActivityWatch = () => {
+    if (activityWatchImporting) return
+    setActivityWatchImporting(true)
+    void triggerActivityWatchImport()
+      .then(() => {
+        setActivityWatchRetry((value) => value + 1)
+      })
+      .catch((error: unknown) => {
+        setActivityWatchImporting(false)
+        setActivityWatchState((current) => ({
+          ...current,
+          error: errorMessage(error),
+        }))
+      })
   }
 
   return (
@@ -253,6 +350,15 @@ export function TimelinePage() {
           error={statisticsError}
           loading={statisticsLoading}
           onRetry={retryStatistics}
+        />
+
+        <ActivityWatchStatus
+          data={activityWatch}
+          error={activityWatchError}
+          loading={activityWatchLoading}
+          importing={activityWatchImporting}
+          onRetry={retryActivityWatch}
+          onImport={importActivityWatch}
         />
 
         <section

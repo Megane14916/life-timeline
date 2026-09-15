@@ -54,6 +54,28 @@ function AppSessionItem({
           <span>{item.deviceName}</span>
           <span>{item.source}</span>
         </div>
+        {item.desktopDetail !== null && (
+          <div className="desktop-detail" data-testid="desktop-detail">
+            {item.desktopDetail.windowTitle !== null && (
+              <p>
+                <span>ウィンドウ</span>
+                <strong>{item.desktopDetail.windowTitle}</strong>
+              </p>
+            )}
+            {item.desktopDetail.url !== null && (
+              <p>
+                <span>Web</span>
+                <strong>{item.desktopDetail.url}</strong>
+              </p>
+            )}
+            {item.desktopDetail.windowTitle === null &&
+              item.desktopDetail.url === null && (
+                <p className="desktop-detail-empty">
+                  許可された詳細情報はありません
+                </p>
+              )}
+          </div>
+        )}
         {flags.length > 0 && (
           <div className="timeline-flags" aria-label="Sessionの境界情報">
             {flags.map((flag) => (

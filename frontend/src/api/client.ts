@@ -1,5 +1,7 @@
 import type {
   ApiErrorBody,
+  ActivityWatchImportTriggerResponse,
+  ActivityWatchStatusResponse,
   MapResponse,
   PhotosResponse,
   StatisticsResponse,
@@ -55,6 +57,37 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return body as T
 }
 
+async function postJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  let response: Response
+  try {
+    response = await fetch(path, { method: 'POST', signal })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw error
+    }
+    throw new ApiClientError(0, 'network_error', 'APIに接続できませんでした。')
+  }
+
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch {
+    body = undefined
+  }
+
+  if (!response.ok) {
+    const apiError = isApiErrorBody(body) ? body.error : undefined
+    throw new ApiClientError(
+      response.status,
+      apiError?.code ?? 'http_error',
+      apiError?.message ?? 'APIの実行に失敗しました。',
+      apiError?.field,
+    )
+  }
+
+  return body as T
+}
+
 export function getTimeline(
   date: string,
   timezone: string,
@@ -94,6 +127,24 @@ export function getAppStatistics(
   const params = new URLSearchParams({ from, to, timezone })
   return getJson<StatisticsResponse>(
     `/api/v1/stats/apps?${params.toString()}`,
+    signal,
+  )
+}
+
+export function getActivityWatchStatus(
+  signal?: AbortSignal,
+): Promise<ActivityWatchStatusResponse> {
+  return getJson<ActivityWatchStatusResponse>(
+    '/api/v1/activitywatch/status',
+    signal,
+  )
+}
+
+export function triggerActivityWatchImport(
+  signal?: AbortSignal,
+): Promise<ActivityWatchImportTriggerResponse> {
+  return postJson<ActivityWatchImportTriggerResponse>(
+    '/api/v1/activitywatch/import',
     signal,
   )
 }

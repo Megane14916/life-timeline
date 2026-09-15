@@ -22,7 +22,13 @@ export interface AppSessionTimelineItem {
   startedAt: string
   endedAt: string
   durationMs: number
+  desktopDetail: DesktopSessionDetail | null
   display: TimelineDisplay
+}
+
+export interface DesktopSessionDetail {
+  windowTitle: string | null
+  url: string | null
 }
 
 export interface PhotoTimelineItem {
@@ -113,6 +119,12 @@ export interface StatisticsTotals {
   appCount: number
 }
 
+export interface StatisticsPlatformTotal {
+  platform: Platform
+  usageMs: number
+  sessionCount: number
+}
+
 export interface StatisticsAppItem {
   appId: string
   platform: Platform
@@ -129,7 +141,28 @@ export interface StatisticsResponse {
   rangeStart: string
   rangeEnd: string
   totals: StatisticsTotals
+  platformTotals: StatisticsPlatformTotal[]
   items: StatisticsAppItem[]
+}
+
+export type ActivityWatchCollectorState =
+  'disabled' | 'idle' | 'queued' | 'running' | 'needs_attention'
+
+export interface ActivityWatchStatusResponse {
+  enabled: boolean
+  detailMode: 'app_only' | 'titles' | 'web'
+  state: ActivityWatchCollectorState
+  lastResult: string | null
+  lastAttemptAt: string | null
+  lastSuccessAt: string | null
+  completedThrough: string | null
+  nextAttemptAt: string | null
+  webDetailsAvailable: boolean
+}
+
+export interface ActivityWatchImportTriggerResponse {
+  accepted: boolean
+  state: 'queued' | 'running' | 'idle'
 }
 
 export interface ApiErrorBody {
