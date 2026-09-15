@@ -57,11 +57,13 @@ def discover_buckets(
     """Select same-host buckets using metadata, never bucket-ID patterns."""
 
     hostname = expected_hostname or info.hostname
-    if not hostname or (expected_hostname is not None and info.hostname != expected_hostname):
+    if not hostname or (
+        expected_hostname is not None and info.hostname.casefold() != expected_hostname.casefold()
+    ):
         return ActivityWatchDiscovery(
             hostname, None, None, None, ACTIVITYWATCH_MISSING_WINDOW_BUCKET
         )
-    same_host = [bucket for bucket in buckets if bucket.hostname == hostname]
+    same_host = [bucket for bucket in buckets if bucket.hostname.casefold() == hostname.casefold()]
     window = _choose(
         [bucket for bucket in same_host if bucket.type == "currentwindow"], WINDOW_CLIENT_PRIORITY
     )

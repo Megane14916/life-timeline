@@ -38,3 +38,15 @@ def new_ulid() -> str:
     if timestamp_ms >= 2**48:
         raise OverflowError("the current timestamp cannot be represented by a ULID")
     return _encode_base32(timestamp_ms, 10) + _encode_base32(secrets.randbits(80), 16)
+
+
+def deterministic_ulid(timestamp_ms: int, entropy: bytes) -> str:
+    """Build a canonical ULID from a timestamp and exactly 80 bits of entropy."""
+
+    if isinstance(timestamp_ms, bool) or not isinstance(timestamp_ms, int):
+        raise ValueError("timestamp_ms must be an integer.")
+    if timestamp_ms < 0 or timestamp_ms >= 2**48:
+        raise ValueError("timestamp_ms is outside the ULID range.")
+    if len(entropy) != 10:
+        raise ValueError("entropy must contain exactly 80 bits.")
+    return _encode_base32(timestamp_ms, 10) + _encode_base32(int.from_bytes(entropy, "big"), 16)
