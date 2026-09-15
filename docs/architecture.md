@@ -60,7 +60,7 @@ flowchart LR
 - TypeScript
 - Vite
 - React Router
-- MapLibre GL JS または Leaflet
+- Leaflet `1.9.4`（online basemapは明示opt-in）
 - 必要に応じてグラフライブラリを追加
 
 初期段階ではブラウザから `localhost` を開くローカルWebアプリとして開発します。
@@ -96,7 +96,7 @@ flowchart LR
 - MediaStore
 - Fused Location Provider
 
-Androidはライフログデータの収集、一時保存、PCへの同期に特化します。写真収集と写真同期はUsageStatsのworkerから独立し、写真専用のunique work nameとRoom leaseを使います。写真収集は15分周期 / 5分flexで、BatteryNotLow・StorageNotLowを要求します。写真同期はUNMETERED・BatteryNotLow・StorageNotLowを要求し、20件単位、最大8分または10 batchで処理します。ACKを受けた写真だけをsyncedへ更新し、network障害時はpendingを保ってretryします。
+Androidはライフログデータの収集、一時保存、PCへの同期に特化します。写真、AppSession、LocationのworkerとRoom leaseは独立させ、Locationの登録・watchdog・同期が既存workerをreplaceしないようにします。位置取得はFused Location Providerの`PRIORITY_BALANCED_POWER_ACCURACY`を使うbatched `PendingIntent`方式で、要求間隔と最小間隔は5分、最大batch遅延は15分です。foreground serviceは使用せず、OSのbackground制約による遅延・欠測を許容します。位置のraw pointはRoomでpendingとして保持し、accepted ACKを受けたIDだけをsyncedにします。写真収集は15分周期 / 5分flexで、BatteryNotLow・StorageNotLowを要求します。写真同期はUNMETERED・BatteryNotLow・StorageNotLowを要求し、20件単位、最大8分または10 batchで処理します。
 
 ### 通信
 
@@ -149,7 +149,7 @@ life-timeline-data/
 
 - devices
 - apps
-- places
+- place naming is not persisted in the current schema; `PlaceVisit` keeps a derived center only
 - categories
 
 ### Fact / Record
@@ -243,19 +243,19 @@ flowchart LR
 
 ```text
 Fused Location Provider
-    ↓
-LocationPoint
-    ↓
-Room
-    ↓
-同期
-    ↓
-SQLite
-    ↓
-PlaceVisit生成
-    ↓
-Map / Timeline
+    ↓ batched PendingIntent
+LocationUpdatesReceiver
+    ↓ normalize / dedupe
+Room: pending LocationPoint
+    ↓ accepted ID ACK
+Tailscale Serve / FastAPI
+    ↓ transaction
+SQLite: raw location_points
+    ├─ stay_point_v1 → PlaceVisit
+    └─ daily Map / Timeline query
 ```
+
+位置permission、OSの位置情報サービス、battery最適化、PC停止中のpendingは[Phase 5位置情報の運用手順](development/phase5-location-operations.md)で切り分けます。背景tileは初期OFFで、ユーザーがオンライン背景地図を明示的に有効化した時だけOpenStreetMapへbrowserからrequestします。life-timelineのAPI payloadやmarker dataをtile providerへ送信しません。
 
 ## 6. ローカルWebアプリとしての構成
 
