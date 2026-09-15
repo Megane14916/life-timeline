@@ -400,22 +400,22 @@ class ActivityWatchRepository:
         for app in apps:
             _validate_app(app)
         durations = {session.id: _validate_session(session) for session in sessions}
-        for detail in details:
-            _validate_detail(detail)
-            if detail.privacy_mode != privacy_mode:
+        for detail_record in details:
+            _validate_detail(detail_record)
+            if detail_record.privacy_mode != privacy_mode:
                 raise RepositoryValidationError("detail privacy mode differs from import state.")
 
         session_by_id: dict[str, ActivityWatchSessionRecord] = {}
-        for record in sessions:
-            if record.id in session_by_id:
+        for session_record in sessions:
+            if session_record.id in session_by_id:
                 raise ActivityWatchConflictError("duplicate ActivityWatch session identifier.")
-            session_by_id[record.id] = record
+            session_by_id[session_record.id] = session_record
         detail_by_session: dict[str, ActivityWatchDetailRecord] = {}
-        for record in details:
-            if record.session_id in detail_by_session:
+        for detail_record in details:
+            if detail_record.session_id in detail_by_session:
                 raise ActivityWatchConflictError("duplicate ActivityWatch detail identifier.")
-            detail_by_session[record.session_id] = record
-            if record.session_id not in session_by_id:
+            detail_by_session[detail_record.session_id] = detail_record
+            if detail_record.session_id not in session_by_id:
                 raise RepositoryValidationError("detail references a session outside the import.")
 
         with self._transaction_scope():
@@ -444,7 +444,7 @@ class ActivityWatchRepository:
                     )
                 )
                 app_id_map[app.id] = app_model.id
-            if any(record.app_id not in app_id_map for record in sessions):
+            if any(session_record.app_id not in app_id_map for session_record in sessions):
                 raise RepositoryValidationError("app_session references an unknown app.")
 
             self._preflight_conflicts(
@@ -462,34 +462,36 @@ class ActivityWatchRepository:
             )
             self.session.execute(delete(AppSession).where(AppSession.id.in_(target_ids)))
 
-            for record in sorted(sessions, key=lambda item: (item.started_at_ms, item.id)):
-                if self.session.get(AppSession, record.id) is not None:
+            for session_record in sorted(sessions, key=lambda item: (item.started_at_ms, item.id)):
+                if self.session.get(AppSession, session_record.id) is not None:
                     continue
                 self.session.add(
                     AppSession(
-                        id=record.id,
+                        id=session_record.id,
                         device_id=device_model.id,
-                        app_id=app_id_map[record.app_id],
-                        started_at_ms=record.started_at_ms,
-                        ended_at_ms=record.ended_at_ms,
-                        duration_ms=durations[record.id],
+                        app_id=app_id_map[session_record.app_id],
+                        started_at_ms=session_record.started_at_ms,
+                        ended_at_ms=session_record.ended_at_ms,
+                        duration_ms=durations[session_record.id],
                         source=ACTIVITYWATCH_SOURCE,
-                        created_at_ms=record.created_at_ms,
+                        created_at_ms=session_record.created_at_ms,
                     )
                 )
             self.session.flush()
-            for record in details:
-                existing_detail = self.session.get(DesktopSessionDetail, record.session_id)
+            for detail_record in details:
+                existing_detail = self.session.get(
+                    DesktopSessionDetail, detail_record.session_id
+                )
                 if existing_detail is None:
                     self.session.add(
                         DesktopSessionDetail(
-                            session_id=record.session_id,
-                            window_title=record.window_title,
-                            url=record.url,
-                            source_event_id=record.source_event_id,
-                            algorithm_version=record.algorithm_version,
-                            privacy_mode=record.privacy_mode,
-                            created_at_ms=record.created_at_ms,
+                            session_id=detail_record.session_id,
+                            window_title=detail_record.window_title,
+                            url=detail_record.url,
+                            source_event_id=detail_record.source_event_id,
+                            algorithm_version=detail_record.algorithm_version,
+                            privacy_mode=detail_record.privacy_mode,
+                            created_at_ms=detail_record.created_at_ms,
                         )
                     )
             state.last_attempt_at_ms = now_ms
@@ -504,7 +506,7 @@ class ActivityWatchRepository:
         return ActivityWatchReplaceResult(
             session_count=len(sessions),
             total_duration_ms=sum(durations.values()),
-            app_count=len({record.app_id for record in sessions}),
+            app_count=len({session_record.app_id for session_record in sessions}),
         )
 
     def _locked_state(self, source_key: str) -> ActivityWatchImportState | None:
@@ -536,27 +538,27 @@ class ActivityWatchRepository:
         device_id: str,
         durations: dict[str, int],
     ) -> None:
-        for record in sessions:
-            existing = self.session.get(AppSession, record.id)
+        for session_record in sessions:
+            existing = self.session.get(AppSession, session_record.id)
             if existing is not None and _session_content(existing) != (
                 device_id,
-                app_id_map[record.app_id],
-                record.started_at_ms,
-                record.ended_at_ms,
-                durations[record.id],
+                app_id_map[session_record.app_id],
+                session_record.started_at_ms,
+                session_record.ended_at_ms,
+                durations[session_record.id],
                 ACTIVITYWATCH_SOURCE,
             ):
                 raise ActivityWatchConflictError(
                     "an ActivityWatch session identifier has different content."
                 )
-        for record in details:
-            existing = self.session.get(DesktopSessionDetail, record.session_id)
-            if existing is not None and _detail_content(existing) != (
-                record.window_title,
-                record.url,
-                record.source_event_id,
-                record.algorithm_version,
-                record.privacy_mode,
+        for detail_record in details:
+            existing_detail = self.session.get(DesktopSessionDetail, detail_record.session_id)
+            if existing_detail is not None and _detail_content(existing_detail) != (
+                detail_record.window_title,
+                detail_record.url,
+                detail_record.source_event_id,
+                detail_record.algorithm_version,
+                detail_record.privacy_mode,
             ):
                 raise ActivityWatchConflictError(
                     "an ActivityWatch detail identifier has different content."
