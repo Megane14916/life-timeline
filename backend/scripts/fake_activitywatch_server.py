@@ -37,11 +37,11 @@ def _fixture_events(bucket_id: str, start: datetime, end: datetime) -> list[dict
             if bucket_id == "p6-window":
                 data: dict[str, object] = {
                     "app": "chrome.exe",
-                    "title": "P6-09 <script>alert(1)</script> \"fixture\"",
+                    "title": 'P6-09 <script>alert(1)</script> "fixture"',
                 }
             elif bucket_id == "p6-web":
                 data = {
-                    "title": "P6-09 <script>alert(1)</script> \"web fixture\"",
+                    "title": 'P6-09 <script>alert(1)</script> "web fixture"',
                     "url": "https://p6-09.example.invalid/timeline/path",
                     "incognito": False,
                 }
