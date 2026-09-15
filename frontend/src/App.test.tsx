@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -37,6 +38,7 @@ const timelineResponse = {
       startedAt: '2026-09-02T14:50:00.000Z',
       endedAt: '2026-09-02T15:10:00.000Z',
       durationMs: 1200000,
+      desktopDetail: null,
       display: {
         startedAt: '2026-09-02T15:00:00.000Z',
         endedAt: '2026-09-02T15:10:00.000Z',
@@ -103,6 +105,10 @@ const statisticsResponse = {
   rangeStart: '2026-09-02T15:00:00.000Z',
   rangeEnd: '2026-09-03T15:00:00.000Z',
   totals: { usageMs: 3900000, sessionCount: 4, appCount: 2 },
+  platformTotals: [
+    { platform: 'android' as const, usageMs: 2100000, sessionCount: 3 },
+    { platform: 'windows' as const, usageMs: 1800000, sessionCount: 1 },
+  ],
   items: [
     {
       appId: '01J00000000000000000001101',
@@ -113,6 +119,33 @@ const statisticsResponse = {
       sessionCount: 3,
     },
   ],
+}
+
+const activityWatchStatusResponse = {
+  enabled: false,
+  detailMode: 'app_only' as const,
+  state: 'disabled' as const,
+  lastResult: null,
+  lastAttemptAt: null,
+  lastSuccessAt: null,
+  completedThrough: null,
+  nextAttemptAt: null,
+  webDetailsAvailable: false,
+}
+
+const activityWatchTimelineItem = {
+  ...timelineResponse.items[0],
+  id: '01J00000000000000000001305',
+  deviceName: 'Demo Windows',
+  platform: 'windows' as const,
+  appId: '01J00000000000000000001104',
+  appIdentifier: 'code.exe',
+  appName: 'Code.exe',
+  source: 'activitywatch',
+  desktopDetail: {
+    windowTitle: '<script>alert(1)</script>',
+    url: 'https://example.invalid/project?q=<script>',
+  },
 }
 
 describe('App', () => {
@@ -126,11 +159,13 @@ describe('App', () => {
     vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
       const url = requestPath(input)
       requestedPaths.push(url)
-      const body = url.includes('/stats/apps')
-        ? statisticsResponse
-        : url.includes('/api/v1/photos')
-          ? photosResponse
-          : timelineResponse
+      const body = url.includes('/activitywatch/status')
+        ? activityWatchStatusResponse
+        : url.includes('/stats/apps')
+          ? statisticsResponse
+          : url.includes('/api/v1/photos')
+            ? photosResponse
+            : timelineResponse
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -264,6 +299,101 @@ describe('App', () => {
       'href',
       `/map?date=2026-09-03&timezone=Asia%2FTokyo&visit=${placeVisitItem.id}`,
     )
+  })
+
+  it('renders ActivityWatch detail as escaped text and shows platform totals', async () => {
+    vi.stubGlobal('fetch', (input: RequestInfo | URL) => {
+      const url = requestPath(input)
+      const body = url.includes('/activitywatch/status')
+        ? { ...activityWatchStatusResponse, enabled: true }
+        : url.includes('/stats/apps')
+          ? statisticsResponse
+          : url.includes('/api/v1/photos')
+            ? photosResponse
+            : { ...timelineResponse, items: [activityWatchTimelineItem] }
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+
+    render(<App />)
+
+    const detail = await screen.findByTestId('desktop-detail')
+    expect(
+      within(detail).getByText('<script>alert(1)</script>'),
+    ).toBeInTheDocument()
+    expect(
+      within(detail).getByText('https://example.invalid/project?q=<script>'),
+    ).toBeInTheDocument()
+    expect(
+      within(detail).queryByRole('link', {
+        name: 'https://example.invalid/project?q=<script>',
+      }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByTestId('dashboard-platform-totals')).toHaveTextContent(
+      'Android',
+    )
+    expect(screen.getByTestId('dashboard-platform-totals')).toHaveTextContent(
+      'Windows',
+    )
+    expect(screen.getByText('30分')).toBeInTheDocument()
+  })
+
+  it('sends one manual ActivityWatch import and refreshes its status', async () => {
+    let postCalls = 0
+    let statusCalls = 0
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestPath(input)
+      if (url.includes('/activitywatch/import')) {
+        postCalls += 1
+        return Promise.resolve(
+          new Response(JSON.stringify({ accepted: true, state: 'queued' }), {
+            status: 202,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      if (url.includes('/activitywatch/status')) {
+        statusCalls += 1
+        const completed = statusCalls > 1
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              ...activityWatchStatusResponse,
+              enabled: true,
+              state: 'idle',
+              lastResult: completed ? 'success' : null,
+              lastSuccessAt: completed ? '2026-09-03T00:30:00.000Z' : null,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        )
+      }
+      const body = url.includes('/stats/apps')
+        ? statisticsResponse
+        : url.includes('/api/v1/photos')
+          ? photosResponse
+          : timelineResponse
+      return Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status: init?.method === 'POST' ? 202 : 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    })
+
+    render(<App />)
+
+    const importButton = await screen.findByRole('button', {
+      name: '今すぐ取り込む',
+    })
+    fireEvent.click(importButton)
+    fireEvent.click(importButton)
+
+    await waitFor(() => expect(postCalls).toBe(1))
+    expect(statusCalls).toBeGreaterThan(1)
+    expect(await screen.findByText('成功')).toBeInTheDocument()
   })
 
   it('shows a Photos API error independently and retries that panel', async () => {
@@ -417,6 +547,7 @@ describe('App', () => {
         ? {
             ...statisticsResponse,
             totals: { usageMs: 0, sessionCount: 0, appCount: 0 },
+            platformTotals: [],
             items: [],
           }
         : { ...timelineResponse, items: [] }
@@ -428,7 +559,9 @@ describe('App', () => {
 
     render(<App />)
 
-    expect(await screen.findByText('0分')).toBeInTheDocument()
+    expect(await screen.findByTestId('dashboard-usage')).toHaveTextContent(
+      '0分',
+    )
     expect(screen.getAllByText('0件')).toHaveLength(2)
     expect(screen.getByText('この日の記録はありません')).toBeInTheDocument()
     expect(screen.getByText('この日の写真はありません。')).toBeInTheDocument()
@@ -477,6 +610,6 @@ describe('App', () => {
       await screen.findByDisplayValue(/\d{4}-\d{2}-\d{2}/),
     ).toBeInTheDocument()
     expect(window.location.search).not.toContain('Not%2FAZone')
-    expect(requestedPaths.length).toBe(3)
+    expect(requestedPaths.length).toBe(4)
   })
 })
