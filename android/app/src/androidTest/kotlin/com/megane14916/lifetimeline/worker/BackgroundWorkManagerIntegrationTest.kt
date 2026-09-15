@@ -215,7 +215,9 @@ class BackgroundWorkManagerIntegrationTest {
       assertEquals(0, adapter.removedPendingIntents.size)
       val receiverIntent = locationUpdatesReceiverIntent(context)
       assertEquals(locationPendingIntent(context), adapter.pendingIntents[0])
-      assertFalse("Fused Location must be able to attach LocationResult extras", adapter.pendingIntents[0].isImmutable)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        assertFalse("Fused Location must be able to attach LocationResult extras", adapter.pendingIntents[0].isImmutable)
+      }
       assertEquals(
         "com.megane14916.lifetimeline.location.LocationUpdatesReceiver",
         receiverIntent.component?.className,
