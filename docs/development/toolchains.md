@@ -72,12 +72,14 @@ P5-01では、Androidの位置受信とPCのMap表示に必要な依存を、後
 
 | 対象 | 確認したstable version | 初めて固定する場所 | 用途 |
 | --- | --- | --- | --- |
-| Google Play services Location | `21.4.0` | Android version catalog、`android/app/build.gradle.kts` | Fused Location Providerのbatched `PendingIntent`更新。foreground serviceは使用しない |
+| Google Play services Location | `21.4.0` | Android version catalog、`android/app/build.gradle.kts` | Fused Location Providerのbalanced power、5分要求、15分最大batch遅延、batched `PendingIntent`更新。foreground serviceは使用しない |
 | AndroidX Fragment | `1.9.0` | Android version catalog、`android/app/build.gradle.kts` | Activity Result APIのLint要件を満たし、Location依存が解決する古いtransitive Fragmentを上書きする |
 | Leaflet | `1.9.4` | `frontend/package.json`、`frontend/package-lock.json` | PCの日次Mapのroute / visit / photo overlay |
 | `@types/leaflet` | `1.9.22` | `frontend/package.json`、`frontend/package-lock.json` | TypeScript 6でのLeaflet型定義 |
 
 Google Play services Locationは[公式セットアップ手順](https://developers.google.com/android/guides/setup)と[release notes](https://developers.google.com/android/guides/releases)、Fragmentは[AndroidX Fragment release notes](https://developer.android.com/jetpack/androidx/releases/fragment)、Leafletと型定義は[npm package registry](https://www.npmjs.com/package/leaflet)および[`@types/leaflet`](https://www.npmjs.com/package/@types/leaflet)でstable tagを確認した。Mapの実装はP5-08で行うが、online basemapは初期OFFとし、利用者が明示操作したときだけOpenStreetMap tileを取得する。位置contractの固定値、合成fixture、fieldの拒否規則は`contracts/sync/locations-v1.json`を正とする。
+
+位置情報の実機運用では、5分を配信周期やdeadlineとして扱わない。AndroidのDoze、OEM battery optimization、permission、位置情報サービス、Google Play services、電波により遅延・欠測が起こる。位置情報を有効化する前に専用DBを用意し、PC停止中のpending保持と復旧後のaccepted ACKを確認する。位置情報は正確な生活圏を含むため、`lifelog.db`をbackupから除外せず、実座標・地名・tile URL・endpointをログ、Issue、PRへ記録しない。日常運用の切り分けは[Phase 5位置情報の運用手順](phase5-location-operations.md)を参照する。
 
 ## 3. Androidアプリの識別子
 

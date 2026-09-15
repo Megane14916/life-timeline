@@ -130,6 +130,8 @@ Phase 3で確定した主な運用値は、collectionの15分周期 / 5分flex�
 
 ## Phase 5: Location
 
+状態: 実装完了。P5-01〜P5-09の自動検証とP5-10の実機受け入れ手順を反映しています。実機のOS配信時刻、OEM差、Doze、battery、長期運転はbest-effort・任意確認として扱い、未実施をPASSとはしません。固定値・非保証・privacy境界は[Phase 5詳細計画](detailed_plan/phase5-location.md)、運用は[Phase 5位置情報の運用手順](development/phase5-location-operations.md)を参照してください。
+
 開始条件: Phase 4の文書引き継ぎがmainへ反映されていること。Photosの正規化media_items、timezone日範囲query、EXIF latitude / longitude、写真固有worker / lease / retry、privacy用合成fixtureを再利用します。LocationPointの連続記録・PlaceVisitは独立した保存モデルとし、写真workerやACCESS_MEDIA_LOCATIONへ混在させません。実装前にLocation固有のpermission、work name、周期、battery budget、同期batch、Map表示を決定します。
 
 目的:
@@ -147,9 +149,11 @@ Phase 3で確定した主な運用値は、collectionの15分周期 / 5分flex�
 
 完成条件:
 
-その日の移動経路と主な滞在場所をPCで確認できる。
+合成fixtureによるrequired CIが成功し、位置収集を有効化した後に同期されたraw pointから、その日の移動経路と主な滞在場所をPCで確認できる。5分ごとの到着、完全な軌跡、地名の自動判定、常時高精度は完成条件にしない。
 
 ## Phase 6: ActivityWatch
+
+開始条件: Phase 5の保存・同期・query境界とprivacy-safeな運用手順がmainへ反映されていること。Phase 6のPC collectorはAndroidのlocation permission、PendingIntent、Room、OSM tile取得を共有しない。
 
 目的:
 
@@ -162,6 +166,13 @@ PC上の行動をlife-timelineへ統合する。
 - Web履歴
 - PC利用時間
 - Timeline統合
+
+再利用する境界:
+
+- `app_sessions` / `place_visits` / `media_items`を混在させるTimeline discriminated unionとtimezone日範囲query
+- raw Factと再生成可能なderived Factを分けるrepository / CLI pattern
+- data type別unique work、lease、retry、safe diagnostics
+- batch、冪等ID、transaction、性能計測の形式
 
 完成条件:
 

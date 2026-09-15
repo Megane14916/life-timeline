@@ -50,7 +50,7 @@ Presentation / Analysis
 - `devices`: 端末情報
 - `apps`: Android / Windows共通のアプリ情報
 - `categories`: アプリ等の統計カテゴリ
-- `places`: 自宅・大学・駅など意味のある場所
+- 命名済み`places` master: 現行Phaseでは未導入。`PlaceVisit`はcenterを持つ派生Factとして保存する
 
 ### Fact / Record
 
@@ -102,7 +102,7 @@ UI表示時にローカルタイムへ変換します。
 
 ## 4. ID
 
-データIDにはUUID v7またはULIDを使用します。
+データIDにはULIDを使用します。LocationPointのIDは同じfixの再配信で安定するdeterministic ULIDです。
 
 Android側でIDを生成します。
 
@@ -248,17 +248,25 @@ Androidは端末内private directoryにthumbnailをatomic保存し、ACK後に�
 
 ## 7. 位置情報設計
 
-位置情報はAndroid側で唯一、継続的な取得が必要になるデータです。
+位置情報はAndroid側で継続的な取得を行うデータです。Phase 5では、過度なbattery消費と常時追跡を避けるため、Fused Location Providerの`PRIORITY_BALANCED_POWER_ACCURACY`とstableなpackage-scoped `PendingIntent`を採用します。
 
-初期設定候補:
+| 項目 | 実装値 / 方針 |
+| --- | --- |
+| opt-in | アプリ設定で明示的に有効化。permissionだけでは開始しない |
+| foreground / background | foreground permissionを先に確認し、background permissionは別導線で許可する |
+| request priority | `PRIORITY_BALANCED_POWER_ACCURACY` |
+| request interval / minimum interval | 5分 / 5分 |
+| maximum batch delay | 15分 |
+| delivery | `LocationUpdatesReceiver`へのbatched `PendingIntent` |
+| registration recovery | opt-in、boot、package replaced、12時間watchdogでunique registration workをenqueue |
+| sync batch / run budget | 最大200 point / 最大20 batchまたは8分 |
+| retry | network / serverはretry、protocol failureはfailure。初期backoff 15分 |
+| foreground service | 使用しない |
+| reverse geocoding / road snapping | 実装しない |
 
-- 5分程度の周期
-- または一定距離移動時
-- 高精度GPSを常時要求しない
+5分、15分、12時間はいずれも実行・配信期限ではありません。Doze、OEM最適化、permission、位置情報サービス、Google Play services、端末状態、電波により遅延・欠測します。Androidはraw pointをRoomへ保存し、PCは`location_points`をSource of Truthとして`stay_point_v1` PlaceVisitを再生成します。
 
-実機テストでバッテリー消費と精度を比較し、最終値を決定します。
-
-PC側では生のLocationPointを保存し、後からPlaceVisitを生成します。
+Mapではaccuracyが存在して1,000m以下のpointを候補にし、30分超のgapまたはPlaceVisitの時間範囲をまたぐ箇所でrouteを分割します。raw GPS jumpを移動距離・速度・mock判定で自動削除・補正するheuristicは導入しません。
 
 例:
 
