@@ -520,6 +520,138 @@ td {
   font-weight: 700;
 }
 
+.activitywatch-status {
+  margin-bottom: 1.5rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+.activitywatch-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.activitywatch-status-grid > div {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.8rem;
+  border-radius: 0.8rem;
+  background: #f0f6f3;
+}
+
+.activitywatch-status-grid span {
+  color: #789087;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.activitywatch-status-grid strong {
+  color: #285c4c;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.activitywatch-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid #dbe6e1;
+  padding-top: 1rem;
+}
+
+.activitywatch-actions p {
+  margin: 0;
+  color: #59766c;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.activitywatch-actions button {
+  flex: 0 0 auto;
+}
+
+.platform-summary {
+  margin-bottom: 1.5rem;
+  border-top: 1px solid #dbe6e1;
+  padding-top: 1.25rem;
+}
+
+.platform-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.platform-card {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #d4e2dc;
+  border-radius: 0.9rem;
+  background: #fbfefc;
+}
+
+.platform-card > span {
+  color: #59766c;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.platform-card strong {
+  color: #1b7057;
+  font-size: 1.35rem;
+}
+
+.platform-card small {
+  color: #789087;
+  font-size: 0.75rem;
+}
+
+.platform-note {
+  margin: 0.7rem 0 0;
+  color: #789087;
+  font-size: 0.75rem;
+}
+
+.desktop-detail {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+  border-left: 3px solid #95c8b0;
+  padding-left: 0.8rem;
+}
+
+.desktop-detail p {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+  min-width: 0;
+}
+
+.desktop-detail p > span {
+  color: #789087;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.desktop-detail p > strong {
+  color: #365d50;
+  font-size: 0.82rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.desktop-detail .desktop-detail-empty {
+  color: #789087;
+  font-size: 0.78rem;
+}
+
 .status-message {
   color: #4c5f5a;
   line-height: 1.7;
@@ -707,6 +839,19 @@ td {
 
   .photo-grid-details {
     padding: 0.65rem;
+  }
+
+  .activitywatch-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .activitywatch-actions button {
+    width: 100%;
+  }
+
+  .platform-grid {
+    grid-template-columns: 1fr;
   }
 }
 

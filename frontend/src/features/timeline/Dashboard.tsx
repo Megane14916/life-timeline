@@ -9,6 +9,14 @@ interface DashboardProps {
 }
 
 export function Dashboard({ data, error, loading, onRetry }: DashboardProps) {
+  const platformTotals = data?.platformTotals ?? []
+  const platformTotal = (platform: 'android' | 'windows') =>
+    platformTotals.find((item) => item.platform === platform) ?? {
+      platform,
+      usageMs: 0,
+      sessionCount: 0,
+    }
+
   return (
     <section className="dashboard panel" aria-labelledby="dashboard-title">
       <div className="section-heading">
@@ -50,6 +58,31 @@ export function Dashboard({ data, error, loading, onRetry }: DashboardProps) {
                 {data.totals.appCount}件
               </strong>
             </div>
+          </div>
+
+          <div
+            className="platform-summary"
+            data-testid="dashboard-platform-totals"
+          >
+            <div className="subsection-heading">
+              <h3>プラットフォーム別</h3>
+              <span>記録されたSession</span>
+            </div>
+            <div className="platform-grid">
+              {(['android', 'windows'] as const).map((platform) => {
+                const total = platformTotal(platform)
+                return (
+                  <div className="platform-card" key={platform}>
+                    <span>{formatPlatform(platform)}</span>
+                    <strong>{formatDuration(total.usageMs)}</strong>
+                    <small>{total.sessionCount}セッション</small>
+                  </div>
+                )
+              })}
+            </div>
+            <p className="platform-note">
+              WindowsはActivityWatchのnot-afk記録から算出しています。
+            </p>
           </div>
 
           <div className="app-summary">
