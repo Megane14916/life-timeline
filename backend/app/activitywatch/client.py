@@ -6,7 +6,7 @@ import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -28,6 +28,32 @@ ACTIVITYWATCH_API_PREFIX = "/api/0"
 ACTIVITYWATCH_STABLE_RELEASE = "0.13.2"
 MAX_RESPONSE_BYTES = 32 * 1024 * 1024
 EVENT_LIMIT = 10_000
+LOOPBACK_HOSTS = frozenset(("127.0.0.1", "localhost", "::1"))
+
+
+def _validate_loopback_base_url(value: str) -> str:
+    """Allow test/configuration overrides without turning the client into a proxy."""
+
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("ActivityWatch base URL must not be blank.")
+    parsed = urlsplit(value.strip())
+    if (
+        parsed.scheme.lower() != "http"
+        or parsed.hostname not in LOOPBACK_HOSTS
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in {"", "/"}
+    ):
+        raise ValueError("ActivityWatch base URL must be an HTTP loopback URL.")
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise ValueError("ActivityWatch base URL has an invalid port.") from error
+    if port is None:
+        raise ValueError("ActivityWatch base URL must include a port.")
+    return value.strip().rstrip("/")
 
 
 def _timestamp_param(value: datetime | str) -> str:
@@ -64,6 +90,7 @@ class ActivityWatchClient:
         self,
         *,
         transport: httpx.BaseTransport | None = None,
+        base_url: str = LOOPBACK_BASE_URL,
         expected_version: str = ACTIVITYWATCH_STABLE_RELEASE,
         max_response_bytes: int = MAX_RESPONSE_BYTES,
         connect_timeout_seconds: float = 2.0,
@@ -71,10 +98,11 @@ class ActivityWatchClient:
     ) -> None:
         if max_response_bytes <= 0 or connect_timeout_seconds <= 0 or read_timeout_seconds <= 0:
             raise ValueError("ActivityWatch client limits must be positive.")
+        validated_base_url = _validate_loopback_base_url(base_url)
         self._expected_version = expected_version
         self._max_response_bytes = max_response_bytes
         self._client = httpx.Client(
-            base_url=LOOPBACK_BASE_URL,
+            base_url=validated_base_url,
             follow_redirects=False,
             trust_env=False,
             timeout=httpx.Timeout(
