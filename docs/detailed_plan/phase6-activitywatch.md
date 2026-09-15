@@ -534,6 +534,8 @@ P6-01 contract・privacy・依存versionを確定
 - **成果物:** source contract、privacy review、合成fixture、dependency / lock更新、toolchains追記。
 - **完了条件:** fixtureに個人情報がなく、write API・remote endpoint・query / fragment保存を実装しない境界がtest可能である。
 
+P6-01のsource contractは[`contracts/activitywatch-v1.json`](../../contracts/activitywatch-v1.json)、privacy reviewは[Phase 6 ActivityWatch privacy review](../development/phase6-activitywatch-privacy.md)を正とする。
+
 ### P6-02: Alembic 0004、Repository、DB leaseを実装する
 
 - **目的:** PC detailとimport状態を既存Factへ安全に関連付ける。

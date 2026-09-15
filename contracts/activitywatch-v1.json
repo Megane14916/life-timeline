@@ -1,0 +1,247 @@
+{
+  "contractVersion": 1,
+  "source": "activitywatch",
+  "activitywatchStableRelease": "0.13.2",
+  "fixture": {
+    "synthetic": true,
+    "hostname": "fixture-host",
+    "reservedDomain": "example.invalid",
+    "bucketIds": [
+      "fixture-window-bucket",
+      "fixture-afk-bucket",
+      "fixture-web-bucket"
+    ]
+  },
+  "requests": {
+    "baseUrl": "http://127.0.0.1:5600",
+    "allowed": [
+      {
+        "method": "GET",
+        "path": "/api/0/info"
+      },
+      {
+        "method": "GET",
+        "path": "/api/0/buckets/"
+      },
+      {
+        "method": "GET",
+        "path": "/api/0/buckets/{percent_encoded_bucket_id}/events",
+        "query": {
+          "start": "UTC ISO 8601",
+          "end": "UTC ISO 8601",
+          "limit": 10000
+        }
+      }
+    ],
+    "forbiddenMethods": [
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE"
+    ],
+    "redirects": "disabled",
+    "proxy": "disabled",
+    "maxResponseBytes": 33554432
+  },
+  "responses": {
+    "info": {
+      "version": "0.13.2",
+      "hostname": "fixture-host",
+      "testing": false
+    },
+    "buckets": {
+      "fixture-window-bucket": {
+        "id": "fixture-window-bucket",
+        "type": "currentwindow",
+        "client": "aw-watcher-window",
+        "hostname": "fixture-host",
+        "created": "2026-09-14T00:00:00.000Z"
+      },
+      "fixture-afk-bucket": {
+        "id": "fixture-afk-bucket",
+        "type": "afkstatus",
+        "client": "aw-watcher-afk",
+        "hostname": "fixture-host",
+        "created": "2026-09-14T00:00:00.000Z"
+      },
+      "fixture-web-bucket": {
+        "id": "fixture-web-bucket",
+        "type": "web.tab.current",
+        "client": "aw-watcher-web",
+        "hostname": "fixture-host",
+        "created": "2026-09-14T00:00:00.000Z"
+      }
+    },
+    "events": {
+      "fixture-window-bucket": [
+        {
+          "id": "window-fixture-001",
+          "timestamp": "2026-09-14T00:00:00.000Z",
+          "duration": 120.125,
+          "data": {
+            "app": "Fixture Editor.exe",
+            "title": "[fixture] synthetic document"
+          }
+        },
+        {
+          "id": "window-fixture-002",
+          "timestamp": "2026-09-14T00:02:00.125Z",
+          "duration": 60.0,
+          "data": {
+            "app": "Fixture Browser.exe",
+            "title": "[fixture] synthetic browser window"
+          }
+        }
+      ],
+      "fixture-afk-bucket": [
+        {
+          "id": "afk-fixture-001",
+          "timestamp": "2026-09-14T00:00:00.000Z",
+          "duration": 180.125,
+          "data": {
+            "status": "not-afk"
+          }
+        }
+      ],
+      "fixture-web-bucket": [
+        {
+          "id": "web-fixture-001",
+          "timestamp": "2026-09-14T00:02:00.125Z",
+          "duration": 30.0,
+          "data": {
+            "url": "https://example.invalid/synthetic/path?fixture=remove-me#section",
+            "title": "[fixture] synthetic web page",
+            "audible": false,
+            "incognito": false
+          }
+        },
+        {
+          "id": "web-fixture-002",
+          "timestamp": "2026-09-14T00:02:30.125Z",
+          "duration": 10.0,
+          "data": {
+            "url": "https://fixture-user:fixture-pass@example.invalid/private",
+            "title": "[fixture] private web page",
+            "audible": false,
+            "incognito": true
+          }
+        }
+      ]
+    }
+  },
+  "requiredEventShape": {
+    "event": [
+      "timestamp: timezone-aware ISO 8601 string",
+      "duration: finite number of seconds greater than zero",
+      "data: JSON object"
+    ],
+    "window": [
+      "data.app: non-empty string",
+      "data.title: optional string"
+    ],
+    "afk": [
+      "data.status: afk or not-afk"
+    ],
+    "web": [
+      "data.url: optional string",
+      "data.title: optional string",
+      "data.incognito: boolean when the event is used for detail"
+    ]
+  },
+  "privacyPolicy": {
+    "titlePolicyVersion": "activitywatch_title_v1",
+    "urlPolicyVersion": "activitywatch_url_v1",
+    "modes": {
+      "app_only": {
+        "nonBrowserWindowTitle": false,
+        "browserWindowTitle": false,
+        "browserTitle": false,
+        "url": false
+      },
+      "titles": {
+        "nonBrowserWindowTitle": true,
+        "browserWindowTitle": false,
+        "browserTitle": false,
+        "url": false
+      },
+      "web": {
+        "nonBrowserWindowTitle": true,
+        "browserWindowTitle": false,
+        "browserTitle": true,
+        "url": true,
+        "requiresActiveBrowser": true,
+        "requiresNonIncognito": true
+      }
+    },
+    "titleMaxUnicodeCharacters": 500,
+    "urlMaxCharacters": 2048,
+    "allowedUrlSchemes": [
+      "http",
+      "https"
+    ],
+    "removedUrlComponents": [
+      "userinfo",
+      "query",
+      "fragment",
+      "default_port"
+    ],
+    "rejectedUrlSchemes": [
+      "file",
+      "data",
+      "javascript",
+      "browser_extension",
+      "browser_internal"
+    ],
+    "incognitoDetail": "null"
+  },
+  "browserMapping": {
+    "version": "activitywatch_browser_mapping_v1",
+    "normalizedIdentifiers": {
+      "chrome": [
+        "chrome",
+        "chrome.exe",
+        "chromium",
+        "chromium.exe"
+      ],
+      "edge": [
+        "edge",
+        "msedge",
+        "msedge.exe"
+      ],
+      "firefox": [
+        "firefox",
+        "firefox.exe"
+      ],
+      "brave": [
+        "brave",
+        "brave.exe"
+      ],
+      "opera": [
+        "opera",
+        "opera.exe"
+      ],
+      "vivaldi": [
+        "vivaldi",
+        "vivaldi.exe"
+      ]
+    },
+    "unknownBrowserBehavior": "save_app_session_without_web_detail"
+  },
+  "fixedValues": {
+    "enabledDefault": false,
+    "detailModeDefault": "app_only",
+    "scheduleInitialDelaySeconds": 30,
+    "scheduleIntervalSeconds": 900,
+    "settlementLagSeconds": 120,
+    "initialLookbackUtcDays": 7,
+    "rollingRefreshUtcDays": 2,
+    "queryContextSeconds": 300,
+    "eventLimitPerRequest": 10000,
+    "minimumSplitSeconds": 300,
+    "runBudgetUtcDays": 8,
+    "runBudgetSeconds": 480,
+    "leaseTtlSeconds": 900,
+    "httpConnectTimeoutSeconds": 2,
+    "httpReadTimeoutSeconds": 60
+  }
+}
