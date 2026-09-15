@@ -260,7 +260,9 @@ def test_invalid_detail_and_conflicting_id_roll_back_the_day_replace(
                     privacy_mode="web",
                 )
             assert session.scalar(select(func.count()).select_from(AppSession)) == 1
-            assert session.get(DesktopSessionDetail, DETAIL_ID).url == "https://example.com/docs"
+            stored_detail = session.get(DesktopSessionDetail, DETAIL_ID)
+            assert stored_detail is not None
+            assert stored_detail.url == "https://example.com/docs"
 
             with pytest.raises(ActivityWatchConflictError):
                 repository.replace_utc_day(
@@ -279,7 +281,9 @@ def test_invalid_detail_and_conflicting_id_roll_back_the_day_replace(
                     now_ms=DAY_START + 3_000,
                     privacy_mode="web",
                 )
-            assert session.get(AppSession, SESSION_ID).duration_ms == 60_000
+            stored_session = session.get(AppSession, SESSION_ID)
+            assert stored_session is not None
+            assert stored_session.duration_ms == 60_000
     finally:
         engine.dispose()
 
