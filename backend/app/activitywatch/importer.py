@@ -130,6 +130,7 @@ class ActivityWatchImportResult:
     chunks: tuple[ActivityWatchImportChunk, ...]
     dry_run: bool
     partial: bool
+    web_details_available: bool = False
 
     @property
     def session_count(self) -> int:
@@ -412,7 +413,12 @@ class ActivityWatchImporter:
                 )
             )
         return ActivityWatchImportResult(
-            source_key, device_id, tuple(chunks), True, len(selected) < len(days)
+            source_key,
+            device_id,
+            tuple(chunks),
+            True,
+            len(selected) < len(days),
+            discovery.web_bucket is not None,
         )
 
     def _run_writing(
@@ -478,7 +484,12 @@ class ActivityWatchImporter:
                 )
             partial = len(selected) < len(days)
             return ActivityWatchImportResult(
-                source_key, device.device.id, tuple(chunks), False, partial
+                source_key,
+                device.device.id,
+                tuple(chunks),
+                False,
+                partial,
+                discovery.web_bucket is not None,
             )
         except Exception as error:
             code, retryable = _safe_error_code(error)

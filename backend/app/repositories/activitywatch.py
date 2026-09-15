@@ -240,6 +240,16 @@ class ActivityWatchRepository:
         with self._transaction_scope():
             return self.session.get(ActivityWatchImportState, source_key)
 
+    def get_latest_import_state(self) -> ActivityWatchImportState | None:
+        """Return the newest safe state without exposing the source key."""
+
+        with self._transaction_scope():
+            return self.session.scalar(
+                select(ActivityWatchImportState).order_by(
+                    ActivityWatchImportState.updated_at_ms.desc()
+                )
+            )
+
     def acquire_lease(
         self,
         *,
