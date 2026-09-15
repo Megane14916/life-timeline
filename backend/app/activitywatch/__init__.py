@@ -46,6 +46,13 @@ from app.activitywatch.privacy import (
     sanitize_title,
     sanitize_url,
 )
+from app.activitywatch.scheduler import (
+    ActivityWatchCollectorStatus,
+    ActivityWatchImportScheduler,
+    ActivityWatchRun,
+    ActivityWatchRuntimeConfig,
+    load_runtime_config,
+)
 from app.activitywatch.schemas import (
     ActivityWatchBucket,
     ActivityWatchEvent,
@@ -56,6 +63,7 @@ __all__ = [
     "ActivityWatchBucket",
     "ActivityWatchBucketEvent",
     "ActivityWatchClient",
+    "ActivityWatchCollectorStatus",
     "ActivityWatchDiscovery",
     "ActivityWatchError",
     "ActivityWatchEvent",
@@ -64,10 +72,13 @@ __all__ = [
     "ActivityWatchImportClient",
     "ActivityWatchImportError",
     "ActivityWatchImportResult",
+    "ActivityWatchImportScheduler",
     "ActivityWatchImportSettings",
     "ActivityWatchImporter",
     "ActivityWatchInfo",
     "ActivityWatchProtocolError",
+    "ActivityWatchRun",
+    "ActivityWatchRuntimeConfig",
     "ActivityWatchUnavailableError",
     "BucketEvent",
     "ImportRangeError",
@@ -81,6 +92,7 @@ __all__ = [
     "intersect_periods",
     "is_browser_identifier",
     "iter_utc_days",
+    "load_runtime_config",
     "local_date_range_to_utc",
     "normalize_activitywatch",
     "normalize_app_identifier",

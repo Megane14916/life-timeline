@@ -1,5 +1,9 @@
 """Pydantic schemas for the public API."""
 
+from app.schemas.activitywatch import (
+    ActivityWatchImportTriggerResponse,
+    ActivityWatchStatusResponse,
+)
 from app.schemas.api import (
     AppSessionTimelineItem,
     ErrorDetail,
@@ -28,6 +32,8 @@ from app.schemas.sync import (
 )
 
 __all__ = [
+    "ActivityWatchImportTriggerResponse",
+    "ActivityWatchStatusResponse",
     "AppSessionTimelineItem",
     "ErrorDetail",
     "ErrorResponse",
