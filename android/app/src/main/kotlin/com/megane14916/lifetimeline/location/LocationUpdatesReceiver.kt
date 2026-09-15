@@ -6,7 +6,7 @@ import android.content.Intent
 import android.location.Location
 import com.google.android.gms.location.LocationResult
 import com.megane14916.lifetimeline.LifeTimelineApplication
-import com.megane14916.lifetimeline.repository.LocationFix
+import com.megane14916.lifetimeline.collector.toLocationFix
 import com.megane14916.lifetimeline.repository.LocationUpdateProcessor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -68,14 +68,3 @@ internal suspend fun handleLocationUpdateIntent(
   if (insertedCount > 0) enqueueLocationSync()
   return insertedCount
 }
-
-internal fun Location.toLocationFix(): LocationFix =
-  LocationFix(
-    recordedAtMs = time,
-    latitude = latitude,
-    longitude = longitude,
-    accuracyM = if (hasAccuracy()) accuracy.toDouble() else null,
-    altitudeM = if (hasAltitude()) altitude else null,
-    speedMps = if (hasSpeed()) speed.toDouble() else null,
-    elapsedRealtimeNanos = elapsedRealtimeNanos,
-  )

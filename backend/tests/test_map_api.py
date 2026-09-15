@@ -168,6 +168,182 @@ def test_routes_filter_accuracy_and_split_per_device_after_thirty_minutes(
         engine.dispose()
 
 
+def test_map_does_not_draw_dwell_fixes_as_routes_or_bridge_across_a_place_visit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine, factory = _migrated_seeded_database(tmp_path, monkeypatch)
+    try:
+        start = build_day_range("2026-09-03", "UTC")[1].start_ms
+        dwell_points = [
+            LocationPoint(
+                id=f"{60_000 + index:026d}",
+                device_id=DEVICE_A,
+                recorded_at_ms=start + index * 5 * 60_000,
+                latitude=35.0,
+                longitude=139.0,
+                accuracy_m=20.0,
+                altitude_m=None,
+                speed_mps=None,
+                source="android_fused_location",
+                created_at_ms=start + index * 5 * 60_000,
+            )
+            for index in range(9)
+        ]
+        # This lower-confidence fix is offset from the stationary cluster, but its
+        # accuracy radius still overlaps the same PlaceVisit.
+        dwell_points[4].latitude = 35.004
+        dwell_points[4].accuracy_m = 500.0
+        visit = PlaceVisit(
+            id="01J00000000000000000003001",
+            device_id=DEVICE_A,
+            started_at_ms=dwell_points[0].recorded_at_ms,
+            ended_at_ms=dwell_points[-1].recorded_at_ms,
+            duration_ms=dwell_points[-1].recorded_at_ms - dwell_points[0].recorded_at_ms,
+            center_latitude=35.0,
+            center_longitude=139.0,
+            radius_m=5.0,
+            point_count=8,
+            algorithm_version="stay_point_v1",
+            source_first_point_id=dwell_points[0].id,
+            source_last_point_id=dwell_points[-1].id,
+            created_at_ms=dwell_points[-1].created_at_ms,
+        )
+        with factory.begin() as session:
+            session.add_all(dwell_points)
+            session.flush()
+            session.add(visit)
+
+        response = _get(create_app(factory), "/api/v1/map", date="2026-09-03", timezone="UTC")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["routes"] == []
+        assert len(payload["placeVisits"]) == 1
+        assert payload["placeVisits"][0]["pointCount"] == 8
+        with factory() as session:
+            assert session.query(LocationPoint).count() >= len(dwell_points)
+    finally:
+        engine.dispose()
+
+
+def test_map_keeps_distant_point_as_isolated_marker_instead_of_linking_through_visit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine, factory = _migrated_seeded_database(tmp_path, monkeypatch)
+    try:
+        start = build_day_range("2026-09-03", "UTC")[1].start_ms
+        dwell_points = [
+            LocationPoint(
+                id=f"{61_000 + index:026d}",
+                device_id=DEVICE_A,
+                recorded_at_ms=start + index * 5 * 60_000,
+                latitude=35.0,
+                longitude=139.0,
+                accuracy_m=20.0,
+                altitude_m=None,
+                speed_mps=None,
+                source="android_fused_location",
+                created_at_ms=start + index * 5 * 60_000,
+            )
+            for index in range(9)
+        ]
+        outlier = LocationPoint(
+            id=f"{61_100:026d}",
+            device_id=DEVICE_A,
+            recorded_at_ms=start + 45 * 60_000,
+            latitude=35.05,
+            longitude=139.0,
+            accuracy_m=25.0,
+            altitude_m=None,
+            speed_mps=None,
+            source="android_fused_location",
+            created_at_ms=start + 45 * 60_000,
+        )
+        visit = PlaceVisit(
+            id="01J00000000000000000003002",
+            device_id=DEVICE_A,
+            started_at_ms=dwell_points[0].recorded_at_ms,
+            ended_at_ms=dwell_points[-1].recorded_at_ms,
+            duration_ms=dwell_points[-1].recorded_at_ms - dwell_points[0].recorded_at_ms,
+            center_latitude=35.0,
+            center_longitude=139.0,
+            radius_m=5.0,
+            point_count=9,
+            algorithm_version="stay_point_v1",
+            source_first_point_id=dwell_points[0].id,
+            source_last_point_id=dwell_points[-1].id,
+            created_at_ms=dwell_points[-1].created_at_ms,
+        )
+        with factory.begin() as session:
+            session.add_all([*dwell_points, outlier])
+            session.flush()
+            session.add(visit)
+
+        response = _get(create_app(factory), "/api/v1/map", date="2026-09-03", timezone="UTC")
+
+        assert response.status_code == 200
+        routes = response.json()["routes"]
+        assert len(routes) == 1
+        assert routes[0]["pointCount"] == 1
+        assert routes[0]["points"][0]["latitude"] == outlier.latitude
+    finally:
+        engine.dispose()
+
+
+def test_map_excludes_low_confidence_jitter_near_daily_place_visit_outside_visit_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine, factory = _migrated_seeded_database(tmp_path, monkeypatch)
+    try:
+        start = build_day_range("2026-09-03", "UTC")[1].start_ms
+        minutes = 60_000
+        points = [
+            LocationPoint(
+                id=f"{62_000 + index:026d}",
+                device_id=DEVICE_A,
+                recorded_at_ms=start + minute * minutes,
+                latitude=35.0 if minute < 30 else 35.003,
+                longitude=139.0,
+                accuracy_m=20.0 if minute < 30 else 500.0,
+                altitude_m=None,
+                speed_mps=None,
+                source="android_fused_location",
+                created_at_ms=start + minute * minutes,
+            )
+            for index, minute in enumerate([0, 5, 10, 15, 20, 25, 56, 61, 66])
+        ]
+        visit = PlaceVisit(
+            id="01J00000000000000000003003",
+            device_id=DEVICE_A,
+            started_at_ms=points[0].recorded_at_ms,
+            ended_at_ms=points[5].recorded_at_ms,
+            duration_ms=points[5].recorded_at_ms - points[0].recorded_at_ms,
+            center_latitude=35.0,
+            center_longitude=139.0,
+            radius_m=1.0,
+            point_count=6,
+            algorithm_version="stay_point_v1",
+            source_first_point_id=points[0].id,
+            source_last_point_id=points[5].id,
+            created_at_ms=points[5].created_at_ms,
+        )
+        with factory.begin() as session:
+            session.add_all(points)
+            session.flush()
+            session.add(visit)
+
+        response = _get(create_app(factory), "/api/v1/map", date="2026-09-03", timezone="UTC")
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["routes"] == []
+        assert len(payload["placeVisits"]) == 1
+        with factory() as session:
+            assert session.query(LocationPoint).count() >= len(points)
+    finally:
+        engine.dispose()
+
+
 def test_place_visit_is_clipped_and_only_geotagged_photos_are_returned(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
