@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from dataclasses import replace
 from typing import Literal
 
 from fastapi import FastAPI, Request
@@ -10,6 +13,11 @@ from pydantic import BaseModel
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.activitywatch.scheduler import (
+    ActivityWatchImportScheduler,
+    load_runtime_config,
+)
+from app.api.activitywatch import router as activitywatch_router
 from app.api.errors import (
     InvalidRequestError,
     PayloadTooLargeError,
@@ -27,7 +35,8 @@ from app.api.photos import router as photos_router
 from app.api.statistics import router as statistics_router
 from app.api.sync import router as sync_router
 from app.api.timeline import router as timeline_router
-from app.db import create_session_factory
+from app.config import get_settings
+from app.db import create_engine_for_settings, create_session_factory
 
 logger = logging.getLogger(__name__)
 
@@ -70,13 +79,47 @@ def create_app(
     session_factory: sessionmaker[Session] | None = None,
     *,
     engine: Engine | None = None,
+    activitywatch_scheduler: ActivityWatchImportScheduler | None = None,
+    activitywatch_enabled: bool | None = None,
 ) -> FastAPI:
-    application = FastAPI(title="life-timeline", version="0.1.0")
+    runtime = load_runtime_config()
+    if activitywatch_enabled is not None:
+        runtime = replace(runtime, enabled=activitywatch_enabled, configuration_error=None)
+    application: FastAPI
+
+    @asynccontextmanager
+    async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
+        scheduler = _application.state.activitywatch_scheduler
+        await scheduler.start()
+        try:
+            yield
+        finally:
+            await scheduler.stop()
+
+    application = FastAPI(title="life-timeline", version="0.1.0", lifespan=lifespan)
 
     if session_factory is None and engine is not None:
         application.state.engine = engine
         session_factory = create_session_factory(engine)
+    if activitywatch_scheduler is None:
+        if runtime.enabled and session_factory is None:
+            settings = get_settings()
+            application.state.engine = create_engine_for_settings(settings)
+            session_factory = create_session_factory(application.state.engine)
+        activitywatch_scheduler = (
+            ActivityWatchImportScheduler.from_defaults(
+                session_factory,
+                runtime=runtime,
+            )
+            if session_factory is not None
+            else ActivityWatchImportScheduler(
+                enabled=False,
+                detail_mode=runtime.privacy_mode,
+                configuration_error=runtime.configuration_error,
+            )
+        )
     application.state.session_factory = session_factory
+    application.state.activitywatch_scheduler = activitywatch_scheduler
 
     @application.exception_handler(InvalidRequestError)
     async def invalid_request_handler(_request: Request, exc: InvalidRequestError) -> JSONResponse:
@@ -131,6 +174,7 @@ def create_app(
     application.include_router(location_sync_router)
     application.include_router(photos_router)
     application.include_router(map_router)
+    application.include_router(activitywatch_router)
     application.add_middleware(PhotoRequestSizeLimitMiddleware)
     application.add_middleware(LocationRequestSizeLimitMiddleware)
 
