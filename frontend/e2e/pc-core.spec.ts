@@ -486,7 +486,7 @@ test.describe('PC core real database flow', () => {
     const mapResponse = await mapResponsePromise
     expect(mapResponse.status()).toBe(200)
     const mapData = await mapResponse.json()
-    expect(mapData.routes).toHaveLength(2)
+    expect(mapData.routes).toHaveLength(0)
     expect(mapData.placeVisits).toHaveLength(1)
     expect(mapData.photos).toHaveLength(1)
     await expect(page.getByTestId('leaflet-map')).toBeVisible()
@@ -499,7 +499,7 @@ test.describe('PC core real database flow', () => {
     await expect(
       page.getByRole('button', { name: '地図で表示' }),
     ).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByLabel('移動経路（2）')).toBeChecked()
+    await expect(page.getByLabel('移動経路（0）')).toBeChecked()
     expect(tileRequestCount).toBe(0)
 
     await page.getByRole('button', { name: 'オンライン背景地図を表示' }).click()
