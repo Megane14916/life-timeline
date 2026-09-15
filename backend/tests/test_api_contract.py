@@ -17,7 +17,7 @@ from app.cli.seed import main as seed_main
 from app.config import Settings
 from app.db import create_engine_for_settings, create_session_factory
 from app.main import create_app
-from app.models import AppSession, LocationPoint, MediaItem, PlaceVisit
+from app.models import AppSession, DesktopSessionDetail, LocationPoint, MediaItem, PlaceVisit
 from app.services.time_range import build_day_range
 
 
@@ -47,6 +47,18 @@ def test_timeline_returns_clipped_master_joined_items_in_stable_order(
 ) -> None:
     engine, factory = _migrated_seeded_database(tmp_path, monkeypatch)
     try:
+        with factory.begin() as session:
+            session.add(
+                DesktopSessionDetail(
+                    session_id="01J00000000000000000001305",
+                    window_title="Synthetic editor window",
+                    url="https://example.invalid/project/path",
+                    source_event_id="aw1_synthetic_event",
+                    algorithm_version="activitywatch_session_v1",
+                    privacy_mode="titles",
+                    created_at_ms=1_000,
+                )
+            )
         response = _get(
             create_app(factory),
             "/api/v1/timeline",
@@ -69,6 +81,7 @@ def test_timeline_returns_clipped_master_joined_items_in_stable_order(
         assert first["deviceName"] == "Demo Android A"
         assert first["appName"] == "Chrome"
         assert first["durationMs"] == 1_200_000
+        assert first["desktopDetail"] is None
         assert first["display"] == {
             "startedAt": "2026-09-02T15:00:00.000Z",
             "endedAt": "2026-09-02T15:10:00.000Z",
@@ -77,6 +90,12 @@ def test_timeline_returns_clipped_master_joined_items_in_stable_order(
             "continuesToNextDay": False,
             "endsAtDayBoundary": False,
         }
+        windows_item = next(item for item in payload["items"] if item["source"] == "activitywatch")
+        assert windows_item["desktopDetail"] == {
+            "windowTitle": "Synthetic editor window",
+            "url": "https://example.invalid/project/path",
+        }
+        assert "sourceEventId" not in windows_item["desktopDetail"]
     finally:
         engine.dispose()
 
@@ -282,6 +301,10 @@ def test_statistics_aggregates_direct_overlaps_and_empty_ranges(
         assert response.status_code == 200
         payload = response.json()
         assert payload["totals"] == {"usageMs": 3_900_000, "sessionCount": 4, "appCount": 2}
+        assert payload["platformTotals"] == [
+            {"platform": "android", "usageMs": 2_100_000, "sessionCount": 3},
+            {"platform": "windows", "usageMs": 1_800_000, "sessionCount": 1},
+        ]
         assert [
             (item["appId"], item["usageMs"], item["sessionCount"]) for item in payload["items"]
         ] == [
@@ -296,6 +319,7 @@ def test_statistics_aggregates_direct_overlaps_and_empty_ranges(
         )
         assert empty.status_code == 200
         assert empty.json()["totals"] == {"usageMs": 0, "sessionCount": 0, "appCount": 0}
+        assert empty.json()["platformTotals"] == []
         assert empty.json()["items"] == []
     finally:
         engine.dispose()
@@ -370,3 +394,7 @@ def test_openapi_exposes_timeline_and_statistics_contracts() -> None:
     schema = create_app().openapi()
     assert "/api/v1/timeline" in schema["paths"]
     assert "/api/v1/stats/apps" in schema["paths"]
+    timeline_schema = schema["components"]["schemas"]["AppSessionTimelineItem"]
+    assert "desktopDetail" in timeline_schema["properties"]
+    statistics_schema = schema["components"]["schemas"]["StatisticsResponse"]
+    assert "platformTotals" in statistics_schema["properties"]

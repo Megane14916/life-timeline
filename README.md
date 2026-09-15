@@ -251,6 +251,8 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 状態確認は`GET /api/v1/activitywatch/status`、手動importの要求はbodyなしの`POST /api/v1/activitywatch/import`です。手動要求が受理されると`202`、無効化中または別run実行中は`409`を返します。自動importは起動後30秒待ってから開始し、通常は15分間隔、通信の一時エラー時は1〜15分のbackoffで再試行します。status responseには安全なresult codeと時刻だけを含め、hostname、bucket、アプリ名、title、URL、例外本文は返しません。
 
+ActivityWatchのWindows AppSessionは既存の`GET /api/v1/timeline`へ統合され、`desktopDetail`はnullableの`windowTitle` / `url`だけを返します。`GET /api/v1/stats/apps`にはAndroid / Windows別の`platformTotals`が含まれます。利用時間は保存済みSessionをtimezone rangeへclipした値の合計で、ActivityWatchのAFK期間やOS uptimeを推測して加算しません。
+
 ## 写真の収集と同期
 
 写真収集はAndroidアプリで明示的に有効化し、写真へのアクセスを許可して利用します。対象はMediaStoreに登録済みの`DCIM/`配下の画像です。full accessでは有効化後に追加された写真を対象にし、Android 14以降のpartial accessでは利用者が選んだ写真だけを扱います。DCIM外、未公開の撮影中ファイル、Secure Folderや別Androidユーザーの写真は対象外になり得ます。

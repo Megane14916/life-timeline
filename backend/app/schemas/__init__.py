@@ -6,6 +6,7 @@ from app.schemas.activitywatch import (
 )
 from app.schemas.api import (
     AppSessionTimelineItem,
+    DesktopSessionDetailResponse,
     ErrorDetail,
     ErrorResponse,
     MapPhotoItem,
@@ -16,6 +17,7 @@ from app.schemas.api import (
     PhotoTimelineItem,
     PlaceVisitTimelineItem,
     StatisticsAppItem,
+    StatisticsPlatformTotal,
     StatisticsResponse,
     StatisticsTotals,
     TimelineDisplay,
@@ -35,6 +37,7 @@ __all__ = [
     "ActivityWatchImportTriggerResponse",
     "ActivityWatchStatusResponse",
     "AppSessionTimelineItem",
+    "DesktopSessionDetailResponse",
     "ErrorDetail",
     "ErrorResponse",
     "LocationSyncRequest",
@@ -47,6 +50,7 @@ __all__ = [
     "PhotosResponse",
     "PlaceVisitTimelineItem",
     "StatisticsAppItem",
+    "StatisticsPlatformTotal",
     "StatisticsResponse",
     "StatisticsTotals",
     "SyncApp",

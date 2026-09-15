@@ -8,7 +8,12 @@ from typing import Literal, cast
 from sqlalchemy.orm import Session
 
 from app.repositories.queries import find_sessions
-from app.schemas import StatisticsAppItem, StatisticsResponse, StatisticsTotals
+from app.schemas import (
+    StatisticsAppItem,
+    StatisticsPlatformTotal,
+    StatisticsResponse,
+    StatisticsTotals,
+)
 from app.services.time_range import build_period_range, clip_interval
 
 
@@ -21,6 +26,12 @@ class _AppTotals:
     session_count: int = 0
 
 
+@dataclass(slots=True)
+class _PlatformTotals:
+    usage_ms: int = 0
+    session_count: int = 0
+
+
 def get_app_statistics(
     session: Session,
     from_value: str | None,
@@ -29,6 +40,7 @@ def get_app_statistics(
 ) -> StatisticsResponse:
     from_date, to_date, query_range = build_period_range(from_value, to_value, timezone_name)
     totals_by_app: dict[str, _AppTotals] = {}
+    totals_by_platform: dict[str, _PlatformTotals] = {}
     for row in find_sessions(session, query_range):
         app_session = row.app_session
         display = clip_interval(app_session.started_at_ms, app_session.ended_at_ms, query_range)
@@ -42,6 +54,9 @@ def get_app_statistics(
         )
         app_totals.usage_ms += display.duration_ms
         app_totals.session_count += 1
+        platform_totals = totals_by_platform.setdefault(row.app.platform, _PlatformTotals())
+        platform_totals.usage_ms += display.duration_ms
+        platform_totals.session_count += 1
 
     items = [
         StatisticsAppItem(
@@ -63,6 +78,14 @@ def get_app_statistics(
             "appCount": len(totals_by_app),
         }
     )
+    platform_items = [
+        StatisticsPlatformTotal(
+            platform=cast(Literal["android", "windows"], platform),
+            usageMs=platform_value.usage_ms,
+            sessionCount=platform_value.session_count,
+        )
+        for platform, platform_value in sorted(totals_by_platform.items())
+    ]
     return StatisticsResponse.model_validate(
         {
             "from": from_date,
@@ -71,6 +94,7 @@ def get_app_statistics(
             "rangeStart": query_range.start_iso,
             "rangeEnd": query_range.end_iso,
             "totals": totals,
+            "platformTotals": platform_items,
             "items": items,
         }
     )

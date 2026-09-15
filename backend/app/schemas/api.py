@@ -30,6 +30,11 @@ class TimelineDisplay(ApiModel):
     ends_at_day_boundary: bool = Field(alias="endsAtDayBoundary")
 
 
+class DesktopSessionDetailResponse(ApiModel):
+    window_title: str | None = Field(alias="windowTitle")
+    url: str | None
+
+
 class AppSessionTimelineItem(ApiModel):
     type: Literal["app_session"]
     id: str
@@ -43,6 +48,7 @@ class AppSessionTimelineItem(ApiModel):
     started_at: str = Field(alias="startedAt")
     ended_at: str = Field(alias="endedAt")
     duration_ms: int = Field(alias="durationMs")
+    desktop_detail: DesktopSessionDetailResponse | None = Field(alias="desktopDetail")
     display: TimelineDisplay
 
 
@@ -106,6 +112,12 @@ class StatisticsTotals(ApiModel):
     app_count: int = Field(alias="appCount")
 
 
+class StatisticsPlatformTotal(ApiModel):
+    platform: Literal["android", "windows"]
+    usage_ms: int = Field(alias="usageMs")
+    session_count: int = Field(alias="sessionCount")
+
+
 class StatisticsAppItem(ApiModel):
     app_id: str = Field(alias="appId")
     platform: Literal["android", "windows"]
@@ -122,6 +134,7 @@ class StatisticsResponse(ApiModel):
     range_start: str = Field(alias="rangeStart")
     range_end: str = Field(alias="rangeEnd")
     totals: StatisticsTotals
+    platform_totals: list[StatisticsPlatformTotal] = Field(alias="platformTotals")
     items: list[StatisticsAppItem]
 
 
