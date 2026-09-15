@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import App, AppSession, Device, MediaItem, PlaceVisit
+from app.models import App, AppSession, DesktopSessionDetail, Device, MediaItem, PlaceVisit
 from app.services.time_range import QueryRange
 
 
@@ -16,6 +16,7 @@ class SessionWithMasters:
     app_session: AppSession
     device: Device
     app: App
+    desktop_detail: DesktopSessionDetail | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,9 +33,10 @@ class PlaceVisitWithDevice:
 
 def find_sessions(session: Session, query_range: QueryRange) -> list[SessionWithMasters]:
     statement = (
-        select(AppSession, Device, App)
+        select(AppSession, Device, App, DesktopSessionDetail)
         .join(Device, Device.id == AppSession.device_id)
         .join(App, App.id == AppSession.app_id)
+        .outerjoin(DesktopSessionDetail, DesktopSessionDetail.session_id == AppSession.id)
         .where(
             AppSession.started_at_ms < query_range.end_ms,
             AppSession.ended_at_ms > query_range.start_ms,
@@ -46,8 +48,13 @@ def find_sessions(session: Session, query_range: QueryRange) -> list[SessionWith
         )
     )
     return [
-        SessionWithMasters(app_session=app_session, device=device, app=app)
-        for app_session, device, app in session.execute(statement).tuples()
+        SessionWithMasters(
+            app_session=app_session,
+            device=device,
+            app=app,
+            desktop_detail=desktop_detail,
+        )
+        for app_session, device, app, desktop_detail in session.execute(statement).tuples()
     ]
 
 

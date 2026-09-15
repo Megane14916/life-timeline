@@ -6,9 +6,15 @@ from typing import Literal, cast
 
 from sqlalchemy.orm import Session
 
-from app.repositories.queries import find_photos, find_place_visits, find_sessions
+from app.repositories.queries import (
+    SessionWithMasters,
+    find_photos,
+    find_place_visits,
+    find_sessions,
+)
 from app.schemas import (
     AppSessionTimelineItem,
+    DesktopSessionDetailResponse,
     PlaceVisitTimelineItem,
     TimelineDisplay,
     TimelineItem,
@@ -16,6 +22,15 @@ from app.schemas import (
 )
 from app.services.photos import to_photo_timeline_item
 from app.services.time_range import build_day_range, clip_interval, format_epoch_ms
+
+
+def _to_desktop_detail(row: SessionWithMasters) -> DesktopSessionDetailResponse | None:
+    if row.app_session.source != "activitywatch" or row.device.platform != "windows":
+        return None
+    return DesktopSessionDetailResponse(
+        windowTitle=row.desktop_detail.window_title if row.desktop_detail is not None else None,
+        url=row.desktop_detail.url if row.desktop_detail is not None else None,
+    )
 
 
 def get_timeline(
@@ -39,6 +54,7 @@ def get_timeline(
             startedAt=format_epoch_ms(app_session.started_at_ms),
             endedAt=format_epoch_ms(app_session.ended_at_ms),
             durationMs=app_session.duration_ms,
+            desktopDetail=_to_desktop_detail(session_row),
             display=TimelineDisplay(
                 startedAt=format_epoch_ms(display.start_ms),
                 endedAt=format_epoch_ms(display.end_ms),
