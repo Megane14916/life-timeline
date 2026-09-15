@@ -194,6 +194,39 @@
     ],
     "incognitoDetail": "null"
   },
+  "browserMapping": {
+    "version": "activitywatch_browser_mapping_v1",
+    "normalizedIdentifiers": {
+      "chrome": [
+        "chrome",
+        "chrome.exe",
+        "chromium",
+        "chromium.exe"
+      ],
+      "edge": [
+        "edge",
+        "msedge",
+        "msedge.exe"
+      ],
+      "firefox": [
+        "firefox",
+        "firefox.exe"
+      ],
+      "brave": [
+        "brave",
+        "brave.exe"
+      ],
+      "opera": [
+        "opera",
+        "opera.exe"
+      ],
+      "vivaldi": [
+        "vivaldi",
+        "vivaldi.exe"
+      ]
+    },
+    "unknownBrowserBehavior": "save_app_session_without_web_detail"
+  },
   "fixedValues": {
     "enabledDefault": false,
     "detailModeDefault": "app_only",
