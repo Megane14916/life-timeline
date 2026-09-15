@@ -479,9 +479,7 @@ class ActivityWatchRepository:
                 )
             self.session.flush()
             for detail_record in details:
-                existing_detail = self.session.get(
-                    DesktopSessionDetail, detail_record.session_id
-                )
+                existing_detail = self.session.get(DesktopSessionDetail, detail_record.session_id)
                 if existing_detail is None:
                     self.session.add(
                         DesktopSessionDetail(
