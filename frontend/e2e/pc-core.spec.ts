@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 const seededDate = '2026-09-03'
 const timezone = 'Asia/Tokyo'
@@ -77,6 +77,19 @@ const pythonSqliteSnapshot = [
 
 function timelineUrl(date = seededDate, selectedTimezone = timezone) {
   return `/timeline?date=${date}&timezone=${encodeURIComponent(selectedTimezone)}`
+}
+
+async function waitForActivityWatchSuccess(page: Page) {
+  const deadline = Date.now() + 20_000
+  while (Date.now() < deadline) {
+    const response = await page.request.get('/api/v1/activitywatch/status')
+    expect(response.status()).toBe(200)
+    const status = await response.json()
+    if (status.lastResult === 'success' && status.state === 'idle')
+      return status
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100))
+  }
+  throw new Error('ActivityWatch fake import did not complete successfully.')
 }
 
 function photoStorageSnapshot(currentPhotoId: string = photoId) {
@@ -509,5 +522,111 @@ test.describe('PC core real database flow', () => {
     )
     await expect(page.getByTestId('map-summary')).toBeVisible()
     await expect(page.getByTestId('leaflet-map')).toBeVisible()
+  })
+
+  test('imports seven days from the loopback fake ActivityWatch server and is idempotent', async ({
+    page,
+  }) => {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1_000)
+      .toISOString()
+      .slice(0, 10)
+    const requestsOutsideLoopback: string[] = []
+    page.on('request', (request) => {
+      const url = request.url()
+      if (
+        url.startsWith('http') &&
+        !/^https?:\/\/127\.0\.0\.1(?::\d+)?\//.test(url)
+      ) {
+        requestsOutsideLoopback.push(url)
+      }
+    })
+
+    const initialStatus = await page.request.get('/api/v1/activitywatch/status')
+    expect(initialStatus.status()).toBe(200)
+    await expect(initialStatus.json()).resolves.toMatchObject({
+      enabled: true,
+      detailMode: 'web',
+    })
+
+    const beforeImport = await page.request.get(
+      `/api/v1/timeline?date=${yesterday}&timezone=UTC`,
+    )
+    expect(beforeImport.status()).toBe(200)
+    await expect(beforeImport.json()).resolves.toMatchObject({ items: [] })
+
+    const trigger = await page.request.post('/api/v1/activitywatch/import')
+    expect(trigger.status()).toBe(202)
+    await expect(trigger.json()).resolves.toMatchObject({ accepted: true })
+    await waitForActivityWatchSuccess(page)
+
+    const firstTimelineResponse = await page.request.get(
+      `/api/v1/timeline?date=${yesterday}&timezone=UTC`,
+    )
+    expect(firstTimelineResponse.status()).toBe(200)
+    const firstTimeline = (await firstTimelineResponse.json()) as {
+      items: Array<{
+        type: string
+        id: string
+        durationMs: number
+        desktopDetail: { windowTitle: string | null; url: string | null } | null
+      }>
+    }
+    const firstSessions = firstTimeline.items.filter(
+      (item) => item.type === 'app_session',
+    )
+    expect(firstSessions.length).toBeGreaterThan(100)
+    expect(firstSessions.every((item) => item.desktopDetail !== null)).toBe(
+      true,
+    )
+    expect(firstSessions.map((item) => item.id)).toEqual(
+      expect.arrayContaining([expect.any(String)]),
+    )
+    const firstIds = firstSessions.map((item) => item.id)
+    const firstUsage = firstSessions.reduce(
+      (total, item) => total + item.durationMs,
+      0,
+    )
+
+    const secondTrigger = await page.request.post(
+      '/api/v1/activitywatch/import',
+    )
+    expect(secondTrigger.status()).toBe(202)
+    await expect(secondTrigger.json()).resolves.toMatchObject({
+      accepted: true,
+    })
+    await waitForActivityWatchSuccess(page)
+    const secondTimelineResponse = await page.request.get(
+      `/api/v1/timeline?date=${yesterday}&timezone=UTC`,
+    )
+    expect(secondTimelineResponse.status()).toBe(200)
+    const secondTimeline = (await secondTimelineResponse.json()) as {
+      items: Array<{ type: string; id: string; durationMs: number }>
+    }
+    const secondSessions = secondTimeline.items.filter(
+      (item) => item.type === 'app_session',
+    )
+    expect(secondSessions.map((item) => item.id)).toEqual(firstIds)
+    expect(
+      secondSessions.reduce((total, item) => total + item.durationMs, 0),
+    ).toBe(firstUsage)
+
+    await page.goto(timelineUrl(yesterday, 'UTC'))
+    await expect(page.getByTestId('activitywatch-state')).toHaveText('待機中')
+    await expect(page.getByTestId('timeline-item')).toHaveCount(
+      firstSessions.length,
+    )
+    await expect(page.getByTestId('desktop-detail').first()).toContainText(
+      'P6-09 <script>alert(1)</script> "web fixture"',
+    )
+    await expect(page.getByTestId('dashboard-platform-totals')).toContainText(
+      'Windows',
+    )
+    await expect(page.getByTestId('dashboard-platform-totals')).toContainText(
+      '120セッション',
+    )
+    expect(await page.locator('body').innerHTML()).not.toContain(
+      '<script>alert(1)</script>',
+    )
+    expect(requestsOutsideLoopback).toEqual([])
   })
 })

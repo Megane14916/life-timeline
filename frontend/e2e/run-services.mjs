@@ -7,6 +7,8 @@ import { spawn, spawnSync } from 'node:child_process'
 const frontendDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repositoryDirectory = resolve(frontendDirectory, '..')
 const backendDirectory = join(repositoryDirectory, 'backend')
+const activityWatchPort =
+  process.env.LIFE_TIMELINE_E2E_ACTIVITYWATCH_PORT ?? '5600'
 const frontendPort = process.env.LIFE_TIMELINE_E2E_FRONTEND_PORT ?? '5173'
 const backendPort = process.env.LIFE_TIMELINE_E2E_BACKEND_PORT ?? '8000'
 const configuredDataDirectory = process.env.LIFE_TIMELINE_E2E_DATA_DIR
@@ -75,24 +77,50 @@ async function waitForUrl(url, child, timeoutMs = 120_000) {
 
 let backend
 let frontend
+let fakeActivityWatch
 
 process.once('exit', () => {
   stopProcess(frontend)
   stopProcess(backend)
+  stopProcess(fakeActivityWatch)
   if (stopFile && existsSync(stopFile)) unlinkSync(stopFile)
 })
 
-backend = startProcess(
+fakeActivityWatch = startProcess(
   pythonExecutable(),
-  ['scripts/e2e_server.py', '--data-dir', dataDirectory, '--port', backendPort],
+  [
+    'scripts/fake_activitywatch_server.py',
+    '--host',
+    '127.0.0.1',
+    '--port',
+    activityWatchPort,
+  ],
   backendDirectory,
-  {
-    LIFE_TIMELINE_DATA_DIR: dataDirectory,
-    PYTHONUNBUFFERED: '1',
-  },
+  { PYTHONUNBUFFERED: '1' },
 )
 
 try {
+  await waitForUrl(
+    `http://127.0.0.1:${activityWatchPort}/health`,
+    fakeActivityWatch,
+  )
+  backend = startProcess(
+    pythonExecutable(),
+    [
+      'scripts/e2e_server.py',
+      '--data-dir',
+      dataDirectory,
+      '--port',
+      backendPort,
+    ],
+    backendDirectory,
+    {
+      LIFE_TIMELINE_DATA_DIR: dataDirectory,
+      LIFE_TIMELINE_ACTIVITYWATCH_ENABLED: 'true',
+      LIFE_TIMELINE_ACTIVITYWATCH_PRIVACY_MODE: 'web',
+      PYTHONUNBUFFERED: '1',
+    },
+  )
   await waitForUrl(`http://127.0.0.1:${backendPort}/api/v1/health`, backend)
   frontend = startProcess(
     process.execPath,
@@ -115,6 +143,7 @@ try {
     if (parentWatch !== undefined) clearInterval(parentWatch)
     stopProcess(frontend)
     stopProcess(backend)
+    stopProcess(fakeActivityWatch)
     setTimeout(() => process.exit(exitCode), 250)
   }
 
@@ -144,6 +173,7 @@ try {
 
   await new Promise(() => {})
 } catch (error) {
+  stopProcess(fakeActivityWatch)
   stopProcess(backend)
   console.error(error)
   process.exitCode = 1
