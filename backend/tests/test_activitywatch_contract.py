@@ -7,7 +7,6 @@ import math
 from pathlib import Path
 from typing import Any
 
-
 FIXTURE_PATH = Path(__file__).parents[2] / "contracts" / "activitywatch-v1.json"
 
 
