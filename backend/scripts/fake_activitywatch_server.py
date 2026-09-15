@@ -63,7 +63,7 @@ def _fixture_events(bucket_id: str, start: datetime, end: datetime) -> list[dict
 class FakeActivityWatchHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         parsed = urlsplit(self.path)
         if parsed.path == "/health":
             payload: object = {"status": "ok"}

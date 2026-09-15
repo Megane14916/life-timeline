@@ -15,7 +15,7 @@ from app.activitywatch import ActivityWatchClient, ActivityWatchProtocolError
 class _FakeActivityWatchHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         parsed = urlsplit(self.path)
         if parsed.path == "/api/0/info":
             payload: object = {
