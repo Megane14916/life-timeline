@@ -1,5 +1,20 @@
 """Public repository exports."""
 
+from app.repositories.activitywatch import (
+    ACTIVITYWATCH_ALGORITHM_VERSION,
+    ACTIVITYWATCH_SOURCE,
+    ActivityWatchAppRecord,
+    ActivityWatchConflictError,
+    ActivityWatchDetailRecord,
+    ActivityWatchDeviceRecord,
+    ActivityWatchLeaseBusyError,
+    ActivityWatchLeaseLostError,
+    ActivityWatchReplaceResult,
+    ActivityWatchRepository,
+    ActivityWatchRepositoryError,
+    ActivityWatchSessionRecord,
+    source_key_for,
+)
 from app.repositories.locations import (
     LocationPointConflictError,
     LocationPointRecord,
@@ -22,6 +37,18 @@ from app.repositories.normalized import (
 )
 
 __all__ = [
+    "ACTIVITYWATCH_ALGORITHM_VERSION",
+    "ACTIVITYWATCH_SOURCE",
+    "ActivityWatchAppRecord",
+    "ActivityWatchConflictError",
+    "ActivityWatchDetailRecord",
+    "ActivityWatchDeviceRecord",
+    "ActivityWatchLeaseBusyError",
+    "ActivityWatchLeaseLostError",
+    "ActivityWatchReplaceResult",
+    "ActivityWatchRepository",
+    "ActivityWatchRepositoryError",
+    "ActivityWatchSessionRecord",
     "AppRecord",
     "AppSessionConflictError",
     "AppSessionRecord",
@@ -40,4 +67,5 @@ __all__ = [
     "RepositoryConflictError",
     "RepositoryError",
     "RepositoryValidationError",
+    "source_key_for",
 ]

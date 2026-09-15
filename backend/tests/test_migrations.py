@@ -34,6 +34,8 @@ def test_initial_migration_reaches_one_head_and_is_repeatable(
             "apps",
             "categories",
             "devices",
+            "activitywatch_import_states",
+            "desktop_session_details",
             "location_points",
             "media_items",
             "place_visits",
@@ -77,7 +79,8 @@ def test_media_migration_preserves_existing_rows_and_adds_constraints(
             assert (
                 connection.scalar(
                     text(
-                        "SELECT count(*) FROM alembic_version WHERE version_num = '0003_locations'"
+                        "SELECT count(*) FROM alembic_version "
+                        "WHERE version_num = '0004_activitywatch'"
                     )
                 )
                 == 1
@@ -148,7 +151,7 @@ def test_location_migration_preserves_app_and_media_rows_and_adds_expected_index
             assert connection.scalar(text("SELECT count(*) FROM media_items")) == 1
             assert (
                 connection.scalar(text("SELECT version_num FROM alembic_version"))
-                == "0003_locations"
+                == "0004_activitywatch"
             )
     finally:
         engine.dispose()

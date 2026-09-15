@@ -74,6 +74,57 @@ class AppSession(Base):
     created_at_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
 
+class DesktopSessionDetail(Base):
+    """Privacy-filtered detail associated with one ActivityWatch session."""
+
+    __tablename__ = "desktop_session_details"
+    __table_args__ = (
+        CheckConstraint("algorithm_version = 'activitywatch_session_v1'", name="algorithm_version"),
+        CheckConstraint("privacy_mode IN ('app_only', 'titles', 'web')", name="privacy_mode"),
+        Index("idx_desktop_session_details_source_event", "source_event_id"),
+    )
+
+    session_id: Mapped[str] = mapped_column(
+        String(26),
+        ForeignKey("app_sessions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    window_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    source_event_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    algorithm_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    privacy_mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class ActivityWatchImportState(Base):
+    """Cursor, retry state, and conditional database lease for one source."""
+
+    __tablename__ = "activitywatch_import_states"
+    __table_args__ = (
+        CheckConstraint("algorithm_version = 'activitywatch_session_v1'", name="algorithm_version"),
+        CheckConstraint("privacy_mode IN ('app_only', 'titles', 'web')", name="privacy_mode"),
+        CheckConstraint("consecutive_failures >= 0", name="nonnegative_failures"),
+    )
+
+    source_key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    device_id: Mapped[str] = mapped_column(
+        String(26), ForeignKey("devices.id", ondelete="RESTRICT"), nullable=False
+    )
+    algorithm_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    privacy_mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    completed_through_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    last_attempt_at_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    last_success_at_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    last_result_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    consecutive_failures: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    next_eligible_at_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    lease_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    lease_expires_at_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    created_at_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    updated_at_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
 class MediaItem(Base):
     __tablename__ = "media_items"
     __table_args__ = (

@@ -2,9 +2,11 @@
 
 from app.models.base import Base
 from app.models.entities import (
+    ActivityWatchImportState,
     App,
     AppSession,
     Category,
+    DesktopSessionDetail,
     Device,
     LocationPoint,
     MediaItem,
@@ -12,10 +14,12 @@ from app.models.entities import (
 )
 
 __all__ = [
+    "ActivityWatchImportState",
     "App",
     "AppSession",
     "Base",
     "Category",
+    "DesktopSessionDetail",
     "Device",
     "LocationPoint",
     "MediaItem",
