@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import com.megane14916.lifetimeline.collector.LocationAccessState
+import com.megane14916.lifetimeline.collector.LocationCurrentFixProvider
 import com.megane14916.lifetimeline.collector.LocationPermissionChecker
 import com.megane14916.lifetimeline.collector.LocationRegistrationClient
 import com.megane14916.lifetimeline.collector.PhotoAccessChecker
@@ -16,6 +17,7 @@ import com.megane14916.lifetimeline.repository.BackgroundLease
 import com.megane14916.lifetimeline.repository.CollectionCoordinator
 import com.megane14916.lifetimeline.repository.CollectionRunResult
 import com.megane14916.lifetimeline.repository.CollectionRunStatus
+import com.megane14916.lifetimeline.repository.LocationUpdateProcessor
 import com.megane14916.lifetimeline.repository.SyncFailureKind
 import com.megane14916.lifetimeline.repository.SyncRepository
 import com.megane14916.lifetimeline.repository.SyncResult
@@ -25,12 +27,15 @@ import com.megane14916.lifetimeline.worker.BackgroundWorkScheduler
 import com.megane14916.lifetimeline.worker.LocationWorkPolicy
 import com.megane14916.lifetimeline.worker.PhotoWorkPolicy
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -59,6 +64,8 @@ data class MainUiState(
   val locationRegistrationResult: String? = null,
   val locationRegistrationErrorKind: String? = null,
   val locationRegistrationWorkState: WorkInfo.State? = null,
+  val currentLocationCaptureInProgress: Boolean = false,
+  val currentLocationCaptureMessage: String? = null,
   val locationSyncAttemptAtMs: Long? = null,
   val locationSyncSuccessAtMs: Long? = null,
   val locationSyncResult: String? = null,
@@ -116,9 +123,12 @@ class MainViewModel(
   private val locationRegistrationClient: LocationRegistrationClient? = null,
   private val pendingLocationCount: suspend () -> Int = { 0 },
   private val latestLocationReceivedAt: suspend () -> Long? = { null },
+  private val locationCurrentFixProvider: LocationCurrentFixProvider? = null,
+  private val locationUpdateProcessor: LocationUpdateProcessor? = null,
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(MainUiState())
   val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+  private var currentLocationCaptureJob: Job? = null
 
   init {
     viewModelScope.launch {
@@ -189,17 +199,23 @@ class MainViewModel(
   fun enableLocationCollection(onRequestPermissions: () -> Unit) {
     viewModelScope.launch {
       preferences.enableLocationCollection(nowMs())
-      _uiState.value = _uiState.value.copy(locationCollectionEnabled = true)
+      _uiState.value = _uiState.value.copy(locationCollectionEnabled = true, currentLocationCaptureMessage = null)
       onRequestPermissions()
     }
   }
 
   fun disableLocationCollection() {
+    currentLocationCaptureJob?.cancel()
     viewModelScope.launch {
       preferences.disableLocationCollection()
       backgroundWorkScheduler?.cancelLocationRegistration()
       runCatching { locationRegistrationClient?.unregister() }
-      _uiState.value = _uiState.value.copy(locationCollectionEnabled = false)
+      _uiState.value =
+        _uiState.value.copy(
+          locationCollectionEnabled = false,
+          currentLocationCaptureInProgress = false,
+          currentLocationCaptureMessage = null,
+        )
       refreshLocationAccessInternal()
     }
   }
@@ -253,6 +269,81 @@ class MainViewModel(
       backgroundWorkScheduler?.enqueueLocationRegistration()
       refreshBackgroundStateInternal()
     }
+  }
+
+  /** Gets one fresh point only after an explicit user action, then persists and syncs it through the normal path. */
+  fun captureCurrentLocation() {
+    if (currentLocationCaptureJob?.isActive == true) return
+    currentLocationCaptureJob =
+      viewModelScope.launch {
+        if (!_uiState.value.locationCollectionEnabled) return@launch
+        val currentSettings = preferences.settings.first()
+        if (!currentSettings.locationCollectionEnabled) {
+          _uiState.value = _uiState.value.copy(currentLocationCaptureMessage = "位置情報収集が無効のため、現在地を取得しませんでした。")
+          return@launch
+        }
+        val access =
+          locationPermissionChecker?.currentAccess(collectionEnabled = currentSettings.locationCollectionEnabled)
+            ?: _uiState.value.locationAccessState
+        if (access != LocationAccessState.APPROXIMATE && access != LocationAccessState.PRECISE) {
+          _uiState.value = _uiState.value.copy(currentLocationCaptureMessage = "位置情報の許可と端末の位置情報サービスを確認してください。")
+          return@launch
+        }
+        val currentFixProvider = locationCurrentFixProvider
+        val updateProcessor = locationUpdateProcessor
+        if (currentFixProvider == null || updateProcessor == null) {
+          _uiState.value = _uiState.value.copy(currentLocationCaptureMessage = "現在地取得を利用できません。アプリを更新してください。")
+          return@launch
+        }
+
+        _uiState.value =
+          _uiState.value.copy(
+            currentLocationCaptureInProgress = true,
+            currentLocationCaptureMessage = null,
+          )
+        try {
+          val fix = currentFixProvider.getCurrentLocation()
+          if (fix == null) {
+            _uiState.value =
+              _uiState.value.copy(currentLocationCaptureMessage = "新しい位置情報を取得できませんでした。位置情報サービスを確認して再試行してください。")
+            return@launch
+          }
+          val result = updateProcessor.persistBatch(listOf(fix))
+          if (result == null) {
+            _uiState.value =
+              _uiState.value.copy(currentLocationCaptureMessage = "収集設定または権限が変わったため、位置情報を保存しませんでした。")
+            return@launch
+          }
+
+          val pending = pendingLocationCount()
+          val endpointConfigured =
+            !preferences.settings
+              .first()
+              .pcBaseUrl
+              .isNullOrBlank()
+          if (pending > 0 && endpointConfigured) backgroundWorkScheduler?.enqueueLocationSync()
+          val message =
+            when {
+              result.insertedCount > 0 && pending > 0 && endpointConfigured -> "現在地を端末に保存し、PCへの同期を依頼しました。"
+              result.insertedCount > 0 -> "現在地を端末に保存しました。PC URLを設定すると同期されます。"
+              result.duplicateCount > 0 -> "この位置情報はすでに記録されています。"
+              result.invalidCount > 0 -> "取得した位置情報は記録条件を満たさず保存されませんでした。もう一度お試しください。"
+              else -> "位置情報を保存できませんでした。状態を確認してください。"
+            }
+          _uiState.value = _uiState.value.copy(currentLocationCaptureMessage = message)
+        } catch (cancellation: CancellationException) {
+          throw cancellation
+        } catch (_: SecurityException) {
+          _uiState.value =
+            _uiState.value.copy(currentLocationCaptureMessage = "位置情報の許可を確認してください。")
+        } catch (_: Throwable) {
+          _uiState.value =
+            _uiState.value.copy(currentLocationCaptureMessage = "現在地を取得できませんでした。位置情報の状態を確認して再試行してください。")
+        } finally {
+          _uiState.value = _uiState.value.copy(currentLocationCaptureInProgress = false)
+          if (currentCoroutineContext().isActive) refreshBackgroundStateInternal()
+        }
+      }
   }
 
   /** Requests the independent Location uploader for locally pending points. */

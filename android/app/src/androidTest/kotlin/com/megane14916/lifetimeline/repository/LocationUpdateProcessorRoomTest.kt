@@ -8,9 +8,9 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.megane14916.lifetimeline.collector.LocationPermissionChecker
 import com.megane14916.lifetimeline.collector.LocationPermissionStateProvider
+import com.megane14916.lifetimeline.collector.toLocationFix
 import com.megane14916.lifetimeline.data.local.LifeTimelineDatabase
 import com.megane14916.lifetimeline.data.preferences.AppSettings
-import com.megane14916.lifetimeline.location.toLocationFix
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test

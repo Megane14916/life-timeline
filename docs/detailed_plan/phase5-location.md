@@ -126,6 +126,8 @@ disable後に再度enableした場合は開始時刻を更新する。off期間�
 
 - `FusedLocationProviderClient.requestLocationUpdates(LocationRequest, PendingIntent)`を使い、callbackをActivityやprocess lifecycleへ結び付けない。Fused Locationが`LocationResult`をintent extrasへ追加できるよう、PendingIntentはAPI 31以降`FLAG_MUTABLE`とし、component/action/dataを明示して送信先を限定する。
 - `LocationUpdatesReceiver`は`LocationResult.extractResult(intent)`からbatchを取り出し、`goAsync()`の有限時間内でRoom transactionを完了する。重いnetwork同期は行わず、WorkManagerへ委譲する。
+- Main画面の明示的な「現在地を1回取得して送信」操作では、foreground中に`FusedLocationProviderClient.getCurrentLocation(CurrentLocationRequest, CancellationToken)`を1回呼ぶ。balanced power、`maxUpdateAgeMillis = 0`、最大30秒とし、過去cacheを現在地として扱わない。返ったfixは`LocationUpdateProcessor`と同じopt-in / permission再確認、正規化、dedupeを通してRoomへ保存し、pendingがあればLocation syncをenqueueする。fixが得られない場合は保存せず、座標やprovider payloadを表示・記録しない。
+- このone-shot取得はユーザーがボタンを押した場合だけ実行する。app resume、boot、package update、watchdog、AppSession収集から暗黙に呼び出さない。
 - enable直後はunique one-time registration workをenqueueする。登録済みの同一PendingIntentは同じrequestへ更新されるため冪等である。
 - `BOOT_COMPLETED` / `MY_PACKAGE_REPLACED`では位置を直接取得せず、unique registration workだけをenqueueする。
 - 12時間ごとのregistration watchdogをWorkManagerに保持し、OS・Play services・processの状態変化後に登録を回復する。15分以内の復旧は保証しない。
@@ -282,7 +284,7 @@ Location syncは既存`BackgroundExecutionCoordinator`のleaseとheartbeatを利
 | malformed JSON / unknown ACK / duplicate ACK | contract failure。全件pending維持 |
 | cancellation | 伝播し、failureとして上書きしない |
 
-AppSessionの「収集して同期」はLocationの現在地取得を暗黙に開始しない。Android UIにはLocation専用の「登録状態を確認」と「未同期を送信」を設け、収集permissionとnetwork診断を分離する。
+AppSessionの「収集して同期」はLocationの現在地取得を暗黙に開始しない。Android UIにはLocation専用の「登録状態を確認」「現在地を1回取得して送信」「未同期を送信」を設け、収集permissionとnetwork診断を分離する。登録成功は継続更新requestが受け付けられたことを表し、位置fixの受信・保存・同期成功とは別状態として表示する。
 
 ### 4.6 Android UI
 
@@ -291,7 +293,7 @@ Main画面へ次を追加する。
 - 位置記録ON/OFFと、収集内容・PC保存・削除非伝播の説明。
 - `無効 / 権限が必要 / background許可が必要 / 概算 / 正確 / 位置サービスOFF / 登録エラー`の状態。
 - 最終受信時刻、最終registration成功、最終sync成功、pending件数。
-- foreground許可要求、background設定を開く、端末の位置設定を開く、登録状態を確認、未同期を送信するbutton。
+- foreground許可要求、background設定を開く、端末の位置設定を開く、登録状態を確認、現在地を1回取得して送信、未同期を送信するbutton。
 - approximateでも利用可能だが、PlaceVisitが生成されない可能性がある説明。
 
 座標、精度、移動速度、端末ID、endpointはMain画面や通常logへ表示しない。開発用raw画面もPhase 5では作らない。
@@ -471,6 +473,7 @@ MapResponse
 
 - `routes`は選択したtimezoneの半開区間`[rangeStart, rangeEnd)`内のLocationPointだけを返す。
 - route pointは`accuracy_m <= 1,000`だけを使う。null / 1,000m超はraw保存するがMapへ線を引かない。
+- 同deviceの同日PlaceVisit中心から`radius_m + accuracy_m`以内にあるLocationPointは、fix時刻がvisit時間範囲外でもrouteから除く。低精度fixはPlaceVisit生成対象外になり得るため、visit時間内だけの判定では同じ滞在場所のjitterがroute線に残る。raw LocationPointは削除しない。PlaceVisitの時間範囲をまたぐ前後のroute point同士も接続しない。
 - `placeVisits`は選択日にoverlapするもの、`photos`は選択日に撮影され座標pairを持つものを返す。
 - 座標順はobject fieldのlatitude / longitudeで明示し、GeoJSONの`[longitude, latitude]`と混同させない。Frontend adapterがLeafletの`[latitude, longitude]`へ一箇所で変換する。
 - dataなしは200 + empty arrays。不正日付 / timezoneは既存Timelineと同じerror contractにする。
@@ -481,10 +484,11 @@ MapResponse
 Map APIはdeviceごとにpointを時刻順へ並べ、次の場合に線を分割する。
 
 - 連続point間が30分超。
+- 同deviceのPlaceVisitの時間範囲をまたぐ場合。PlaceVisit中心と精度半径内のpointは時刻にかかわらずrouteに含めず、前後の移動を線で橋渡ししない。
 - 途中にMap非対象の低精度pointがあり、対象point同士の時刻差も30分超。
 - 日境界。
 
-1 pointだけのsegmentも返し、Frontendは線ではなくpointとして表示する。欠測区間を直線で接続せず、OS制約による空白を実移動として見せない。距離や速度からpointを自動削除するheuristicは初版へ入れず、明白なGPS jumpはraw pointとして確認可能なままにする。
+1 pointだけのsegmentも返し、Frontendは線ではなくpointとして表示する。PlaceVisitが表す滞在fixはraw tableに保持しつつroute polylineから外す。欠測区間や滞在区間を直線で接続せず、OS制約による空白を実移動として見せない。GPS jumpのraw pointを削除せず、PlaceVisitで説明できない孤立fixは単独pointとして確認可能なままにする。
 
 ## 8. React Map UI
 

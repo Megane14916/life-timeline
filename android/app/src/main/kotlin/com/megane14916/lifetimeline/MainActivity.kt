@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.megane14916.lifetimeline.collector.FusedLocationCurrentFixProvider
 import com.megane14916.lifetimeline.collector.LocationAccessState
 import com.megane14916.lifetimeline.collector.LocationPermissionChecker
 import com.megane14916.lifetimeline.collector.LocationRequestController
@@ -100,6 +101,7 @@ class MainActivity : ComponentActivity() {
           onDisableLocationCollection = viewModel::disableLocationCollection,
           onRequestLocationPermission = ::advanceLocationPermissionFlow,
           onCheckLocationRegistration = viewModel::checkLocationRegistration,
+          onCaptureCurrentLocation = viewModel::captureCurrentLocation,
           onSyncLocationNow = viewModel::syncLocationNow,
           onOpenLocationSettings = {
             startActivity(Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS))
@@ -138,6 +140,8 @@ class MainActivity : ComponentActivity() {
       locationRegistrationClient = LocationRequestController(appContext, locationPermissionChecker),
       pendingLocationCount = { container.locationCollectionRepository.countPending() },
       latestLocationReceivedAt = { container.locationCollectionRepository.latestReceivedAt() },
+      locationCurrentFixProvider = FusedLocationCurrentFixProvider(appContext, locationPermissionChecker),
+      locationUpdateProcessor = container.locationUpdateProcessor,
     )
   }
 
@@ -203,6 +207,7 @@ private fun MainScreen(
   onDisableLocationCollection: () -> Unit,
   onRequestLocationPermission: () -> Unit,
   onCheckLocationRegistration: () -> Unit,
+  onCaptureCurrentLocation: () -> Unit,
   onSyncLocationNow: () -> Unit,
   onOpenLocationSettings: () -> Unit,
 ) {
@@ -394,6 +399,19 @@ private fun MainScreen(
         Button(onClick = onCheckLocationRegistration, enabled = !busy) {
           Text("登録状態を確認")
         }
+        Button(
+          onClick = onCaptureCurrentLocation,
+          enabled =
+            !state.currentLocationCaptureInProgress &&
+              (
+                state.locationAccessState == LocationAccessState.APPROXIMATE ||
+                  state.locationAccessState == LocationAccessState.PRECISE
+              ),
+        ) {
+          Text(if (state.currentLocationCaptureInProgress) "現在地を取得中…" else "現在地を1回取得して送信")
+        }
+        Text("この操作を押したときだけ、新しい位置を1点取得します。通常のバックグラウンド収集とは別です。")
+        state.currentLocationCaptureMessage?.let { message -> Text(message) }
       }
       Text("位置情報の最終受信: ${formatDeviceTimestamp(state.latestLocationReceivedAtMs)}")
       Text("位置情報pending: ${state.pendingLocationCount}")
@@ -463,6 +481,7 @@ private fun MainScreenPreview() {
       onDisableLocationCollection = {},
       onRequestLocationPermission = {},
       onCheckLocationRegistration = {},
+      onCaptureCurrentLocation = {},
       onSyncLocationNow = {},
       onOpenLocationSettings = {},
     )
