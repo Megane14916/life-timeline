@@ -249,6 +249,7 @@ class ActivityWatchRepository:
         now_ms: int,
         ttl_ms: int = DEFAULT_LEASE_TTL_MS,
         token: str | None = None,
+        allow_privacy_mode_change: bool = False,
     ) -> str | None:
         """Acquire a source lease, recovering expired or far-future leases."""
 
@@ -296,7 +297,7 @@ class ActivityWatchRepository:
                 raise RepositoryConflictError("source_key is already bound to another device.")
             if state.algorithm_version != ACTIVITYWATCH_ALGORITHM_VERSION:
                 raise RepositoryConflictError("source state uses another algorithm version.")
-            if state.privacy_mode != privacy_mode:
+            if state.privacy_mode != privacy_mode and not allow_privacy_mode_change:
                 raise RepositoryConflictError("source state uses another privacy mode.")
             expiry = state.lease_expires_at_ms
             active = (
@@ -307,6 +308,7 @@ class ActivityWatchRepository:
             )
             if active:
                 return None
+            state.privacy_mode = privacy_mode
             state.lease_token = lease_token
             state.lease_expires_at_ms = now_ms + ttl_ms
             state.updated_at_ms = now_ms

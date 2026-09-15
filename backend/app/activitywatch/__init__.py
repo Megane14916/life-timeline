@@ -11,6 +11,7 @@ from app.activitywatch.errors import (
     ActivityWatchUnavailableError,
 )
 from app.activitywatch.importer import (
+    ActivityWatchEventClient,
     ActivityWatchImportChunk,
     ActivityWatchImportClient,
     ActivityWatchImporter,
@@ -58,6 +59,7 @@ __all__ = [
     "ActivityWatchDiscovery",
     "ActivityWatchError",
     "ActivityWatchEvent",
+    "ActivityWatchEventClient",
     "ActivityWatchImportChunk",
     "ActivityWatchImportClient",
     "ActivityWatchImportError",

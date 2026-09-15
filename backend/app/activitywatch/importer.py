@@ -42,10 +42,8 @@ MAX_RUN_MS = 8 * 60 * 1000
 DEFAULT_TIMEZONE = "UTC"
 
 
-class ActivityWatchImportClient(Protocol):
-    """The read-only client surface required by the importer."""
-
-    def discover(self, *, expected_hostname: str | None = None) -> ActivityWatchDiscovery: ...
+class ActivityWatchEventClient(Protocol):
+    """The minimal client surface required by bounded event fetching."""
 
     def get_events(
         self,
@@ -55,6 +53,12 @@ class ActivityWatchImportClient(Protocol):
         end: datetime | str,
         limit: int = EVENT_LIMIT,
     ) -> tuple[ActivityWatchEvent, ...]: ...
+
+
+class ActivityWatchImportClient(ActivityWatchEventClient, Protocol):
+    """The read-only client surface required by the importer."""
+
+    def discover(self, *, expected_hostname: str | None = None) -> ActivityWatchDiscovery: ...
 
 
 class ActivityWatchImportError(RuntimeError):
@@ -217,7 +221,7 @@ def _bucket_created_ms(bucket: ActivityWatchBucket) -> int:
 
 
 def fetch_bucket_events(
-    client: ActivityWatchImportClient,
+    client: ActivityWatchEventClient,
     bucket: ActivityWatchBucket,
     *,
     start_ms: int,
@@ -347,6 +351,7 @@ class ActivityWatchImporter:
             device=empty,
             days=days,
             now_ms=now_ms,
+            allow_privacy_mode_change=from_ms is not None,
         )
 
     def _plan_days(
@@ -418,6 +423,7 @@ class ActivityWatchImporter:
         device: NormalizedActivityWatch,
         days: Sequence[tuple[int, int]],
         now_ms: int,
+        allow_privacy_mode_change: bool,
     ) -> ActivityWatchImportResult:
         if self.session_factory is None:
             raise ValueError("session_factory is required for a writing import.")
@@ -429,6 +435,7 @@ class ActivityWatchImporter:
                 privacy_mode=self.settings.privacy_mode,
                 now_ms=now_ms,
                 ttl_ms=self.settings.lease_ttl_ms,
+                allow_privacy_mode_change=allow_privacy_mode_change,
             )
             if token is None:
                 raise ActivityWatchImportError("lease_busy")
@@ -598,6 +605,7 @@ __all__ = [
     "MIN_SPLIT_MS",
     "SETTLEMENT_LAG_MS",
     "UTC_DAY_MS",
+    "ActivityWatchEventClient",
     "ActivityWatchImportChunk",
     "ActivityWatchImportClient",
     "ActivityWatchImportError",
