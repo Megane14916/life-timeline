@@ -83,7 +83,7 @@ Google Play services Locationは[公式セットアップ手順](https://develop
 
 ### Phase 6 ActivityWatch依存とsource contract
 
-P6-01では、ActivityWatchのWindows stable releaseと、loopback REST Adapterのruntime HTTP clientを固定した。確認日は2026年9月15日である。ActivityWatch `v0.14.0b5`以下のpre-release系列は採用せず、stableとして公開されている`v0.13.2`を基準にする。ActivityWatch本体はlife-timelineへ同梱せず、利用者が公式手順でインストールする。
+Phase 6では、ActivityWatchのWindows stable releaseと、loopback REST Adapterのruntime HTTP clientを固定した。確認日は2026年9月15日である。ActivityWatch `v0.14.0b5`以下のpre-release系列は採用せず、stableとして公開されている`v0.13.2`を基準にする。ActivityWatch本体はlife-timelineへ同梱せず、利用者が公式手順でインストールする。
 
 | 対象 | 確認したversion | 初めて固定する場所 | 用途 |
 | --- | --- | --- | --- |
@@ -93,6 +93,8 @@ P6-01では、ActivityWatchのWindows stable releaseと、loopback REST Adapter�
 ActivityWatchはPython packageとして実行せず、Windowsで動作する外部serverへHTTP接続する。そのためPython `3.13.15`との互換性は、Backendのcontract fixture / HTTP transportとActivityWatch `v0.13.2`のREST shapeを分離して確認する。ActivityWatchのinternal DB・設定file・write APIには依存しない。HTTPXは既存lockに記録済みの`0.28.1`をruntimeへ移し、test専用の範囲指定依存を残さない。
 
 source contractの正本は[`contracts/activitywatch-v1.json`](../../contracts/activitywatch-v1.json)、保存前のdata minimizationとfixtureレビューは[Phase 6 ActivityWatch privacy review](phase6-activitywatch-privacy.md)に記録する。ActivityWatchのversion更新、browser mapping追加、privacy policy変更は、contract fixture・policy test・この表を同じPull Requestで更新する。
+
+実装上の保存境界は、ActivityWatchのraw eventを直接DBやログへ複製せず、`app_sessions`とnullableな`desktop_session_details`へ正規化することです。window eventは`not-afk`とのintersectionで利用時間を算出し、`app_only`を既定とします。ActivityWatchの原本DB・設定・raw exportはlife-timelineのdata root backupとは別に管理します。
 
 一次資料: [ActivityWatch REST API](https://docs.activitywatch.net/en/latest/api/rest.html)、[ActivityWatch releases](https://github.com/ActivityWatch/activitywatch/releases)、[HTTPX on PyPI](https://pypi.org/project/httpx/)。
 

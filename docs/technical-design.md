@@ -294,11 +294,15 @@ life-timeline側はREST API経由でデータを取得します。
 ActivityWatch
    ↓
 Adapter
-   ↓
-desktop_sessions
+   ├── app_sessions
+   └── desktop_session_details
 ```
 
-ActivityWatchの内部データ構造にlife-timeline本体を依存させず、Adapterで変換します。
+ActivityWatchの内部データ構造にlife-timeline本体を依存させず、loopback REST Adapterで変換します。連携は明示的なopt-in時だけ有効で、`127.0.0.1:5600`へread-only GETを行います。Adapterはbucket metadataを検証し、window eventと`not-afk` periodのintersectionを共通`app_sessions`へ正規化します。window titleとWeb URLはPC固有のnullableな`desktop_session_details`へ分離し、既定の`app_only`では保存しません。
+
+ActivityWatchは原本のSource of Truthです。life-timeline側のSessionとdetailは指定UTC日範囲から再生成可能なmaterialized Factとして扱い、日単位のtransactional replace、cursor、lease、retryで再取込を冪等にします。ActivityWatch停止時はcollector statusだけを失敗扱いにし、既存のTimeline、Photos、Map、Android同期を停止させません。PC利用時間はWindows uptimeや勤務時間を推測せず、記録済みwindow eventと`not-afk`の重なりだけから算出します。
+
+Privacy modeは`app_only`を既定とし、`titles`では非browser title、`web`ではactive browserとのintersectionに限ってdetailを扱います。incognito、非active browser、危険なURL、URLのuserinfo / query / fragmentは保存しません。保存前のdata minimizationを通過しないtitle / URLをログ、fixture、artifactへ出力しません。
 
 ---
 

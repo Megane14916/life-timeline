@@ -168,7 +168,7 @@ TimelineではSession単位で表示します。
 
 ## Desktop Activity
 
-ActivityWatchからPC利用履歴を取り込みます。
+ActivityWatchからPC利用履歴を取り込みます。連携は既定で無効で、利用者が有効化した場合だけWindowsの`127.0.0.1:5600`へread-only GETを行います。ActivityWatch本体のDBやraw exportをlife-timelineへコピーしません。
 
 例:
 
@@ -178,6 +178,12 @@ ActivityWatchからPC利用履歴を取り込みます。
 - Discord
 - アクティブウィンドウ
 - Webページ
+
+window eventはActivityWatchの`not-afk` periodと重なる範囲だけをPC利用時間として扱います。したがって、表示される利用時間は記録されたactive periodの集計であり、Windows uptime、勤務時間、実際の集中時間を保証しません。AFK timeoutはActivityWatch側の設定に従い、life-timeline側では固定しません。
+
+privacy modeは`app_only`、`titles`、`web`を用意します。`app_only`ではアプリ識別子と利用時間だけを保存し、`titles`では非browserのwindow titleを追加できます。`web`ではactive browser windowに重なるWeb eventだけを対象にし、incognitoや安全に扱えないURLのdetailはnullにします。URLのquery、fragment、userinfoは保存前に除去し、title / URLを無条件に収集しません。
+
+保存先は共通の`app_sessions`とPC固有のnullableな`desktop_session_details`です。TimelineとStatisticsはこれらの保存済みFactから生成し、同じUTC日範囲をCLIで再生成できます。日常の起動、停止、catch-up、backfill、privacy mode変更、backupの境界は[Phase 6 Windows運用手順](development/phase6-operations.md)を参照してください。
 
 ---
 
@@ -327,7 +333,7 @@ PC上のローカルデータを正とします。
 
 クラウドアカウントを必須にしません。
 
-現在はExport / Backup UIや自動backup機能を提供していません。手動backupではPCのdata rootにある`lifelog.db`と`thumbnails/`を一体でコピーし、手順は[README](../README.md#手動バックアップと復旧)に従います。Export / Backup UIはPhase 7の候補です。
+現在はExport / Backup UIや自動backup機能を提供していません。手動backupではPCのdata rootにある`lifelog.db`と`thumbnails/`を一体でコピーし、手順は[README](../README.md#手動バックアップと復旧)に従います。ActivityWatchの原本DB・設定・raw exportは別の外部sourceであり、このbackupには含めません。ActivityWatch原本を失うと、life-timeline側のPC Sessionを将来再生成できない場合があります。Export / Backup UIはPhase 7の候補です。
 
 ---
 

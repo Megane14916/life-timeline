@@ -38,12 +38,12 @@ flowchart LR
         DB[(SQLite)]
         FS[Thumbnail Files]
         WEB[React + TypeScript]
-        AW[ActivityWatch]
+        AW[ActivityWatch<br/>127.0.0.1:5600]
 
         API --> DB
         API --> FS
         WEB --> API
-        AW --> API
+        AW -->|read-only REST GET| API
     end
 
     MSYNC -->|HTTPS| TS
@@ -181,7 +181,7 @@ PCへ送るのは原本ではなく、Android側で生成した最大辺512px・
 
 ### ActivityWatch
 
-PC作業履歴の収集には既存のActivityWatchを利用します。
+PC作業履歴の収集には既存のActivityWatchを利用します。ActivityWatchは外部collectorであり、life-timelineは本体や内部DBを再実装・直接参照しません。連携は明示的なopt-in時だけ有効になり、`127.0.0.1:5600`のloopback REST APIへread-only GETを送ります。
 
 life-timeline側では、ActivityWatchのREST APIから以下を取り込みます。
 
@@ -190,7 +190,7 @@ life-timeline側では、ActivityWatchのREST APIから以下を取り込みま�
 - Webサイト利用履歴
 - AFK情報
 
-ActivityWatch自体を再実装しません。
+window eventを`not-afk` periodとintersectionし、共通の`app_sessions`へ保存します。window titleとWeb URLは`desktop_session_details`へ分離し、既定の`app_only`では最小化します。`titles` / `web`へ広げる場合もincognito、非active browser、危険なURL、query / fragment / userinfoを抑止します。ActivityWatch停止時はcollectorのstatusだけを失敗扱いにし、Backend、既存Timeline、Android同期全体は継続可能にします。
 
 ### Google Photos
 

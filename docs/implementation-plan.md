@@ -162,10 +162,10 @@ PC上の行動をlife-timelineへ統合する。
 内容:
 
 - ActivityWatch REST Adapter
-- desktop_sessions
-- Web履歴
-- PC利用時間
-- Timeline統合
+- 共通`app_sessions`とPC固有`desktop_session_details`
+- Web履歴（privacy modeで明示的に許可した範囲のみ）
+- AFKを除外したPC利用時間
+- Timeline / Statistics統合
 
 再利用する境界:
 
@@ -176,7 +176,14 @@ PC上の行動をlife-timelineへ統合する。
 
 完成条件:
 
-PCとAndroidの行動が同じTimeline上で表示される。
+ActivityWatchを明示的に有効化した環境で、loopback read-only RESTから取得したwindow / AFK / Web eventが、Androidと同じTimelineへ表示される。PC利用時間はwindowと`not-afk`のintersectionだけを集計し、既定の`app_only`ではtitle / URLを保存しない。停止復旧、catch-up、backfill、再取込の冪等性はPhase 6の受け入れ・運用文書で確認し、未実施の実機項目はPASSとしない。
+
+Phase 6で再利用する境界:
+
+- timezone日範囲、Timeline discriminated union、共通`app_sessions`
+- raw sourceと再生成可能なmaterialized Factの分離
+- data type別のlease、retry、safe diagnostics、batch、transaction
+- data root全体のbackup境界（ActivityWatch原本は別管理）
 
 ---
 
@@ -188,16 +195,19 @@ PCとAndroidの行動が同じTimeline上で表示される。
 
 内容:
 
-- Filter / Search
-- Statistics画面
-- Calendar
-- Device management
-- Backup
-- Export
-- 手動イベント
+- Filter / Search / URL domain search
+- 日 / 週 / 月Statisticsとplatform比較
+- CalendarとTimeline grouping
+- Device management / hostname変更時のmerge
+- Settingsとprivacy mode変更preview
+- Backup / Export UI（PC detailの選択的除外を含む）
+- 手動イベント、category master、手動分類
 - Error UI
-- Settings
-- performance改善
+- performance改善 / virtualization
+
+開始条件:
+
+Phase 6の共通AppSession query、ActivityWatchのread-only loopback境界、privacy mode、再取込・backup境界を維持したまま、実機受け入れ記録の未確認項目を明示してから着手する。Phase 7でtitle / URLを無条件収集へ変更しない。
 
 ---
 
