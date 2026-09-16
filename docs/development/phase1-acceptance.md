@@ -107,7 +107,7 @@ mainの[保護ruleset](https://github.com/Megane14916/life-timeline/rules/222533
 
 - 保存先は`LIFE_TIMELINE_DATA_DIR`の絶対パスで統一し、seedとBackendが別DBを開かないようにした。
 - migration前seed、DBパス誤り、8000/5173のポート競合、timezone不正、Backend停止はREADMEに切り分け手順を記載した。
-- Phase 1のFactは`app_sessions`であり、`app_sessions.id`単独を主キーとして扱う。`desktop_sessions`は上位文書に残る旧称で、ActivityWatch固有の実装はPhase 6へ残す。
+- Phase 1のFactは`app_sessions`であり、`app_sessions.id`単独を主キーとして扱う。ActivityWatch固有の取込と`desktop_session_details`はPhase 6の責務である。
 - Timeline APIは`/api/v1/timeline`、Statistics APIは`/api/v1/stats/apps`を正とし、表示用レスポンスを同期payloadとして扱わない。
 
 ## 7. Phase 2への引き継ぎ

@@ -841,4 +841,4 @@ Phase 6のActivityWatch連携はPC側collectorであり、Android background per
 - Timeline / Map間のdeep linkと、canvasに依存しないtext alternative。
 - 個人データをfixture / log / artifactへ含めない受け入れ記録。
 
-Phase 6ではActivityWatch bucket / event cursor、desktop session生成、window title / URLのprivacy、PC collector scheduleを別途決定する。Locationのpermission、PendingIntent、Android Room、OSM tile opt-inへActivityWatchの責務を同居させない。
+Phase 6ではActivityWatch bucket / event cursor、共通`app_sessions`へのSession生成、window title / URLのprivacy、PC collector scheduleを定義する。Locationのpermission、PendingIntent、Android Room、OSM tile opt-inへActivityWatchの責務を同居させない。

@@ -10,7 +10,7 @@
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | [implementation-plan.md](../implementation-plan.md)         | ActivityWatch REST Adapter、PC利用時間、Web履歴、Timeline統合を対象とする                   | Windows PCの実データを既存の共通AppSession経路へ投入する                           |
 | [product-spec.md](../product-spec.md)                       | Desktop Activityはアプリ、active window、Webページを扱う                                    | AFKを除いたPC利用を保存し、詳細は明示的なprivacy modeに従う                        |
-| [data-model.md](../data-model.md)                           | PC利用も`app_sessions`へ保存し、固有情報だけ`desktop_session_details`へ分離する             | `desktop_sessions`という別Fact tableは作らず、既存モデルを拡張する                 |
+| [data-model.md](../data-model.md)                           | PC利用も`app_sessions`へ保存し、固有情報だけ`desktop_session_details`へ分離する             | 独立したPC利用Fact tableは作らず、既存の共通モデルを拡張する                      |
 | [architecture.md](../architecture.md)                       | ActivityWatchをPC側collectorとしてREST経由で利用する                                        | ActivityWatchの内部DBや設定fileを直接読まず、loopback REST Adapterで隔離する       |
 | [technical-design.md](../technical-design.md)               | UTC、冪等ID、正規化Fact、再生成可能な派生データを使う                                       | UTC日chunk単位の置換とdeterministic IDで再取込可能にする                           |
 | [phase5-location.md](phase5-location.md)                    | Timeline union、timezone query、raw / derived分離、batch、lease、safe diagnosticsが完成済み | PC collectorへ同じ失敗安全性を適用するが、Android componentは共有しない            |
@@ -612,7 +612,7 @@ P6-01のsource contractは[`contracts/activitywatch-v1.json`](../../contracts/ac
 
 - **目的:** 実装値、制約、日常運用をrepository全体で一致させる。
 - **依存:** P6-10。
-- **作業:** README、overview、product-spec、architecture、technical-design、data-model、implementation-plan、toolchainsを更新し、旧称`desktop_sessions`を共通AppSession + detailへ統一する。
+- **作業:** README、overview、product-spec、architecture、technical-design、data-model、implementation-plan、toolchainsを更新し、PC利用を共通AppSession + detailへ統一する。
 - **成果物:** Phase 6完了状態の文書とPhase 7 backlog。
 - **完了条件:** install済み前提、opt-in、AFK、privacy mode、loopback、catch-up、非保証、backup範囲が追跡できる。
 

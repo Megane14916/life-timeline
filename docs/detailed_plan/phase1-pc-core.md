@@ -23,7 +23,7 @@
 ### 文書間に残る記述差の扱い
 
 - schemaの基準は`data-model.md`とする。`technical-design.md`§4の`device_id + event_id`という重複防止方針に対し、`data-model.md`は`app_sessions.id`単独をPRIMARY KEYとしている。本計画は後者を採用し、同一IDの端末・内容を照合する。同じ端末の再送は増えず、別端末の同一IDは競合として拒否する（§5）。
-- `technical-design.md`§8と`implementation-plan.md`のPhase 6に残る`desktop_sessions`は旧名として扱う。保存先は共通の`app_sessions`とPC固有の`desktop_session_details`に読み替え、後者とActivityWatch取込はPhase 6へ残す。
+- Phase 6のActivityWatch取込は、共通の`app_sessions`とPC固有の`desktop_session_details`へ保存する。後者はPhase 6で追加されたPC固有detailである。
 - `technical-design.md`§9の`desktop_session` / `photo`等は表示用レスポンスの例であり、同名テーブルを作る根拠にはしない。後続の保存モデルは`media_items`・`manual_records`を用いる。
 - `data-model.md`§15にあるULID / ORM等の未決事項は、Phase 1では§3.2の採用案で進める。Categoryの本番初期値や管理UIは今回確定しない。
 - AppSession IDはLifeTimelineが正規化Sessionの生成時に付与するIDとし、OSの生イベントIDとは区別する（§5.3）。日跨ぎ計算はBackendに集約し、E2Eは上位設計の任意実行案にかかわらず全PRの必須チェックとする（§6・§11）。
@@ -205,7 +205,7 @@ fixture用カテゴリだけをseedする。本番向けカテゴリの初期セ
 
 - 同一アプリのMaster重複を避けるため、Phase 1の具体化として`UNIQUE(platform, identifier)`を置く。同じアプリを複数端末が利用しても同じ`app_id`を参照する。
 - 名称が同じでもplatform・identifierが異なるアプリは別Masterとする。表示名を一意キーにしない。
-- Phase 1のfixtureではidentifierの表記を固定して完全一致で照合する。Windowsのパス・大文字小文字等の収集元固有の正規化はPhase 6で決める。
+- Phase 1のfixtureではidentifierの表記を固定して完全一致で照合する。Windowsのパス・大文字小文字等の収集元固有の正規化はPhase 6のActivityWatch Adapterで扱う。
 
 #### app_sessions
 
