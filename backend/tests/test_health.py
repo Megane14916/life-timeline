@@ -41,7 +41,11 @@ def test_health_returns_ok(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
 def test_health_reports_unmigrated_database(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    response = asyncio.run(get(_app(tmp_path, monkeypatch, migrate=False), "/api/v1/health"))
+    application = _app(tmp_path, monkeypatch, migrate=False)
+    response = asyncio.run(get(application, "/api/v1/health"))
+    timeline_response = asyncio.run(
+        get(application, "/api/v1/timeline?date=2026-09-03&timezone=UTC")
+    )
 
     assert response.status_code == 503
     assert response.json() == {
@@ -53,6 +57,8 @@ def test_health_reports_unmigrated_database(
             "field": None,
         }
     }
+    assert timeline_response.status_code == 503
+    assert timeline_response.json() == response.json()
 
 
 def test_unknown_route_returns_not_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
