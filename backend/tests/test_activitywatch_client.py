@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -189,3 +190,12 @@ def test_client_accepts_activitywatch_release_version_with_v_prefix() -> None:
         info = client.get_info()
 
     assert info.version == "v0.13.2"
+
+
+def test_client_accepts_utc_naive_bucket_created_timestamp() -> None:
+    bucket = _bucket("fixture-window", "currentwindow", "aw-watcher-window")
+    bucket["created"] = "2026-09-14T00:00:00.000000"
+
+    parsed = ActivityWatchBucket.from_payload("fixture-window", bucket)
+
+    assert parsed.created == datetime(2026, 9, 14, tzinfo=UTC)

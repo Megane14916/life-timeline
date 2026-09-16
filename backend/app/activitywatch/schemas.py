@@ -16,8 +16,8 @@ def _required_string(value: object, *, incompatible: bool = True) -> str:
     return value
 
 
-def parse_timestamp(value: object) -> datetime:
-    """Parse an offset-aware ISO-8601 timestamp without guessing a timezone."""
+def parse_timestamp(value: object, *, naive_is_utc: bool = False) -> datetime:
+    """Parse an ISO-8601 timestamp, optionally treating a naive value as UTC."""
 
     if not isinstance(value, str) or not value.strip():
         raise ActivityWatchProtocolError(incompatible=True)
@@ -28,7 +28,11 @@ def parse_timestamp(value: object) -> datetime:
         parsed = datetime.fromisoformat(candidate)
     except ValueError as error:
         raise ActivityWatchProtocolError(incompatible=True) from error
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
+    if parsed.tzinfo is None:
+        if not naive_is_utc:
+            raise ActivityWatchProtocolError(incompatible=True)
+        parsed = parsed.replace(tzinfo=UTC)
+    if parsed.utcoffset() is None:
         raise ActivityWatchProtocolError(incompatible=True)
     return parsed.astimezone(UTC)
 
@@ -69,7 +73,9 @@ class ActivityWatchBucket:
         if declared_id != bucket_id:
             raise ActivityWatchProtocolError(incompatible=True)
         created_value = payload.get("created")
-        created = parse_timestamp(created_value) if created_value is not None else None
+        created = (
+            parse_timestamp(created_value, naive_is_utc=True) if created_value is not None else None
+        )
         return cls(
             id=declared_id,
             type=_required_string(payload.get("type")),
