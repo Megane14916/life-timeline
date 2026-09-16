@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -176,6 +177,25 @@ def test_client_rejects_incompatible_version_and_schema_rejects_invalid_event_du
     assert version_error.value.code == "incompatible_api"
     with pytest.raises(ActivityWatchProtocolError):
         ActivityWatchEvent.from_payload({"timestamp": START, "duration": float("inf"), "data": {}})
+
+
+def test_client_logs_safe_reason_for_incompatible_version(caplog: pytest.LogCaptureFixture) -> None:
+    def incompatible_info(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"version": "0.12.0", "hostname": "fixture-secret-host"},
+            request=request,
+        )
+
+    with caplog.at_level(logging.WARNING, logger="app.activitywatch.client"):
+        with ActivityWatchClient(transport=httpx.MockTransport(incompatible_info)) as client:
+            with pytest.raises(ActivityWatchProtocolError):
+                client.get_info()
+
+    assert "endpoint=info" in caplog.text
+    assert "reason=version_mismatch" in caplog.text
+    assert "reported_version=0.12.0" in caplog.text
+    assert "fixture-secret-host" not in caplog.text
 
 
 def test_client_accepts_activitywatch_release_version_with_v_prefix() -> None:

@@ -76,6 +76,20 @@ Invoke-RestMethod 'http://127.0.0.1:8000/api/v1/activitywatch/status' |
 
 「今すぐ取り込む」は同時に1件だけ実行します。連続clickや別PowerShellからの同時CLI実行は避け、実行中はstatusが完了するまで待ちます。
 
+### 3.1 ActivityWatch連携の安全な診断ログ
+
+BackendはActivityWatch連携の失敗箇所を確認できる分類ログをBackend terminalへ出力します。ログには`info` / `buckets` / `events`の段階、結果コード、HTTP status class、件数だけが含まれ、hostname、bucket ID、event本文、アプリ名、title、URLは含めません。
+
+「今すぐ取り込む」を1回実行した後、Backend terminalで`ActivityWatch`から始まる行だけを確認します。例えば、次のように段階を特定できます。
+
+```text
+ActivityWatch response accepted: endpoint=info
+ActivityWatch response rejected: endpoint=buckets code=incompatible_api reason=bucket_schema
+ActivityWatch import failed: result=incompatible_api retryable=False
+```
+
+`endpoint=info`の後に`endpoint=buckets`が出なければserver APIまたはversion、`reason=bucket_schema`ならbucket metadata、`endpoint=events`ならevent shapeを確認します。ログをIssue / PRへ貼る場合は`ActivityWatch`から始まる分類行だけに限定し、raw logやActivityWatch画面の内容は共有しません。
+
 ## 4. backfillと再取込
 
 初回自動importは直近7 UTC日だけです。古い履歴は31日以下の範囲へ分けてCLIでbackfillします。`<from>`、`<to>`、timezoneは利用者の対象範囲へ置き換えますが、実値をこの文書やIssueへ書きません。
