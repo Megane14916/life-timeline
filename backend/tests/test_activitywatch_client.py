@@ -179,6 +179,30 @@ def test_client_rejects_incompatible_version_and_schema_rejects_invalid_event_du
         ActivityWatchEvent.from_payload({"timestamp": START, "duration": float("inf"), "data": {}})
 
 
+def test_activitywatch_accepts_zero_duration_events() -> None:
+    event = ActivityWatchEvent.from_payload({"timestamp": START, "duration": 0, "data": {}})
+
+    assert event.duration_seconds == 0
+
+
+def test_client_logs_safe_event_schema_reason(caplog: pytest.LogCaptureFixture) -> None:
+    def invalid_events(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json=[{"timestamp": START, "duration": -1, "data": {}}],
+            request=request,
+        )
+
+    with caplog.at_level(logging.WARNING, logger="app.activitywatch.client"):
+        with ActivityWatchClient(transport=httpx.MockTransport(invalid_events)) as client:
+            with pytest.raises(ActivityWatchProtocolError):
+                client.get_events("fixture-window", start=START, end=END)
+
+    assert "endpoint=events" in caplog.text
+    assert "reason=duration_range" in caplog.text
+    assert "event_index=0" in caplog.text
+
+
 def test_client_logs_safe_reason_for_incompatible_version(caplog: pytest.LogCaptureFixture) -> None:
     def incompatible_info(request: httpx.Request) -> httpx.Response:
         return httpx.Response(

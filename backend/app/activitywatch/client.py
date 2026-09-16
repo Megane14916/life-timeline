@@ -209,13 +209,32 @@ class ActivityWatchClient:
         )
         try:
             if not isinstance(payload, list):
-                raise ActivityWatchProtocolError(incompatible=True)
-            events = tuple(ActivityWatchEvent.from_payload(event) for event in payload)
-        except ActivityWatchProtocolError:
-            logger.warning(
-                "ActivityWatch response rejected: endpoint=events code=incompatible_api "
-                "reason=event_schema"
-            )
+                raise ActivityWatchProtocolError(incompatible=True, reason="event_list")
+            parsed_events: list[ActivityWatchEvent] = []
+            for event_index, event in enumerate(payload):
+                try:
+                    parsed_events.append(ActivityWatchEvent.from_payload(event))
+                except ActivityWatchProtocolError as error:
+                    reason = error.reason or "event_schema"
+                    logger.warning(
+                        "ActivityWatch response rejected: endpoint=events "
+                        "code=incompatible_api reason=%s event_index=%d",
+                        reason,
+                        event_index,
+                    )
+                    raise
+            events = tuple(parsed_events)
+        except ActivityWatchProtocolError as error:
+            if error.reason == "event_list":
+                logger.warning(
+                    "ActivityWatch response rejected: endpoint=events "
+                    "code=incompatible_api reason=event_list"
+                )
+            elif error.reason is None:
+                logger.warning(
+                    "ActivityWatch response rejected: endpoint=events "
+                    "code=incompatible_api reason=event_schema"
+                )
             raise
         logger.info("ActivityWatch response accepted: endpoint=events event_count=%d", len(events))
         return events

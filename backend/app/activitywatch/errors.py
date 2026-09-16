@@ -61,7 +61,11 @@ class ActivityWatchUnavailableError(ActivityWatchError):
 class ActivityWatchProtocolError(ActivityWatchError):
     """Raised for permanent HTTP, JSON, or response-shape violations."""
 
-    def __init__(self, *, incompatible: bool = False) -> None:
+    def __init__(self, *, incompatible: bool = False, reason: str | None = None) -> None:
+        # ``reason`` is intentionally a fixed, caller-supplied category. It is
+        # not included in the exception message, so response contents cannot
+        # leak into API responses or user-facing logs.
+        self.reason = reason
         super().__init__(
             ActivityWatchErrorInfo(
                 code=ACTIVITYWATCH_INCOMPATIBLE_API

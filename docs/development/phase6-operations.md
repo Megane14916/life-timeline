@@ -88,7 +88,7 @@ ActivityWatch response rejected: endpoint=buckets code=incompatible_api reason=b
 ActivityWatch import failed: result=incompatible_api retryable=False
 ```
 
-`endpoint=info`の後に`endpoint=buckets`が出なければserver APIまたはversion、`reason=bucket_schema`ならbucket metadata、`endpoint=events`ならevent shapeを確認します。ログをIssue / PRへ貼る場合は`ActivityWatch`から始まる分類行だけに限定し、raw logやActivityWatch画面の内容は共有しません。
+`endpoint=info`の後に`endpoint=buckets`が出なければserver APIまたはversion、`reason=bucket_schema`ならbucket metadata、`endpoint=events`ならevent shapeを確認します。eventsの拒否時は`event_index`と安全な理由（`duration_type`、`duration_range`、`event_timestamp`、`event_data`など）も出力されます。ログをIssue / PRへ貼る場合は`ActivityWatch`から始まる分類行だけに限定し、raw logやActivityWatch画面の内容は共有しません。
 
 ## 4. backfillと再取込
 
