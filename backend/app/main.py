@@ -18,6 +18,7 @@ from app.activitywatch.scheduler import (
     load_runtime_config,
 )
 from app.api.activitywatch import router as activitywatch_router
+from app.api.dependencies import DATABASE_NOT_READY_MESSAGE
 from app.api.errors import (
     InvalidRequestError,
     PayloadTooLargeError,
@@ -36,7 +37,7 @@ from app.api.statistics import router as statistics_router
 from app.api.sync import router as sync_router
 from app.api.timeline import router as timeline_router
 from app.config import get_settings
-from app.db import create_engine_for_settings, create_session_factory
+from app.db import create_engine_for_settings, create_session_factory, is_database_ready
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +102,10 @@ def create_app(
     if session_factory is None and engine is not None:
         application.state.engine = engine
         session_factory = create_session_factory(engine)
+    elif session_factory is not None and engine is None:
+        bound_engine = session_factory.kw.get("bind")
+        if isinstance(bound_engine, Engine):
+            application.state.engine = bound_engine
     if activitywatch_scheduler is None:
         if runtime.enabled and session_factory is None:
             settings = get_settings()
@@ -120,6 +125,15 @@ def create_app(
         )
     application.state.session_factory = session_factory
     application.state.activitywatch_scheduler = activitywatch_scheduler
+
+    def _database_engine() -> Engine:
+        current_engine = getattr(application.state, "engine", None)
+        if isinstance(current_engine, Engine):
+            return current_engine
+        current_engine = create_engine_for_settings(get_settings())
+        application.state.engine = current_engine
+        application.state.session_factory = create_session_factory(current_engine)
+        return current_engine
 
     @application.exception_handler(InvalidRequestError)
     async def invalid_request_handler(_request: Request, exc: InvalidRequestError) -> JSONResponse:
@@ -180,6 +194,8 @@ def create_app(
 
     @application.get("/api/v1/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
+        if not is_database_ready(_database_engine()):
+            raise TemporarilyUnavailableError(DATABASE_NOT_READY_MESSAGE)
         return HealthResponse(status="ok")
 
     return application

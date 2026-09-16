@@ -31,6 +31,12 @@ EVENT_LIMIT = 10_000
 LOOPBACK_HOSTS = frozenset(("127.0.0.1", "localhost", "::1"))
 
 
+def _normalized_release_version(value: str) -> str:
+    """Normalize the optional ``v`` prefix used by ActivityWatch releases."""
+
+    return value.strip().removeprefix("v")
+
+
 def _validate_loopback_base_url(value: str) -> str:
     """Allow test/configuration overrides without turning the client into a proxy."""
 
@@ -99,7 +105,7 @@ class ActivityWatchClient:
         if max_response_bytes <= 0 or connect_timeout_seconds <= 0 or read_timeout_seconds <= 0:
             raise ValueError("ActivityWatch client limits must be positive.")
         validated_base_url = _validate_loopback_base_url(base_url)
-        self._expected_version = expected_version
+        self._expected_version = _normalized_release_version(expected_version)
         self._max_response_bytes = max_response_bytes
         self._client = httpx.Client(
             base_url=validated_base_url,
@@ -127,7 +133,7 @@ class ActivityWatchClient:
     def get_info(self) -> ActivityWatchInfo:
         payload = self._get_json(f"{ACTIVITYWATCH_API_PREFIX}/info")
         info = ActivityWatchInfo.from_payload(payload)
-        if info.version != self._expected_version:
+        if _normalized_release_version(info.version) != self._expected_version:
             raise ActivityWatchProtocolError(incompatible=True)
         return info
 

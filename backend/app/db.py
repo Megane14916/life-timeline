@@ -8,14 +8,19 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, inspect
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import Settings
+from app.models import Base
 
 
 class DataDirectoryError(OSError):
     """Raised when the configured data directory cannot be prepared."""
+
+
+REQUIRED_TABLES = frozenset(Base.metadata.tables)
 
 
 def ensure_data_directory(data_dir: Path) -> Path:
@@ -80,6 +85,22 @@ def create_session_factory(engine: Engine) -> sessionmaker[Session]:
     """Create a non-global session factory bound to ``engine``."""
 
     return sessionmaker(bind=engine, class_=Session, expire_on_commit=False)
+
+
+def is_database_ready(engine: Engine) -> bool:
+    """Return whether the configured database has the current application schema.
+
+    The API must not treat a newly-created empty SQLite file as a usable database.
+    Checking the model table set catches the common case where the server and the
+    migration command used different ``LIFE_TIMELINE_DATA_DIR`` values.
+    """
+
+    try:
+        with engine.connect() as connection:
+            existing_tables = set(inspect(connection).get_table_names())
+    except SQLAlchemyError:
+        return False
+    return REQUIRED_TABLES.issubset(existing_tables)
 
 
 @contextmanager
