@@ -191,7 +191,7 @@ backupに含める対象はdata root全体です。ActivityWatch本体のraw DB�
 ```powershell
 $restoreRoot = Join-Path $env:TEMP 'life-timeline-phase6-restore-<unique>'
 New-Item -ItemType Directory -Force -Path $restoreRoot | Out-Null
-Copy-Item -LiteralPath '<backup directoryの絶対パス>\*' -Destination $restoreRoot -Recurse
+Copy-Item -Path '<backup directoryの絶対パス>\*' -Destination $restoreRoot -Recurse
 $env:LIFE_TIMELINE_DATA_DIR = $restoreRoot
 ```
 
