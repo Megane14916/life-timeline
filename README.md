@@ -223,7 +223,7 @@ WorkManagerによる定期収集・自動同期、Room v2、期限付きlease、
 
 ## Phase 6 Windows実機受け入れ
 
-ActivityWatchのwatcher / AFK / Web privacy、停止復旧、CLI再取込、Androidとの共通Timelineの実機確認は[Phase 6 Windows実機受け入れ手順・記録](docs/development/phase6-acceptance.md)に従ってください。日常の起動・停止、backfill、privacy mode変更、backup、障害切り分けは[Phase 6 Windows運用手順](docs/development/phase6-operations.md)を参照してください。実在のhostname、bucket ID、app一覧、title、URL、raw logは記録しません。
+Phase 6のActivityWatch連携実装は、既定OFF・loopback read-only・`app_only` privacyを前提に、PCのwindow / AFK / Web eventをAndroidと共通のAppSessionへ統合します。watcher / AFK / Web privacy、停止復旧、CLI再取込、Androidとの共通Timelineの実機確認は[Phase 6 Windows実機受け入れ手順・記録](docs/development/phase6-acceptance.md)に従ってください。日常の起動・停止、backfill、privacy mode変更、backup、障害切り分けは[Phase 6 Windows運用手順](docs/development/phase6-operations.md)を参照してください。実在のhostname、bucket ID、app一覧、title、URL、raw logは記録しません。実機チェックリストの`NOT TESTED`はPASSとみなしません。
 
 ## 位置情報の収集と同期
 
@@ -257,6 +257,8 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 ActivityWatchのWindows AppSessionは既存の`GET /api/v1/timeline`へ統合され、`desktopDetail`はnullableの`windowTitle` / `url`だけを返します。`GET /api/v1/stats/apps`にはAndroid / Windows別の`platformTotals`が含まれます。利用時間は保存済みSessionをtimezone rangeへclipした値の合計で、ActivityWatchのAFK期間やOS uptimeを推測して加算しません。
 
+ActivityWatchの原本DB・設定・raw exportはlife-timelineのbackupには含めません。life-timelineの手動backupは、FastAPI停止後に同じdata rootの`lifelog.db`と`thumbnails/`を一体でコピーします。ActivityWatch原本のbackupが必要な場合は、ActivityWatch側の別手順・別snapshotとして管理してください。
+
 ## 写真の収集と同期
 
 写真収集はAndroidアプリで明示的に有効化し、写真へのアクセスを許可して利用します。対象はMediaStoreに登録済みの`DCIM/`配下の画像です。full accessでは有効化後に追加された写真を対象にし、Android 14以降のpartial accessでは利用者が選んだ写真だけを扱います。DCIM外、未公開の撮影中ファイル、Secure Folderや別Androidユーザーの写真は対象外になり得ます。
@@ -277,6 +279,8 @@ Invoke-RestMethod 'http://127.0.0.1:8000/api/v1/photos?date=2026-09-13&timezone=
 ### 手動バックアップと復旧
 
 life-timelineには現時点で自動backup機能はありません。PCのmetadataは`$env:LIFE_TIMELINE_DATA_DIR\lifelog.db`、写真previewは同じdata rootの`thumbnails/`にあります。この二つを必ず一体として扱い、片方だけのbackupを完全なbackupとして使わないでください。
+
+ActivityWatchは別の外部sourceです。ActivityWatch本体のDB、設定、raw exportをlife-timelineのdata rootやrepositoryへコピーしないでください。life-timeline側のsnapshotを復旧しても、ActivityWatch原本は復旧されません。
 
 整合したsnapshotを作るには、FastAPIを停止した後、data root全体を別の場所へコピーします。
 
@@ -403,7 +407,9 @@ PC endpointには`https://`のTailscale Serve URLだけを設定します。ま�
 | [Phase 5詳細計画](docs/detailed_plan/phase5-location.md) | Android background location、同期、Map / PlaceVisit |
 | [Phase 5実機受け入れ手順・記録](docs/development/phase5-acceptance.md) | 通常系の実機テストとprivacy-safeな結果記録 |
 | [Phase 5位置情報の運用手順](docs/development/phase5-location-operations.md) | permission、同期、battery、tile privacyの運用と障害切り分け |
+| [Phase 6詳細計画](docs/detailed_plan/phase6-activitywatch.md) | ActivityWatchの実装計画、受け入れ条件、Phase 7引き継ぎ |
 | [Phase 6 Windows実機受け入れ手順・記録](docs/development/phase6-acceptance.md) | ActivityWatch、停止復旧、再取込、Android共通Timelineの実機確認 |
+| [Phase 6 ActivityWatch privacy review](docs/development/phase6-activitywatch-privacy.md) | 収集範囲、data minimization、fixtureとartifactの境界 |
 | [Phase 6 Windows運用手順](docs/development/phase6-operations.md) | 起動、停止、backfill、privacy変更、backup、障害切り分け |
 
 Androidの`applicationId`と`namespace`は`com.megane14916.lifetimeline`です。

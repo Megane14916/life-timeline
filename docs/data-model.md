@@ -19,7 +19,7 @@ Android / ActivityWatch / User Input
 Collector Output
         ↓ 正規化
 Normalized Data
-AppSession / LocationPoint / PlaceVisit / MediaItem / ManualRecord
+AppSession / DesktopSessionDetail / LocationPoint / PlaceVisit / MediaItem / ManualRecord
         ↓ 集計・変換
 View / Aggregate
 Timeline / Statistics / Map / Photos
@@ -171,6 +171,8 @@ created_at_ms  INTEGER
 `source`例: `android_usage_stats`, `activitywatch`
 
 ここからアプリ別・端末別・カテゴリ別利用時間、セッション回数、平均セッション時間、時間帯別利用、週次/月次推移などを算出できます。
+
+ActivityWatch由来のSessionは、window eventと`not-afk` periodのintersectionから生成する再生成可能なFactです。ActivityWatchのraw eventは外部source側を正本とし、life-timelineは指定UTC日範囲のmaterialized copyを保持します。
 
 ## desktop_session_details
 
@@ -471,15 +473,24 @@ ManualRecord  → JSON / CSV
 
 PC data rootでは`lifelog.db`と`thumbnails/`が一つのbackup / restore単位です。位置情報は`lifelog.db`の`location_points`に含まれるため、DBを個別に除外したbackupは完全なライフログbackupではありません。完全な復旧では両方を同じsnapshotから戻します。手順と自動backup機能の現状は[README](../README.md#手動バックアップと復旧)を参照してください。
 
-# 15. Phase 6以降に検討する事項
+# 15. Phase 7 backlogと将来検討
 
 - 命名済みplaces masterを導入する時期と、PlaceVisit centerからの手動関連付け
-- ActivityWatchの詳細な保存・query規則
 - SQLAlchemy以外のrepository実装を追加する必要性
-- Categoryの初期値
-- AppSession生成ルール
-- ActivityWatchイベントの統合ルール
 - PlaceVisitの次期algorithm version（現行は`stay_point_v1`で固定）
 - timezone履歴の保存方法
 - Aggregate導入タイミング
 - LocationPointの保持・間引き方針（現行Phaseではraw保持、間引き・明示削除は未提供）
+
+Phase 6で確定した共通`app_sessions`、PC固有`desktop_session_details`、ActivityWatchのloopback read-only境界、AFK intersection、privacy mode、日単位再生成は変更せず、次をPhase 7 Product Polishの候補として引き継ぎます。
+
+- App / Location / Photo / ActivityWatchのfilter、期間検索、URL domain検索
+- Category masterの初期値、手動分類、ActivityWatch category規則との関係
+- 日 / 週 / 月Statistics、platform比較、domain別集計、Calendar badge
+- collector Settings UI、privacy mode変更preview、対象期間のredaction / delete
+- hostname変更・PC移行時のDevice merge UI
+- Backup / Export UIとPC detailの選択的除外
+- Timelineの大量Session grouping、連続appの折りたたみ、virtualization
+- manual eventとPC / Android活動の横断表示
+
+ActivityWatchの原本DB・設定・raw exportはlife-timelineのdata root backupに含めません。life-timelineの完全なsnapshotは`lifelog.db`と`thumbnails/`の組み合わせであり、ActivityWatch原本のバックアップと復旧は別運用です。

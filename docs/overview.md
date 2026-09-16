@@ -60,7 +60,11 @@ AIによる要約や分析は必須機能とせず、まずは **記録をでき
 
 Phase 1〜5で、Androidのアプリ利用履歴、写真、位置情報を収集し、Tailscale Serve経由でローカルPCへ同期する経路を実装しています。写真は利用者が収集を有効にした後、許可されたMediaStoreの`DCIM/`画像からメタデータと最大辺512pxのWebPサムネイルを扱います。位置情報はFused Location Providerのraw `LocationPoint`をPCへ保存し、PlaceVisitを派生させます。原本写真はPCへ送信しません。
 
-Phase 5の実装値と通常系の受け入れ手順は[Phase 5詳細計画](detailed_plan/phase5-location.md)と[Phase 5受け入れ記録](development/phase5-acceptance.md)を参照してください。実機のbackground配信はOSのbest-effortであり、5分到着、完全な軌跡、常時高精度を保証しません。Phase 6ではActivityWatchなどのPC collectorを、Phase 5の共通Timeline query・worker・privacy境界へ接続します。
+Phase 5の実装値と通常系の受け入れ手順は[Phase 5詳細計画](detailed_plan/phase5-location.md)と[Phase 5受け入れ記録](development/phase5-acceptance.md)を参照してください。実機のbackground配信はOSのbest-effortであり、5分到着、完全な軌跡、常時高精度を保証しません。
+
+Phase 6ではActivityWatchをWindows PC側のopt-in collectorとして接続しました。ActivityWatchのloopback REST APIから読み取ったwindow / AFK / Web eventを、Androidと共通の`app_sessions`およびPC固有の`desktop_session_details`へ正規化します。PC利用時間はwindow eventと`not-afk` periodの重なりだけを対象とし、Windowsのuptime、勤務時間、実際の集中時間を表すものではありません。既定のprivacy modeは`app_only`で、titleやURLは明示的に広げた場合だけ最小化して保存します。
+
+Phase 6の実機確認は[Windows実機受け入れ手順・記録](development/phase6-acceptance.md)、日常運用と障害切り分けは[Windows運用手順](development/phase6-operations.md)を参照してください。実機チェックリストの`NOT TESTED`はPASSとみなさず、ActivityWatchの原本DBはlife-timelineのbackup対象に含めません。
 
 ## 非目標
 
