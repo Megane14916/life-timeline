@@ -96,8 +96,18 @@ class ActivityWatchEvent:
     def from_payload(cls, payload: object) -> ActivityWatchEvent:
         if not isinstance(payload, dict):
             raise ActivityWatchProtocolError(incompatible=True, reason="event_payload")
-        event_id = payload.get("id")
-        if event_id is not None and (not isinstance(event_id, str) or not event_id.strip()):
+        raw_event_id = payload.get("id")
+        if raw_event_id is None:
+            event_id = None
+        elif isinstance(raw_event_id, bool):
+            raise ActivityWatchProtocolError(incompatible=True, reason="event_id")
+        elif isinstance(raw_event_id, int):
+            # GET /events responses include ActivityWatch's server-generated
+            # integer ID, while client-submitted events may omit it.
+            event_id = str(raw_event_id)
+        elif isinstance(raw_event_id, str) and raw_event_id.strip():
+            event_id = raw_event_id
+        else:
             raise ActivityWatchProtocolError(incompatible=True, reason="event_id")
         duration = payload.get("duration")
         if isinstance(duration, bool) or not isinstance(duration, (int, float)):

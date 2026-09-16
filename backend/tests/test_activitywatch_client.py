@@ -185,6 +185,14 @@ def test_activitywatch_accepts_zero_duration_events() -> None:
     assert event.duration_seconds == 0
 
 
+def test_activitywatch_accepts_server_generated_integer_event_id() -> None:
+    event = ActivityWatchEvent.from_payload(
+        {"id": 12345, "timestamp": START, "duration": 1, "data": {}}
+    )
+
+    assert event.id == "12345"
+
+
 def test_client_logs_safe_event_schema_reason(caplog: pytest.LogCaptureFixture) -> None:
     def invalid_events(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
