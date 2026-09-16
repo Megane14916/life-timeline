@@ -16,7 +16,7 @@ def _alembic_config() -> Config:
     return Config(str(Path(__file__).parents[1] / "alembic.ini"))
 
 
-def _app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, migrate: bool):
+def _app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, migrate: bool) -> FastAPI:
     data_dir = tmp_path / ("migrated" if migrate else "unmigrated")
     monkeypatch.setenv(DATA_DIR_ENV, str(data_dir))
     if migrate:
