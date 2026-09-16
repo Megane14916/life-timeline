@@ -175,3 +175,17 @@ def test_client_rejects_incompatible_version_and_schema_rejects_invalid_event_du
     assert version_error.value.code == "incompatible_api"
     with pytest.raises(ActivityWatchProtocolError):
         ActivityWatchEvent.from_payload({"timestamp": START, "duration": float("inf"), "data": {}})
+
+
+def test_client_accepts_activitywatch_release_version_with_v_prefix() -> None:
+    def prefixed_info(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"version": "v0.13.2", "hostname": "fixture-host"},
+            request=request,
+        )
+
+    with ActivityWatchClient(transport=httpx.MockTransport(prefixed_info)) as client:
+        info = client.get_info()
+
+    assert info.version == "v0.13.2"
