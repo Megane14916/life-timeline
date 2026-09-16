@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -29,12 +30,25 @@ ACTIVITYWATCH_STABLE_RELEASE = "0.13.2"
 MAX_RESPONSE_BYTES = 32 * 1024 * 1024
 EVENT_LIMIT = 10_000
 LOOPBACK_HOSTS = frozenset(("127.0.0.1", "localhost", "::1"))
+logger = logging.getLogger(__name__)
 
 
 def _normalized_release_version(value: str) -> str:
     """Normalize the optional ``v`` prefix used by ActivityWatch releases."""
 
     return value.strip().removeprefix("v")
+
+
+def _endpoint_label(path: str) -> str:
+    """Return a safe endpoint label without logging bucket IDs or query values."""
+
+    if path.endswith("/info"):
+        return "info"
+    if path.endswith("/buckets/"):
+        return "buckets"
+    if path.endswith("/events"):
+        return "events"
+    return "unknown"
 
 
 def _validate_loopback_base_url(value: str) -> str:
@@ -132,22 +146,46 @@ class ActivityWatchClient:
 
     def get_info(self) -> ActivityWatchInfo:
         payload = self._get_json(f"{ACTIVITYWATCH_API_PREFIX}/info")
-        info = ActivityWatchInfo.from_payload(payload)
+        try:
+            info = ActivityWatchInfo.from_payload(payload)
+        except ActivityWatchProtocolError:
+            logger.warning(
+                "ActivityWatch response rejected: endpoint=info code=incompatible_api "
+                "reason=info_schema"
+            )
+            raise
         if _normalized_release_version(info.version) != self._expected_version:
+            logger.warning(
+                "ActivityWatch response rejected: endpoint=info code=incompatible_api "
+                "reason=version_mismatch reported_version=%s expected_version=%s",
+                info.version,
+                self._expected_version,
+            )
             raise ActivityWatchProtocolError(incompatible=True)
+        logger.info("ActivityWatch response accepted: endpoint=info")
         return info
 
     def get_buckets(self) -> tuple[ActivityWatchBucket, ...]:
         payload = self._get_json(f"{ACTIVITYWATCH_API_PREFIX}/buckets/")
-        if not isinstance(payload, dict):
-            raise ActivityWatchProtocolError(incompatible=True)
-        buckets = tuple(
-            ActivityWatchBucket.from_payload(bucket_id, bucket_payload)
-            for bucket_id, bucket_payload in payload.items()
-            if isinstance(bucket_id, str)
+        try:
+            if not isinstance(payload, dict):
+                raise ActivityWatchProtocolError(incompatible=True)
+            buckets = tuple(
+                ActivityWatchBucket.from_payload(bucket_id, bucket_payload)
+                for bucket_id, bucket_payload in payload.items()
+                if isinstance(bucket_id, str)
+            )
+            if len(buckets) != len(payload):
+                raise ActivityWatchProtocolError(incompatible=True)
+        except ActivityWatchProtocolError:
+            logger.warning(
+                "ActivityWatch response rejected: endpoint=buckets code=incompatible_api "
+                "reason=bucket_schema"
+            )
+            raise
+        logger.info(
+            "ActivityWatch response accepted: endpoint=buckets bucket_count=%d", len(buckets)
         )
-        if len(buckets) != len(payload):
-            raise ActivityWatchProtocolError(incompatible=True)
         return buckets
 
     def get_events(
@@ -169,9 +207,37 @@ class ActivityWatchClient:
             path,
             params={"start": start_param, "end": end_param, "limit": str(limit)},
         )
-        if not isinstance(payload, list):
-            raise ActivityWatchProtocolError(incompatible=True)
-        return tuple(ActivityWatchEvent.from_payload(event) for event in payload)
+        try:
+            if not isinstance(payload, list):
+                raise ActivityWatchProtocolError(incompatible=True, reason="event_list")
+            parsed_events: list[ActivityWatchEvent] = []
+            for event_index, event in enumerate(payload):
+                try:
+                    parsed_events.append(ActivityWatchEvent.from_payload(event))
+                except ActivityWatchProtocolError as error:
+                    reason = error.reason or "event_schema"
+                    logger.warning(
+                        "ActivityWatch response rejected: endpoint=events "
+                        "code=incompatible_api reason=%s event_index=%d",
+                        reason,
+                        event_index,
+                    )
+                    raise
+            events = tuple(parsed_events)
+        except ActivityWatchProtocolError as error:
+            if error.reason == "event_list":
+                logger.warning(
+                    "ActivityWatch response rejected: endpoint=events "
+                    "code=incompatible_api reason=event_list"
+                )
+            elif error.reason is None:
+                logger.warning(
+                    "ActivityWatch response rejected: endpoint=events "
+                    "code=incompatible_api reason=event_schema"
+                )
+            raise
+        logger.info("ActivityWatch response accepted: endpoint=events event_count=%d", len(events))
+        return events
 
     def discover(self, *, expected_hostname: str | None = None) -> ActivityWatchDiscovery:
         info = self.get_info()
@@ -182,6 +248,7 @@ class ActivityWatchClient:
     def _stream_get(
         self, path: str, *, params: dict[str, str] | None = None
     ) -> Iterator[httpx.Response]:
+        endpoint = _endpoint_label(path)
         try:
             with self._client.stream("GET", path, params=params) as response:
                 if 300 <= response.status_code < 400:
@@ -202,11 +269,24 @@ class ActivityWatchClient:
                     except ValueError as error:
                         raise ActivityWatchProtocolError() from error
                 yield response
-        except ActivityWatchError:
+        except ActivityWatchError as error:
+            logger.warning(
+                "ActivityWatch request failed: endpoint=%s code=%s",
+                endpoint,
+                error.code,
+            )
             raise
         except httpx.TimeoutException as error:
+            logger.warning(
+                "ActivityWatch request failed: endpoint=%s code=unavailable reason=timeout",
+                endpoint,
+            )
             raise ActivityWatchUnavailableError() from error
         except httpx.RequestError as error:
+            logger.warning(
+                "ActivityWatch request failed: endpoint=%s code=unavailable reason=request",
+                endpoint,
+            )
             raise ActivityWatchUnavailableError() from error
 
     def _get_json(self, path: str, *, params: dict[str, str] | None = None) -> object:
@@ -219,4 +299,9 @@ class ActivityWatchClient:
         try:
             return json.loads(bytes(body).decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            logger.warning(
+                "ActivityWatch response rejected: endpoint=%s code=incompatible_api "
+                "reason=invalid_json",
+                _endpoint_label(path),
+            )
             raise ActivityWatchProtocolError(incompatible=True) from error

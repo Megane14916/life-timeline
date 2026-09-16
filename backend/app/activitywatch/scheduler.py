@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import os
 import time
 from collections.abc import Callable, Mapping
@@ -29,6 +30,7 @@ SCHEDULER_INITIAL_DELAY_SECONDS = 30
 SCHEDULER_INTERVAL_SECONDS = 15 * 60
 TRANSIENT_BACKOFF_INITIAL_SECONDS = 60
 TRANSIENT_BACKOFF_MAX_SECONDS = 15 * 60
+logger = logging.getLogger(__name__)
 
 CollectorState = Literal["disabled", "idle", "queued", "running", "needs_attention"]
 
@@ -273,12 +275,24 @@ class ActivityWatchImportScheduler:
         try:
             result = await asyncio.to_thread(self._importer_factory().run)
         except ActivityWatchImportError as error:
+            logger.warning(
+                "ActivityWatch import failed: result=%s retryable=%s",
+                error.result_code,
+                error.retryable,
+            )
             self._handle_failure(error.result_code, error.retryable)
         except ActivityWatchError as error:
+            logger.warning(
+                "ActivityWatch import failed: result=%s retryable=%s",
+                error.code,
+                error.retryable,
+            )
             self._handle_failure(error.code, error.retryable)
         except Exception:
+            logger.warning("ActivityWatch import failed: result=protocol_error retryable=false")
             self._handle_failure("protocol_error", False)
         else:
+            logger.info("ActivityWatch import succeeded: result=success")
             self._handle_success(result)
 
     def _handle_success(self, result: ActivityWatchImportResult) -> None:

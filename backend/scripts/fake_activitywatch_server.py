@@ -70,7 +70,7 @@ class FakeActivityWatchHandler(BaseHTTPRequestHandler):
         elif parsed.path == "/api/0/info":
             payload = {"version": VERSION, "hostname": HOSTNAME, "testing": True}
         elif parsed.path == "/api/0/buckets/":
-            created = "2026-09-15T00:00:00.000Z"
+            created = "2026-09-15T00:00:00.000000"
             payload = {
                 bucket_id: {
                     "id": bucket_id,
