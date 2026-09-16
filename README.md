@@ -221,6 +221,10 @@ WorkManagerによる定期収集・自動同期、Room v2、期限付きlease、
 
 位置情報の自動検証、通常系実機確認の手順、既知の非保証は[Phase 5実機受け入れ手順・記録](docs/development/phase5-acceptance.md)を参照してください。実機確認はOS・端末依存のため、未実施項目をPASSとは扱いません。日常運用と障害切り分けは[Phase 5位置情報の運用手順](docs/development/phase5-location-operations.md)にまとめています。
 
+## Phase 6 Windows実機受け入れ
+
+ActivityWatchのwatcher / AFK / Web privacy、停止復旧、CLI再取込、Androidとの共通Timelineの実機確認は[Phase 6 Windows実機受け入れ手順・記録](docs/development/phase6-acceptance.md)に従ってください。日常の起動・停止、backfill、privacy mode変更、backup、障害切り分けは[Phase 6 Windows運用手順](docs/development/phase6-operations.md)を参照してください。実在のhostname、bucket ID、app一覧、title、URL、raw logは記録しません。
+
 ## 位置情報の収集と同期
 
 位置収集はアプリのopt-in、foreground / background権限、端末の位置情報サービス、Google Play servicesが利用可能なことを前提にします。Fused Location Providerへbalanced powerの5分要求と15分の最大batch遅延を設定しますが、これは到着期限ではありません。AndroidのDoze、OEM最適化、権限状態、電波、端末の判断により遅延・欠測が起こります。foreground serviceやreverse geocodingは使用しません。
@@ -399,5 +403,7 @@ PC endpointには`https://`のTailscale Serve URLだけを設定します。ま�
 | [Phase 5詳細計画](docs/detailed_plan/phase5-location.md) | Android background location、同期、Map / PlaceVisit |
 | [Phase 5実機受け入れ手順・記録](docs/development/phase5-acceptance.md) | 通常系の実機テストとprivacy-safeな結果記録 |
 | [Phase 5位置情報の運用手順](docs/development/phase5-location-operations.md) | permission、同期、battery、tile privacyの運用と障害切り分け |
+| [Phase 6 Windows実機受け入れ手順・記録](docs/development/phase6-acceptance.md) | ActivityWatch、停止復旧、再取込、Android共通Timelineの実機確認 |
+| [Phase 6 Windows運用手順](docs/development/phase6-operations.md) | 起動、停止、backfill、privacy変更、backup、障害切り分け |
 
 Androidの`applicationId`と`namespace`は`com.megane14916.lifetimeline`です。
